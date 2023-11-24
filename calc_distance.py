@@ -193,4 +193,4 @@ ax.hist(np_bkgbkg, bins=binning, label="bkg-bkg", alpha=0.5, weights=np_bkgbkg_w
 ax.legend(loc='upper right')
 ax.set_xlabel(str(args.variable)+"_"+str(args.distance) +" distance", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
-fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/"+str(args.variable)+"_"+str(args.distance)+"_distances.pdf")
+fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/"+str(args.variable)+"/"+str(args.variable)+"_"+str(args.distance)+"_distances.pdf")

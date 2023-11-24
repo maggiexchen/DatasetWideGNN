@@ -86,30 +86,34 @@ ax.hist(norm_bkgbkg, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt, alpha=0.
 ax.legend(loc='upper right')
 ax.set_xlabel(str(variable) + str(distance) +" distance", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
-fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/"+str(variable)+str(distance)+"minmax_distances.pdf")
+fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/minmax_normed/"+str(variable)+str(distance)+"minmax_distances.pdf")
 
 logging.info("Calculating and saving ROC to json ...")
-y_sigsig = [0]*len(norm_sigsig)
-y_bkgbkg = [1]*len(norm_bkgbkg)
-y_sigbkg = [1]*len(norm_sigbkg)
-y_ss_bb = numpy.concatenate((y_sigsig, y_bkgbkg))
-y_ss_sb = numpy.concatenate((y_sigsig, y_sigbkg))
-ss_bb = numpy.concatenate((norm_sigsig, norm_bkgbkg))
-ss_sb = numpy.concatenate((norm_sigsig, norm_sigbkg))
-ss_bb_wgt = numpy.concatenate((sigsig_wgt, bkgbkg_wgt))
-
 # fpr here is the fraction of sigsig above a certain cut
 # tpr here is the fraction of sig(bkg)bkg above a certain cut
 # the actual tpr we want is the fraction of sigsig below a certain cut: (1-fpr)
 # and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tpr)
 
-fpr_ss_bb, tpr_ss_bb, cut_ss_bb = roc_curve(y_ss_bb, ss_bb)
-roc_auc_ss_bb = roc_auc_score(y_ss_bb, ss_bb)
-fpr_ss_sb, tpr_ss_sb, cut_ss_sb = roc_curve(y_ss_sb, ss_sb)
-roc_auc_ss_sb = roc_auc_score(y_ss_sb, ss_sb)
+def calc_ROC(sig, bkg, sig_wgt, bkg_wgt):
+    y_sig = [0]*len(sig)
+    y_bkg = [1]*len(bkg)
+    x_combined = numpy.concatenate((sig, bkg))
+    y_combined = numpy.concatenate((y_sig, y_bkg))
+    wgt_combined = numpy.concatenate((sig_wgt, bkg_wgt))
+
+    fpr, tpr, cut = roc_curve(y_combined, x_combined, sample_weight=wgt_combined)
+    auc = roc_auc_score(y_combined, x_combined, sample_weight=wgt_combined)
+
+    true_tpr = 1-fpr
+    true_fpr = 1-tpr
+
+    return true_tpr, true_fpr, cut, auc
+
+tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = calc_ROC(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt)
+tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = calc_ROC(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt)
 
 # saving roc and auc to json file
-roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(), "tpr_ss_bb": (1-fpr_ss_bb).tolist(), "fpr_ss_bb": (1-tpr_ss_bb).tolist(), "ss_sb_sig_cut": cut_ss_sb.tolist(), "tpr_sb_bb": (1-fpr_ss_sb).tolist(), "fpr_sb_bb": (1-tpr_ss_sb).tolist()}
+roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(), "tpr_ss_bb": tpr_ss_bb.tolist(), "fpr_ss_bb": fpr_ss_bb.tolist(), "ss_sb_sig_cut": cut_ss_sb.tolist(), "tpr_sb_bb": tpr_ss_bb.tolist(), "fpr_sb_bb": fpr_ss_bb.tolist()}
 with open("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/ROC/"+str(variable)+str(distance)+"roc.json", "w") as outfile:
   json.dump(roc_dict, outfile)
 
@@ -128,20 +132,21 @@ ss_sb_thresholds = []
 
 # finding the tpr, fpr and distance thresholds for each efficiency, then reverse minmax the distance threshold
 for eff in sigsig_eff:
-    ss_bb_roc_cut, ss_bb_threshold = find_threshold((1-fpr_ss_bb), (1-tpr_ss_bb), eff, cut_ss_bb)
+    ss_bb_roc_cut, ss_bb_threshold = find_threshold(tpr_ss_bb, fpr_ss_bb, eff, cut_ss_bb)
     ss_bb_roc_cuts.append(ss_bb_roc_cut)
     ss_bb_thresholds.append(reverse_minmax(ss_bb_threshold, 0, d_max))
-    ss_sb_roc_cut, ss_sb_threshold = find_threshold((1-fpr_ss_sb), (1-tpr_ss_sb), eff, cut_ss_sb)
+    ss_sb_roc_cut, ss_sb_threshold = find_threshold(tpr_ss_sb,fpr_ss_sb, eff, cut_ss_sb)
     ss_sb_roc_cuts.append(ss_sb_roc_cut)
     ss_sb_thresholds.append(reverse_minmax(ss_sb_threshold, 0 ,d_max))
 
 # saving linking lengths
 length_dict = {"sigsig_eff": sigsig_eff, "ss_bb_length": ss_bb_thresholds, "ss_sb_length": ss_sb_thresholds}
-with open("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/ROC/"+str(variable)+str(distance)+"linking_length.json", "w") as lengthfile:
+with open("/data/atlas/atlasdata3/maggiechen/gnn_project/linking_lengths/"+str(variable)+str(distance)+"linking_length.json", "w") as lengthfile:
   json.dump(length_dict, lengthfile)
 
 logging.info("Plotting distance with linking lengths selected from ROC ...")
 nBins = 100
+# plotting sig-sig and bkg-bkg distributions and the linking lengths
 fig, ax = plt.subplots()
 binning = numpy.linspace(0,max(bkgbkg_distance),nBins)
 ax.hist(sigsig_distance, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
@@ -153,15 +158,30 @@ for i, eff in enumerate(sigsig_eff):
 ax.legend(loc='upper right')
 ax.set_xlabel(str(variable) + str(distance) +"distance", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
-fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/"+str(variable)+str(distance)+"ss_bb_linking_lengths.pdf")
+fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/linking_lengths_ss_bb/"+str(variable)+str(distance)+"ss_bb_linking_lengths.pdf")
+
+# plotting sig-sig and sig-bkg distributions and the linking lengths
+fig, ax = plt.subplots()
+binning = numpy.linspace(0,max(bkgbkg_distance),nBins)
+ax.hist(sigsig_distance, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
+ax.hist(sigbkg_distance, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="forestgreen")
+y_min, y_max = ax.get_ylim()
+for i, eff in enumerate(sigsig_eff):
+    ax.axvline(x=ss_bb_thresholds[i], ymax=0.75+i*0.02, linestyle="--")
+    ax.text(x=ss_bb_thresholds[i], y=0.75+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_labels[i], ha='center', va='bottom', fontsize=9)
+ax.legend(loc='upper right')
+ax.set_xlabel(str(variable) + str(distance) +"distance", loc="right")
+ax.set_ylabel("Normalised No. Events", loc="top")
+fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/linking_lengths_ss_sb/"+str(variable)+str(distance)+"ss_sb_linking_lengths.pdf")
+
 
 logging.info("Plotting ROC curves ...")
 fig = plt.figure(figsize=(15,12))
 plt.style.use(hep.style.ROOT)
-plt.plot((1-tpr_ss_bb), (1-fpr_ss_bb), label='sig-sig bkg-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_bb))
-plt.plot((1-tpr_ss_sb), (1-fpr_ss_sb), label='sig-sig sig-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_sb))
-plt.scatter(numpy.array(ss_bb_roc_cuts)[:,1], numpy.array(ss_bb_roc_cuts)[:,0], marker='x', s=6, label="linking lengths",color="red")
-plt.scatter(numpy.array(ss_sb_roc_cuts)[:,1], numpy.array(ss_bb_roc_cuts)[:,0], marker='x', s=6,color="red")
+plt.plot(fpr_ss_bb, tpr_ss_bb, label='sig-sig bkg-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_bb))
+plt.plot(fpr_ss_sb, tpr_ss_sb, label='sig-sig sig-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_sb))
+plt.scatter(numpy.array(ss_bb_roc_cuts)[:,1], numpy.array(ss_bb_roc_cuts)[:,0], marker='x', s=40, label="linking lengths",color="red")
+plt.scatter(numpy.array(ss_sb_roc_cuts)[:,1], numpy.array(ss_bb_roc_cuts)[:,0], marker='x', s=40,color="red")
 plt.legend()
 ymin, ymax = plt.ylim()
 plt.ylim(ymin, ymax*1.2)
