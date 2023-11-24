@@ -13,6 +13,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
+import normalisation as norm
 
 def GetParser():
   """Argument parser for reading Ntuples script."""
@@ -63,19 +64,11 @@ print(min(bkgbkg_distance), max(bkgbkg_distance))
 # Between sigsig (0) and bkgbkg (1)
 # Need to normalise the distances to be between 0 and 1, e.g. using minmax normalisation
 
-def minmax(dist, d_min, d_max):
-    norm_dist = (dist - d_min)/(d_max-d_min)
-    return norm_dist
-
-def reverse_minmax(norm_value, d_min, d_max):
-    value = norm_value * (d_max-d_min) + d_min
-    return value
-
 logging.info("Minmax normalising distances and plotting ...")
 d_max = max(max(sigbkg_distance), max(bkgbkg_distance))
-norm_sigsig = minmax(sigsig_distance, 0, d_max)
-norm_sigbkg = minmax(sigbkg_distance, 0, d_max)
-norm_bkgbkg = minmax(bkgbkg_distance, 0, d_max)
+norm_sigsig = norm.minmax(sigsig_distance, 0, d_max)
+norm_sigbkg = norm.minmax(sigbkg_distance, 0, d_max)
+norm_bkgbkg = norm.minmax(bkgbkg_distance, 0, d_max)
 
 nBins = 100
 fig, ax = plt.subplots()
@@ -134,10 +127,10 @@ ss_sb_thresholds = []
 for eff in sigsig_eff:
     ss_bb_roc_cut, ss_bb_threshold = find_threshold(tpr_ss_bb, fpr_ss_bb, eff, cut_ss_bb)
     ss_bb_roc_cuts.append(ss_bb_roc_cut)
-    ss_bb_thresholds.append(reverse_minmax(ss_bb_threshold, 0, d_max))
+    ss_bb_thresholds.append(norm.reverse_minmax(ss_bb_threshold, 0, d_max))
     ss_sb_roc_cut, ss_sb_threshold = find_threshold(tpr_ss_sb,fpr_ss_sb, eff, cut_ss_sb)
     ss_sb_roc_cuts.append(ss_sb_roc_cut)
-    ss_sb_thresholds.append(reverse_minmax(ss_sb_threshold, 0 ,d_max))
+    ss_sb_thresholds.append(norm.reverse_minmax(ss_sb_threshold, 0 ,d_max))
 
 # saving linking lengths
 length_dict = {"sigsig_eff": sigsig_eff, "ss_bb_length": ss_bb_thresholds, "ss_sb_length": ss_sb_thresholds}
@@ -154,7 +147,7 @@ ax.hist(bkgbkg_distance, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt, alph
 y_min, y_max = ax.get_ylim()
 for i, eff in enumerate(sigsig_eff):
     ax.axvline(x=ss_bb_thresholds[i], ymax=0.75+i*0.02, linestyle="--")
-    ax.text(x=ss_bb_thresholds[i], y=0.75+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_labels[i], ha='center', va='bottom', fontsize=9)
+    ax.text(x=ss_bb_thresholds[i], y=0.75+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_labels[i], ha='center', va='bottom', fontsize=7)
 ax.legend(loc='upper right')
 ax.set_xlabel(str(variable) + str(distance) +"distance", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
@@ -164,7 +157,7 @@ fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weight
 fig, ax = plt.subplots()
 binning = numpy.linspace(0,max(bkgbkg_distance),nBins)
 ax.hist(sigsig_distance, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
-ax.hist(sigbkg_distance, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="forestgreen")
+ax.hist(sigbkg_distance, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="darkorange")
 y_min, y_max = ax.get_ylim()
 for i, eff in enumerate(sigsig_eff):
     ax.axvline(x=ss_bb_thresholds[i], ymax=0.75+i*0.02, linestyle="--")

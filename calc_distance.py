@@ -14,7 +14,7 @@ logging.getLogger().setLevel(logging.INFO)
 import argparse
 import tensorflow as tf
 import distances as dis
-
+import normalisation as norm
 
 def GetParser():
   """Argument parser for reading Ntuples script."""
@@ -66,15 +66,6 @@ elif args.variable == "combined":
 else:
     print("bruh")
 
-# median absolute deviation scaling
-def MAD_norm(dist1, dist2):
-    dist2_median = numpy.median(dist2)
-    dist2_MAD = numpy.median(abs(dist2-dist2_median))
-    norm_dist1 = (dist1 - dist2_median)/dist2_MAD
-    norm_dist2 = (dist2 - dist2_median)/dist2_MAD
-
-    return norm_dist1, norm_dist2
-
 # load in input files
 logging.info('Importing signal and background files...')
 file_path = "/data/atlas/atlasdata3/maggiechen/gnn_project/split_files/"
@@ -90,7 +81,7 @@ if args.sample == True:
 logging.info("MAD scaling...")
 # normalise kinematic values using MAD scaling
 for var in kinematics:
-    df_sig.loc[:, var], df_bkg.loc[:, var] = MAD_norm(df_sig.loc[:, var], df_bkg.loc[:, var])
+    df_sig.loc[:, var], df_bkg.loc[:, var] = norm.MAD_norm(df_sig.loc[:, var], df_bkg.loc[:, var])
 
 # convert pandas dataframes to tf tensors
 # only the kinematics used in distance calculation and weights need to be converted to tensors here for matrix multiplications
