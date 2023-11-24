@@ -1,0 +1,12 @@
+distances/
+*_study/
+ntuple_files/
+linking_lengths/
+plots/
+signal_MC/
+split_files/
+submits/
+preprocessing/
+train_files/
+gnn.py
+__pycache__/
