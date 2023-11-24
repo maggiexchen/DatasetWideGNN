@@ -10,3 +10,5 @@ preprocessing/
 train_files/
 gnn.py
 __pycache__/
+deepsets_baseline/deepsets_model/
+deepsets_baseline/*.pdf
