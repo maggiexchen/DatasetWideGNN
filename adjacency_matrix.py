@@ -3,6 +3,7 @@ import uproot
 import numpy
 import h5py
 import json
+import math
 import random
 import tensorflow as tf
 import os
@@ -14,6 +15,9 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
 import normalisation as norm
+import distances as dis
+import time
+st = time.time()
 
 
 def GetParser():
@@ -95,6 +99,9 @@ logging.info("Converting tf tensors...")
 tf_sig = tf.convert_to_tensor(df_sig, dtype_hint = 'float32')
 tf_bkg = tf.convert_to_tensor(df_bkg, dtype_hint = 'float32')
 
+# concatenating signal and background events
+tf_all = tf.concat([tf_sig, tf_bkg], axis=0)
+
 # read in linking length calculated from sampled training data
 sigsig_eff = args.eff
 with open('/data/atlas/atlasdata3/maggiechen/gnn_project/linking_lengths/'+args.variable+"_"+args.distance+"_linking_length.json", 'r') as lfile:
@@ -110,5 +117,33 @@ else:
     print("Please specify distributions to generate the linking length (ssbb or sssb)!")
 
 # calculate distances in chunks
-# generate adjacency matrix chunks using linking length
-# save adjecency matrix chunks
+logging.info('Calculating distances in batches...')
+chunksize = 10000
+nchunk = math.ceil(len(tf_all)/chunksize)
+
+# calculating distances and cutting with linking length in chunks 
+for i in range(nchunk):
+    # initialise adjacency matrix
+    adj_mat = tf.reshape((), (0,len(kinematics)))
+    # create subset of sig+bkg dataset
+    tf_all_subset = tf_all[(i*chunksize):(i+1)*chunksize]
+    # calculate distances
+    if args.distance == "euclidean":
+        distance_subset = dis.euclidean(tf_all, tf_all_subset)
+    elif args.distance == "cityblock":
+        distance_subset = dis.cityblock(tf_all, tf_all_subset)
+    elif args.distance == "cosine":
+        distance_subset = dis.cosine(tf_all, tf_all_subset)
+
+    adj_mat_subset = tf.cast(distance_subset<linking_length, "float32")
+    print(adj_mat_subset)
+    
+    print(f"--------> {i}: time taken so far: {time.time() - st}")
+
+    # convert back to pd dataframes (honestly this is the bit that takes the longest and is the most unnecessary part)
+    adj_mat_subset = pd.DataFrame(adj_mat_subset)
+    # can also add event weights and labels etc. later
+    # write adj_mat to file
+    adj_mat_subset.to_hdf(f"adjacency_matrix/test__v{i}.h5", 'df')
+
+print(f"-------->{i}: total time taken: {time.time() - st}" )
