@@ -2,10 +2,7 @@
 This repo generates the files, distances and adjacency needed for GNN training for HHH signal vs. background discrimination.
 
 ## Dataset splitting
-```
-write_files.py
-``` 
-splits the root ntuples into training, validation and test datasets, and outputs them as h5 files.
+`write_files.py` splits the root ntuples into training, validation and test datasets, and outputs them as h5 files.
 
 ## Distance calculation
 Linking lengths requires calculating a specific type of pair-wise distance for a specified set of variables, for a given dataset. These can be specified when running
@@ -20,3 +17,11 @@ Once the distances are calculated and saved, linking lengths can be generated be
 linking_length.py -v <type of variables> -d <distance>
 ```
 and the sigsig vs. bkgbkg, sigsig vs. sigbkg linking lengths are saved in json files.
+
+## Adjacency matrix
+(This part currently takes a reaaaaaally long time to run, will be switching to pytorch soon.)
+The adjacency matrix that defines the edges of between events are generated using a specified linking length by running
+```
+adjacency_matrix.py -v <type of variables> -d <distance> --eff <sigsig efficiency> --<ssbb or sssb> 
+```
+The linking length used here could be generated from compairing sig-sig with bkg-bkg distances or from sig-sig with sig-bkg distances by specifying `--ssbb` or `--sssb`. The linking length that gives 0.7, 0.8, or 0.9 sig-sig efficiencies can be chosen.
