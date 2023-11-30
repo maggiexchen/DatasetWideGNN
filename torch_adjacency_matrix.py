@@ -5,7 +5,7 @@ import h5py
 import json
 import math
 import random
-import tensorflow as tf
+import torch
 import os
 os.environ["NUMEXPR_MAX_THREADS"] = "16"
 from scipy.spatial.distance import pdist, squareform
@@ -15,7 +15,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
 import normalisation as norm
-import distances as dis
+import torch_distances as dis
 import time
 st = time.time()
 
@@ -94,13 +94,13 @@ logging.info("MAD scaling...")
 for var in kinematics:
     df_sig.loc[:, var], df_bkg.loc[:, var] = norm.MAD_norm(df_sig.loc[:, var], df_bkg.loc[:, var])
 
-logging.info("Converting tf tensors...")
-# convert pd dataframes to tensorflow tensors
-tf_sig = tf.convert_to_tensor(df_sig, dtype_hint='float32')
-tf_bkg = tf.convert_to_tensor(df_bkg, dtype_hint='float32')
+logging.info("Converting torch tensors...")
+# convert pd dataframes to torch tensors
+torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)
+torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)
 
 # concatenating signal and background events
-tf_all = tf.concat([tf_sig, tf_bkg], axis=0)
+torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
 
 # read in linking length calculated from sampled training data
 sigsig_eff = args.eff
@@ -119,31 +119,28 @@ else:
 # calculate distances in chunks
 logging.info('Calculating distances in batches...')
 chunksize = 10000
-nchunk = math.ceil(len(tf_all)/chunksize)
+nchunk = math.ceil(len(torch_all)/chunksize)
+
+def create_adj_mat(a, length):
+    return (a < length).float()
 
 # calculating distances and cutting with linking length in chunks 
 for i in range(nchunk):
     # initialise adjacency matrix
-    adj_mat = tf.reshape((), (0,len(kinematics)))
+    adj_mat = torch.empty((0,len(kinematics)))
     # create subset of sig+bkg dataset
-    tf_all_subset = tf_all[(i*chunksize):(i+1)*chunksize]
+    torch_all_subset = torch_all[(i*chunksize):(i+1)*chunksize]
     # calculate distances
     if args.distance == "euclidean":
-        distance_subset = dis.euclidean(tf_all, tf_all_subset)
+        distance_subset = dis.euclidean(torch_all, torch_all_subset)
     elif args.distance == "cityblock":
-        distance_subset = dis.cityblock(tf_all, tf_all_subset)
+        distance_subset = dis.cityblock(torch_all, torch_all_subset)
     elif args.distance == "cosine":
-        distance_subset = dis.cosine(tf_all, tf_all_subset)
+        distance_subset = dis.cosine(torch_all, torch_all_subset)
 
-    adj_mat_subset = tf.cast(distance_subset<linking_length, "float32")
+    adj_mat_subset = create_adj_mat(distance_subset, linking_length)
     print(adj_mat_subset)
     
     print(f"--------> {i}: time taken so far: {time.time() - st}")
-
-    # convert back to pd dataframes (honestly this is the bit that takes the longest and is the most unnecessary part)
-    adj_mat_subset = pd.DataFrame(adj_mat_subset)
-    # can also add event weights and labels etc. later
-    # write adj_mat to file
-    adj_mat_subset.to_hdf(f"adjacency_matrix/test__v{i}.h5", 'df')
 
 print(f"-------->{i}: total time taken: {time.time() - st}" )
