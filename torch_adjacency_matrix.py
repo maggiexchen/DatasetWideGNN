@@ -14,8 +14,8 @@ import mplhep as hep
 import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
-import normalisation as norm
-import torch_distances as dis
+import utils.normalisation as norm
+import utils.torch_distances as dis
 import time
 st = time.time()
 
@@ -70,7 +70,6 @@ args = GetParser()
 
 if args.variable == "mass":
     # mass-based kinematics
-    #kinematics = ["mH1","mH2","mH3","mHHH","mHcosTheta","meanmH","rmsmH","meanmBB","rmsmBB","meanPt","rmsPt","ht","massfraceta","massfracphi","massfracraw"]
     kinematics = ["mH1","mH2","mH3","mHHH"]
 elif args.variable == "angular":
     # angular kinematics
@@ -118,16 +117,17 @@ else:
 
 # calculate distances in chunks
 logging.info('Calculating distances in batches...')
-chunksize = 10000
+chunksize = 20000
 nchunk = math.ceil(len(torch_all)/chunksize)
 
 def create_adj_mat(a, length):
     return (a < length).float()
 
+# initialise adjacency matrix
+adj_mat = torch.empty((0,len(torch_all)))
+
 # calculating distances and cutting with linking length in chunks 
 for i in range(nchunk):
-    # initialise adjacency matrix
-    adj_mat = torch.empty((0,len(kinematics)))
     # create subset of sig+bkg dataset
     torch_all_subset = torch_all[(i*chunksize):(i+1)*chunksize]
     # calculate distances
@@ -139,8 +139,7 @@ for i in range(nchunk):
         distance_subset = dis.cosine(torch_all, torch_all_subset)
 
     adj_mat_subset = create_adj_mat(distance_subset, linking_length)
-    print(adj_mat_subset)
-    
-    print(f"--------> {i}: time taken so far: {time.time() - st}")
+    adj_mat = torch.concat((adj_mat_subset, adj_mat), dim=0)
 
-print(f"-------->{i}: total time taken: {time.time() - st}" )
+print(f"Time taken for adjacency matrix generation: {time.time() - st}" )
+
