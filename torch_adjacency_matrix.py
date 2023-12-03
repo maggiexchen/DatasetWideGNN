@@ -16,6 +16,8 @@ logging.getLogger().setLevel(logging.INFO)
 import argparse
 import utils.normalisation as norm
 import utils.torch_distances as dis
+from pyunicorn import network
+from pyunicorn import mpi
 import time
 st = time.time()
 
@@ -61,7 +63,12 @@ def GetParser():
       action="store_true",
       help="Specify linking length between sig-sig and sig-bkg",
   )
-
+  
+  parser.add_argument(
+      "--centrality",
+      action="store_true",
+      help="Calculate degree centrality",
+  )
 
   args = parser.parse_args()
   return args
@@ -85,8 +92,12 @@ else:
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
 file_path = "/data/atlas/atlasdata3/maggiechen/gnn_project/split_files/"
-df_sig = pd.read_hdf(file_path+"sig_train.h5", key="sig_train")[kinematics]
-df_bkg = pd.read_hdf(file_path+"bkg_train.h5", key="bkg_train")[kinematics]
+df_sig = pd.read_hdf(file_path+"sig_train.h5", key="sig_train")
+df_sig_wgts = df_sig["eventWeight"]
+df_sig = df_sig[kinematics]
+df_bkg = pd.read_hdf(file_path+"bkg_train.h5", key="bkg_train")
+df_bkg_wgts = df_bkg["eventWeight"]
+df_bkg = df_bkg[kinematics]
 
 logging.info("MAD scaling...")
 # normalise kinematic values using MAD scaling
@@ -97,9 +108,12 @@ logging.info("Converting torch tensors...")
 # convert pd dataframes to torch tensors
 torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)
 torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)
+torch_sig_wgts = torch.tensor(df_sig_wgts.values, dtype=torch.float32)
+torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
 
-# concatenating signal and background events
+# concatenating signal and background events / weights
 torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
+torch_wgts = torch.concat((torch_sig_wgts, torch_bkg_wgts), dim=0)
 
 # read in linking length calculated from sampled training data
 sigsig_eff = args.eff
@@ -123,13 +137,23 @@ nchunk = math.ceil(len(torch_all)/chunksize)
 def create_adj_mat(a, length):
     return (a < length).float()
 
+
+def create_node_wgts(a, b):
+    a_col = a.view(-1,1)
+    b_col = b.view(1,-1)
+    outer = torch.matmul(a_col, b_col)
+    return torch.transpose(outer, 0, 1)
+
 # initialise adjacency matrix
-adj_mat = torch.empty((0,len(torch_all)))
+adj_mat = torch.empty((0, len(torch_all)))
+node_wgts = torch.empty((0, len(torch_wgts)))
 
 # calculating distances and cutting with linking length in chunks 
 for i in range(nchunk):
+    print("Batch number ", i)
     # create subset of sig+bkg dataset
     torch_all_subset = torch_all[(i*chunksize):(i+1)*chunksize]
+    torch_wgts_subset = torch_wgts[(i*chunksize):(i+1)*chunksize]
     # calculate distances
     if args.distance == "euclidean":
         distance_subset = dis.euclidean(torch_all, torch_all_subset)
@@ -139,7 +163,23 @@ for i in range(nchunk):
         distance_subset = dis.cosine(torch_all, torch_all_subset)
 
     adj_mat_subset = create_adj_mat(distance_subset, linking_length)
+    print("adj mat subset", adj_mat_subset.size())
+    print("adj mat", adj_mat.size())
     adj_mat = torch.concat((adj_mat_subset, adj_mat), dim=0)
+    
+    # get calculate node weights by batches
+    node_wgts_subset = create_node_wgts(torch_wgts, torch_wgts_subset)
+    print("node wgts subset", node_wgts_subset.size())
+    print("node wgts", node_wgts.size())
+    node_wgts = torch.concat((node_wgts_subset, node_wgts), dim=0)
 
 print(f"Time taken for adjacency matrix generation: {time.time() - st}" )
 
+if args.centrality:
+    logging.info('Calculating degree centrality ...')
+    HHH_network = network.Network(adjacency=adj_mat)
+    logging.info('Network created')
+    HHH_network.node_weights = node_wgts.numpy().flatten()
+    logging.info('Flattening node weights to numpy')
+    degree_centrality = HHH_network.nsi_eigenvector_centrality()
+    betweenness = HHH_network.nsi_betweenness()
