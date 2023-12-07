@@ -5,7 +5,6 @@ import h5py
 import json
 import math
 import random
-import torch
 import os
 os.environ["NUMEXPR_MAX_THREADS"] = "16"
 from scipy.spatial.distance import pdist, squareform
@@ -16,8 +15,12 @@ logging.getLogger().setLevel(logging.INFO)
 import argparse
 import utils.normalisation as norm
 import utils.torch_distances as dis
-from pyunicorn import network
-from pyunicorn import mpi
+
+import torch
+import torch.nn as nn
+#import torch_geometric
+#import torch_geometric.nn as geom_nn
+
 import time
 st = time.time()
 
@@ -114,6 +117,8 @@ torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
 # concatenating signal and background events / weights
 torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
 torch_wgts = torch.concat((torch_sig_wgts, torch_bkg_wgts), dim=0)
+print("Shape of signal + background tensor", torch_all.size())
+
 
 # read in linking length calculated from sampled training data
 sigsig_eff = args.eff
@@ -173,13 +178,49 @@ for i in range(nchunk):
     print("node wgts", node_wgts.size())
     node_wgts = torch.concat((node_wgts_subset, node_wgts), dim=0)
 
-print(f"Time taken for adjacency matrix generation: {time.time() - st}" )
+print(f"Time taken for adjacency matrix generation: {time.time() - st}")
 
-if args.centrality:
-    logging.info('Calculating degree centrality ...')
-    HHH_network = network.Network(adjacency=adj_mat)
-    logging.info('Network created')
-    HHH_network.node_weights = node_wgts.numpy().flatten()
-    logging.info('Flattening node weights to numpy')
-    degree_centrality = HHH_network.nsi_eigenvector_centrality()
-    betweenness = HHH_network.nsi_betweenness()
+
+# Big ass GNN class like an adult
+class GCNModel(nn.Module):
+    def __init__(
+        self,
+        dim_in,
+        dim_out
+    ):
+        """
+        dim_in: the number of features (kinematics) per node (event)
+        dim_out: the nubmer of output tasks (sig/bkg classification - 2)
+        """
+        super().__init__()
+        self.projection = nn.Linear(dim_in, dim_out)
+
+    def forward(self, node_feats, adj_matrix):
+        """
+        Generate nodes and their features
+        - node_feats: Tensor with node features of shape [batch_size, num_nodes, dim_in]
+        - adj_matrix: adjacency matrix of graph (in batches)
+        """
+        num_neighbours = adj_matrix.sum(dim=-1, keepdims=True)
+        node_feats = self.projection(node_feats)
+        node_feats = torch.matmul(adj_matrix, node_feats) / num_neighbours
+        return node_feats
+
+# Apply the GCN Layer
+layer = GCNModel(dim_in=len(kinematics), dim_out=2)
+# initialise the trainable weights (identity matrix) and biases (zero matrix)
+# weight is a N x N matrix
+weights=torch.eye(len(kinematics))
+layer.projection.weight.data = weights
+# bias is a 1 x N vector
+biases = torch.zeros(torch_all.size()[0], 1)
+layer.projection.bias.data = biases
+print("Input data", torch_all.size())
+print("Adjacency matrix", adj_mat.size())
+print("Weights", weights.size())
+print("Biases", biases.size())
+
+logging.info('Generating GCN and printing out embedding ...')
+with torch.no_grad():
+    out_feats = layer(torch_all, adj_mat)
+print(out_feats)
