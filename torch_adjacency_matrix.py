@@ -21,6 +21,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+#import torch_geometric
 
 import time
 st = time.time()
@@ -78,8 +79,8 @@ else:
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
 file_path = "/data/atlas/atlasdata3/maggiechen/gnn_project/split_files/"
-train_x, train_wgts, train_truth_labels = adj.data_loader(file_path, "train", kinematics)
-val_x, val_wgts, val_truth_labels = adj.data_loader(file_path, "val", kinematics)
+train_sig, train_bkg, train_x, train_wgts, train_truth_labels = adj.data_loader(file_path, "train", kinematics)
+val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader(file_path, "val", kinematics)
 
 # read in linking length calculated from sampled training data
 sigsig_eff = args.eff
@@ -129,44 +130,85 @@ class GCNClassifier(nn.Module):
         super(GCNClassifier, self).__init__()
         # hidden layers
         self.hidden_layers = nn.ModuleList([GCNLayer(input_size, hidden_sizes[0], node_weights)])
-        self.hidden_layers.append(nn.ReLU())
         for i in range(1, len(hidden_sizes)):
-            self.hidden_layers.append(GCNLayer(hidden_sizes[i-1], hidden_sizes[i], node_weights))
-            self.hidden_activation = nn.ReLU()
+           self.hidden_layers.append(GCNLayer(hidden_sizes[i-1], hidden_sizes[i], node_weights))
+           self.hidden_activation = nn.ReLU()
         # output layer
         self.output_layer = GCNLayer(hidden_sizes[-1], output_size, node_weights)
-        self.output_activation = nn.Sigmoid()
+        self.output_activation = nn.Softmax(dim=1)
 
     def forward(self, x, adjacency_matrix):
         for layer in self.hidden_layers:
             if isinstance(layer, GCNLayer):
                x = layer(x, adjacency_matrix)
+               x = self.hidden_activation(x)
             else:
                 x = layer(x)
                 x = self.hidden_activation(x)
         output = self.output_layer(x, adjacency_matrix)
-        output = self.output_activation(output)
-        return output
+        return self.output_activation(output)
 
 input_size = len(kinematics)
-hidden_sizes = [12, 12, 12]
+hidden_sizes = [12, 12]
 LR = 0.001
-epochs = 50
+epochs = 10
+train_loss = []
+val_loss = []
 
+gcn_model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1, node_weights=train_wgts)
 
 # Load in training dataset, adjacency matrix, labels
 # Load in validation dataset, adjacency matrix, labels
-gcn_model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1, node_weights=train_wgts)
-train_loss = nn.CrossEntropyLoss()
+train_dataset = TensorDataset(train_x, train_adj_mat, train_truth_labels)
+val_dataset = TensorDataset(val_x, val_adj_mat, val_truth_labels)
+
+train_loader = DataLoader(train_dataset, batch_size=len(train_dataset), shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=len(val_dataset), shuffle=True)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+gcn_model.to(device)
+
+loss_function = nn.CrossEntropyLoss()
 optimiser = torch.optim.Adam(gcn_model.parameters(), lr=LR)
 
 for epoch in range(epochs):
-    outputs = gcn_model(train_x, train_adj_mat)
-    outputs = torch.sigmoid(outputs)
-    loss = train_loss(outputs.squeeze(), train_truth_labels.squeeze())
-    optimiser.zero_grad()
-    loss.backward()
-    optimiser.step()
-    print(f'Epoch {epoch + 1}/{epochs}, Loss: {loss.item()}')
-print("Final predictions", outputs)
-print("Truth labels", train_truth_labels)
+    gcn_model.train()
+    for data in train_loader:
+        train_inputs, train_adjacency_matrix, train_labels = data
+        train_inputs, train_adjacency_matrix, train_labels = train_inputs.to(device), train_adjacency_matrix.to(device), train_labels.to(device)
+        optimiser.zero_grad()
+        train_outputs = gcn_model(train_inputs, train_adjacency_matrix)
+        loss = loss_function(train_outputs.squeeze(), train_labels.squeeze())
+        loss.backward()
+        optimiser.step()
+    train_loss.append(loss.item())
+
+    gcn_model.eval()
+    with torch.no_grad():
+        total_val_loss = 0.0
+        for data in val_loader:
+            val_inputs, val_adjacency_matrix, val_labels = data
+            val_inputs, val_adjacency_matrix, val_labels = val_inputs.to(device), val_adjacency_matrix.to(device), val_labels.to(device)
+            val_outputs = gcn_model(val_inputs, val_adjacency_matrix)
+            validation_loss = loss_function(val_outputs.squeeze(), val_labels.squeeze())
+            total_val_loss += validation_loss.item()
+    avg_val_loss = total_val_loss / len(val_loader)
+    val_loss.append(avg_val_loss)
+
+    print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {loss.item()}, Validation Loss: {avg_val_loss}')
+
+val_outputs = val_outputs.view(-1)
+val_label_bool = val_labels.bool()
+val_sig_pred = val_outputs[val_label_bool]
+val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
+print("sig pred", val_sig_pred)
+print("bkg pred", val_bkg_pred)
+fig, ax = plt.subplots()
+binning = numpy.linspace(0,1,20)
+ax.hist(val_sig_pred, bins=binning, label="Signal", histtype="step", density=True)
+ax.hist(val_bkg_pred, bins=binning, label="Background", histtype="step", density=True)
+ax.legend(loc='upper right')
+ax.set_xlabel("GNN Score", loc="right")
+ax.set_ylabel("Normalised No. Events", loc="top")
+fig.savefig("test_pred.pdf", transparent=True)
+

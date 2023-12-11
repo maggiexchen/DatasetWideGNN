@@ -10,8 +10,8 @@ import utils.torch_distances as dis
 def data_loader(file_path, f_type, kinematics):
     df_sig =  pd.read_hdf(file_path+"sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
     df_bkg =  pd.read_hdf(file_path+"bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
-    df_sig = df_sig.sample(n=10)
-    df_bkg = df_bkg.sample(n=10)
+    df_sig = df_sig.sample(n=20)
+    df_bkg = df_bkg.sample(n=20)
     df_sig_wgts = df_sig["eventWeight"]
     df_bkg_wgts = df_bkg["eventWeight"]
     df_sig = df_sig[kinematics]
@@ -33,7 +33,7 @@ def data_loader(file_path, f_type, kinematics):
     torch_wgts = torch.concat((torch_sig_wgts, torch_bkg_wgts), dim=0)
     truth_labels = torch.tensor(numpy.concatenate((sig_label, bkg_label)), dtype=torch.float32)
 
-    return torch_all, torch_wgts, truth_labels
+    return torch_sig, torch_bkg, torch_all, torch_wgts, truth_labels
 
 def create_adj_mat(a, length):
     return (a < length).float()
