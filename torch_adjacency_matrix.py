@@ -18,6 +18,7 @@ import utils.torch_distances as dis
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 #import torch_geometric
 #import torch_geometric.nn as geom_nn
 
@@ -66,12 +67,6 @@ def GetParser():
       action="store_true",
       help="Specify linking length between sig-sig and sig-bkg",
   )
-  
-  parser.add_argument(
-      "--centrality",
-      action="store_true",
-      help="Calculate degree centrality",
-  )
 
   args = parser.parse_args()
   return args
@@ -96,10 +91,14 @@ else:
 logging.info('Importing signal and background files...')
 file_path = "/data/atlas/atlasdata3/maggiechen/gnn_project/split_files/"
 df_sig = pd.read_hdf(file_path+"sig_train.h5", key="sig_train")
+df_sig = df_sig.sample(n=10)
 df_sig_wgts = df_sig["eventWeight"]
+sig_label = [1]*len(df_sig)
 df_sig = df_sig[kinematics]
 df_bkg = pd.read_hdf(file_path+"bkg_train.h5", key="bkg_train")
+df_bkg = df_bkg.sample(n=10)
 df_bkg_wgts = df_bkg["eventWeight"]
+bkg_label = [0]*len(df_bkg)
 df_bkg = df_bkg[kinematics]
 
 logging.info("MAD scaling...")
@@ -113,9 +112,9 @@ torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)
 torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)
 torch_sig_wgts = torch.tensor(df_sig_wgts.values, dtype=torch.float32)
 torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
-
 # concatenating signal and background events / weights
 torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
+truth_labels = torch.tensor(numpy.concatenate((sig_label, bkg_label)), dtype=torch.float32)
 torch_wgts = torch.concat((torch_sig_wgts, torch_bkg_wgts), dim=0)
 print("Shape of signal + background tensor", torch_all.size())
 
@@ -182,45 +181,76 @@ print(f"Time taken for adjacency matrix generation: {time.time() - st}")
 
 
 # Big ass GNN class like an adult
-class GCNModel(nn.Module):
-    def __init__(
-        self,
-        dim_in,
-        dim_out
-    ):
+class GCNLayer(nn.Module):
+    # TODO add attention layer ...
+    def __init__(self, dim_in, dim_out, node_weights):
         """
-        dim_in: the number of features (kinematics) per node (event)
-        dim_out: the nubmer of output tasks (sig/bkg classification - 2)
+        dim_in: dimension of input node features
+        dim_out: dimension of output features (for binary classification is 1)
+        node_weights: weights (event weights) of the nodes (events)
         """
-        super().__init__()
-        self.projection = nn.Linear(dim_in, dim_out)
+        super(GCNLayer, self).__init__()
+        self.train_weight = nn.Parameter(torch.FloatTensor(dim_in, dim_out))
+        self.train_bias = nn.Parameter(torch.FloatTensor(dim_out))
+        self.node_weights = nn.Parameter(node_weights)
+        self.reset_parameters()
 
-    def forward(self, node_feats, adj_matrix):
-        """
-        Generate nodes and their features
-        - node_feats: Tensor with node features of shape [batch_size, num_nodes, dim_in]
-        - adj_matrix: adjacency matrix of graph (in batches)
-        """
-        num_neighbours = adj_matrix.sum(dim=-1, keepdims=True)
-        node_feats = self.projection(node_feats)
-        node_feats = torch.matmul(adj_matrix, node_feats) / num_neighbours
-        return node_feats
+    def reset_parameters(self):
+        nn.init.xavier_uniform_(self.train_weight.data)
+        nn.init.zeros_(self.train_bias.data)
 
-# Apply the GCN Layer
-layer = GCNModel(dim_in=len(kinematics), dim_out=2)
-# initialise the trainable weights (identity matrix) and biases (zero matrix)
-# weight is a N x N matrix
-weights=torch.eye(len(kinematics))
-layer.projection.weight.data = weights
-# bias is a 1 x N vector
-biases = torch.zeros(torch_all.size()[0], 1)
-layer.projection.bias.data = biases
-print("Input data", torch_all.size())
-print("Adjacency matrix", adj_mat.size())
-print("Weights", weights.size())
-print("Biases", biases.size())
+    def forward(self, x, adjacency_matrix):
+        weighted_node_features = torch.mul(x, self.node_weights[:, None])
+        output = torch.matmul(adjacency_matrix, torch.matmul(weighted_node_features, self.train_weight)) + self.train_bias
+        #output = F.relu(output)
+        return output
 
-logging.info('Generating GCN and printing out embedding ...')
-with torch.no_grad():
-    out_feats = layer(torch_all, adj_mat)
-print(out_feats)
+class GCNClassifier(nn.Module):
+    def __init__(self, input_size, hidden_sizes, output_size, node_weights):
+        """
+        input_sizes: dimension of input node features
+        hidden_sizes: number of nodes in hidden graph layers as a list
+        output_sizes: dimension of output features (for binary classification is 1)
+        """
+        super(GCNClassifier, self).__init__()
+        # hidden layers
+        self.hidden_layers = nn.ModuleList([GCNLayer(input_size, hidden_sizes[0], node_weights)])
+        self.hidden_layers.append(nn.ReLU())
+        for i in range(1, len(hidden_sizes)):
+            self.hidden_layers.append(GCNLayer(hidden_sizes[i-1], hidden_sizes[i], node_weights))
+            self.hidden_activation = nn.ReLU()
+        # output layer
+        self.output_layer = GCNLayer(hidden_sizes[-1], output_size, node_weights)
+        self.output_activation = nn.Sigmoid()
+
+    def forward(self, x, adjacency_matrix):
+        for layer in self.hidden_layers:
+            if isinstance(layer, GCNLayer):
+                x = layer(x, adjacency_matrix)
+                x = self.hidden_activation(x)
+            else:
+                x = layer(x)
+                x = self.hidden_activation(x)
+        output = self.output_layer(x, adjacency_matrix)
+        output = self.output_activation(output)
+        return output
+
+input_size = len(kinematics)
+hidden_sizes = [12, 12, 12]
+LR = 0.001
+epochs = 30
+
+gcn_model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1, node_weights=torch_wgts)
+train_loss = nn.CrossEntropyLoss()
+optimiser = torch.optim.Adam(gcn_model.parameters(), lr=LR)
+
+for epoch in range(epochs):
+    outputs = gcn_model(torch_all, adj_mat)
+    outputs = torch.sigmoid(outputs)
+    loss = train_loss(outputs.squeeze(), truth_labels.squeeze())
+    optimiser.zero_grad()
+    loss.backward()
+    optimiser.step()
+    print(f'Epoch {epoch + 1}/{epochs}, Loss: {loss.item()}')
+print("Final predictions", outputs)
+print("Truth labels", truth_labels)
