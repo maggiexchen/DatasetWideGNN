@@ -13,7 +13,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
-import normalisation as norm
+import utils.normalisation as norm 
 
 def GetParser():
   """Argument parser for reading Ntuples script."""
@@ -141,40 +141,51 @@ logging.info("Plotting distance with linking lengths selected from ROC ...")
 nBins = 100
 # plotting sig-sig and bkg-bkg distributions and the linking lengths
 fig, ax = plt.subplots()
-binning = numpy.linspace(0,max(bkgbkg_distance),nBins)
+binning = numpy.linspace(0,18,nBins)
 ax.hist(sigsig_distance, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
+ax.hist(sigbkg_distance, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="darkorange")
 ax.hist(bkgbkg_distance, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt, alpha=0.5, density=True, color="forestgreen")
+ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
+ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
+ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
+ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
 y_min, y_max = ax.get_ylim()
 for i, eff in enumerate(sigsig_eff):
-    ax.axvline(x=ss_bb_thresholds[i], ymax=0.75+i*0.02, linestyle="--")
+    ax.axvline(x=ss_bb_thresholds[i], ymax=0.75+i*0.02, linestyle="--", color="red")
     ax.text(x=ss_bb_thresholds[i], y=0.75+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_labels[i], ha='center', va='bottom', fontsize=7)
 ax.legend(loc='upper right')
+ax.set_ylim(y_min, y_max*1.2)
 ax.set_xlabel(str(variable) + str(distance) +"distance", loc="right")
-ax.set_ylabel("Normalised No. Events", loc="top")
-fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/linking_lengths_ss_bb/"+str(variable)+str(distance)+"ss_bb_linking_lengths.pdf")
+ax.set_ylabel("Normalised No. Pairs", loc="top")
+fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/linking_lengths_ss_bb/"+str(variable)+str(distance)+"ss_bb_linking_lengths.pdf", transparent=True)
 
 # plotting sig-sig and sig-bkg distributions and the linking lengths
 fig, ax = plt.subplots()
 binning = numpy.linspace(0,max(bkgbkg_distance),nBins)
 ax.hist(sigsig_distance, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
 ax.hist(sigbkg_distance, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="darkorange")
+ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
+ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
+ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
+ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
 y_min, y_max = ax.get_ylim()
 for i, eff in enumerate(sigsig_eff):
-    ax.axvline(x=ss_bb_thresholds[i], ymax=0.75+i*0.02, linestyle="--")
+    ax.axvline(x=ss_bb_thresholds[i], ymax=0.75+i*0.02, linestyle="--", color="red")
     ax.text(x=ss_bb_thresholds[i], y=0.75+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_labels[i], ha='center', va='bottom', fontsize=9)
 ax.legend(loc='upper right')
+ax.set_ylim(y_min, y_max*1.2)
 ax.set_xlabel(str(variable) + str(distance) +"distance", loc="right")
-ax.set_ylabel("Normalised No. Events", loc="top")
-fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/linking_lengths_ss_sb/"+str(variable)+str(distance)+"ss_sb_linking_lengths.pdf")
+ax.set_ylabel("Normalised No. Pairs", loc="top")
+fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/linking_lengths_ss_sb/"+str(variable)+str(distance)+"ss_sb_linking_lengths.pdf", transparent=True)
 
 
 logging.info("Plotting ROC curves ...")
-fig = plt.figure(figsize=(15,12))
+fig, ax = plt.subplots()
 plt.style.use(hep.style.ROOT)
 plt.plot(fpr_ss_bb, tpr_ss_bb, label='sig-sig bkg-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_bb))
 plt.plot(fpr_ss_sb, tpr_ss_sb, label='sig-sig sig-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_sb))
-plt.scatter(numpy.array(ss_bb_roc_cuts)[:,1], numpy.array(ss_bb_roc_cuts)[:,0], marker='x', s=40, label="linking lengths",color="red")
-plt.scatter(numpy.array(ss_sb_roc_cuts)[:,1], numpy.array(ss_bb_roc_cuts)[:,0], marker='x', s=40,color="red")
+plt.scatter(numpy.array(ss_bb_roc_cuts)[:,1], numpy.array(ss_bb_roc_cuts)[:,0], marker='x', s=50, label="linking lengths",color="red")
+plt.scatter(numpy.array(ss_sb_roc_cuts)[:,1], numpy.array(ss_bb_roc_cuts)[:,0], marker='x', s=50,color="red")
 plt.legend()
 ymin, ymax = plt.ylim()
 plt.ylim(ymin, ymax*1.2)
