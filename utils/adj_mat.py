@@ -10,15 +10,14 @@ import utils.torch_distances as dis
 def data_loader(file_path, f_type, kinematics):
     df_sig =  pd.read_hdf(file_path+"sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
     df_bkg =  pd.read_hdf(file_path+"bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
-    df_sig = df_sig.sample(n=20)
-    df_bkg = df_bkg.sample(n=20)
+    df_sig = df_sig.sample(n=1000)
+    df_bkg = df_bkg.sample(n=2000)
     df_sig_wgts = df_sig["eventWeight"]
     df_bkg_wgts = df_bkg["eventWeight"]
     df_sig = df_sig[kinematics]
     df_bkg = df_bkg[kinematics]
     sig_label = [1]*len(df_sig)
     bkg_label = [0]*len(df_bkg)
-
     # MAD scaling
     for var in kinematics:
         df_sig.loc[:, var], df_bkg.loc[:, var] = norm.MAD_norm(df_sig.loc[:, var], df_bkg.loc[:, var])
@@ -61,7 +60,6 @@ def generate_adj_mat(x, x_wgts, chunksize, dis_type, linking_length):
             distance_subset = dis.cityblock(x, x_subset)
         elif dis_type == "cosine":
             distance_subset = dis.cosine(x, x_subset)
-
         adj_mat_subset = create_adj_mat(distance_subset, linking_length)
         adj_mat = torch.concat((adj_mat_subset, adj_mat), dim=0)
         

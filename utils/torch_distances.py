@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 
 def cosine(a, b):
-    numerator = torch.matmul(a, torch.transpose(c, 0, 1))
+    numerator = torch.matmul(a, torch.transpose(b, 0, 1))
     denominator = torch.sqrt(torch.tensordot(torch.sum(torch.square(a),dim=1), torch.sum(torch.square(b),dim=1)))
     return 1 - numerator / denominator
 

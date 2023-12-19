@@ -13,8 +13,8 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
 import tensorflow as tf
-import distances as dis
-import normalisation as norm
+import utils.distances as dis
+import utils.normalisation as norm
 
 def GetParser():
   """Argument parser for reading Ntuples script."""
