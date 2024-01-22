@@ -4,6 +4,7 @@ import math
 import torch
 import time
 st = time.time()
+import matplotlib.pyplot as plt
 import utils.normalisation as norm
 import utils.torch_distances as dis
 
@@ -11,7 +12,7 @@ def data_loader(file_path, f_type, kinematics):
     df_sig =  pd.read_hdf(file_path+"sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
     df_bkg =  pd.read_hdf(file_path+"bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
     df_sig = df_sig.sample(n=1000)
-    df_bkg = df_bkg.sample(n=2000)
+    df_bkg = df_bkg.sample(n=1000)
     df_sig_wgts = df_sig["eventWeight"]
     df_bkg_wgts = df_bkg["eventWeight"]
     df_sig = df_sig[kinematics]
@@ -21,7 +22,18 @@ def data_loader(file_path, f_type, kinematics):
     # MAD scaling
     for var in kinematics:
         df_sig.loc[:, var], df_bkg.loc[:, var] = norm.MAD_norm(df_sig.loc[:, var], df_bkg.loc[:, var])
-
+        fig, ax = plt.subplots()
+        binning = numpy.linspace(min(df_bkg.loc[:, var]),max(df_bkg.loc[:, var]), 50)
+        ax.hist(df_sig.loc[:, var], bins=binning, label="MAD-normed sig", alpha=0.3, density=True, color="steelblue")
+        ax.hist(df_bkg.loc[:, var], bins=binning, label="MAD-normed bkg", alpha=0.3, density=True, color="red")
+        ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
+        ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
+        ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
+        ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
+        ax.legend(loc='upper right')
+        ax.set_xlabel(str(var), loc="right")
+        ax.set_ylabel("Normalised No. Events", loc="top")
+        fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+str(var)+".pdf", transparent=True)
     # convert pd dataframes to torch tensors
     torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)
     torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)

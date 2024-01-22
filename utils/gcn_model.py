@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
 from utils.gcn_layer import GCNLayer
 
 class GCNClassifier(nn.Module):
@@ -19,5 +20,5 @@ class GCNClassifier(nn.Module):
     def forward(self, x, adjacency_matrix):
         for layer in self.layers:
             x = F.relu(layer(x, adjacency_matrix))
-        output = F.sigmoid(self.output_layer(x, adjacency_matrix))
+        output = torch.sigmoid(self.output_layer(x, adjacency_matrix))
         return output
