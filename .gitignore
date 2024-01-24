@@ -13,3 +13,5 @@ __pycache__/
 deepsets_baseline/deepsets_model/
 deepsets_baseline/*.pdf
 *.pdf
+MADnormed_distances/
+standardised_distances/

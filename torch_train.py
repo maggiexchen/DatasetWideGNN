@@ -18,12 +18,13 @@ import utils.adj_mat as adj
 import utils.misc as misc
 import utils.performance as perf
 from utils.gcn_model import GCNClassifier
-from utils.gcn_model import DNNClassifier
+from utils.dnn_model import DNNClassifier
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
 #import torch_geometric
 
 import time
@@ -73,6 +74,14 @@ def GetParser():
       type=str,
       required=False,
       help="Specify the path to store all the input/output data and results",
+  )
+
+  parser.add_argument(
+      "--model",
+      "-m",
+      type=str,
+      required=True,
+      help="Specify the type of model",
   )
 
   args = parser.parse_args()
@@ -125,7 +134,12 @@ epochs = 100
 train_loss = []
 val_loss = []
 
-gcn_model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
+if args.model == "gcn":
+    model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
+elif args.model == "dnn":
+    model = DNNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
+else:
+    print("Janky")
 
 # # Load in training dataset, adjacency matrix, labels
 # # Load in validation dataset, adjacency matrix, labels
@@ -134,45 +148,94 @@ val_dataset = TensorDataset(val_x, val_adj_mat, val_truth_labels)
 
 # Define loss function for binary classification and ADAM optimiser
 loss_function = nn.BCELoss()
-optimiser = torch.optim.Adam(gcn_model.parameters(), lr=LR)
+optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 
 ## TODO: load in the training the validation data differently
 ## TODO: define the training and evaluation steps as functions
 for epoch in range(epochs):
-    gcn_model.train()
+    model.train()
     optimiser.zero_grad()
-    train_outputs = gcn_model(train_x, train_adj_mat)
+    if args.model == "gcn":
+        train_outputs = model(train_x, train_adj_mat)
+    elif args.model == "dnn":
+        train_outputs = model(train_x)
     loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze())
     loss.backward()
     train_loss.append(loss.item())
     optimiser.step()
 
-    gcn_model.eval()
-    val_outputs = gcn_model(val_x, val_adj_mat)
+    model.eval()
+    if args.model == "gcn":
+        val_outputs = model(val_x, val_adj_mat)
+    elif args.model == "dnn":
+        val_outputs = model(val_x)
     validation_loss = loss_function(val_outputs.squeeze(), val_truth_labels.squeeze())
     val_loss.append(validation_loss.item())
 
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {loss.item()}, Validation Loss: {validation_loss.item()}')
-    print("training pred", train_outputs)
 
-#perf.doShap(gcn_model, train_x, kinematics, path)
+logging.info("Plotting training outputs ...")
+train_outputs = train_outputs.view(-1)
+train_label_bool = train_truth_labels.bool()
+train_sig_pred = train_outputs[train_label_bool]
+train_bkg_pred = train_outputs[torch.logical_not(train_label_bool)]
 
-fpr, tpr, cut = roc_curve(train_truth_labels.detach().numpy(), train_outputs.detach().numpy())
-auc = roc_auc_score(train_truth_labels.detach().numpy(), train_outputs.detach().numpy())
-print("Training AUC", auc)
+train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().numpy(), train_outputs.detach().numpy())
+train_auc = roc_auc_score(train_truth_labels.detach().numpy(), train_outputs.detach().numpy())
+print("Training AUC", train_auc)
 
 val_outputs = val_outputs.view(-1)
 val_label_bool = val_truth_labels.bool()
 val_sig_pred = val_outputs[val_label_bool]
 val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
 fig, ax = plt.subplots()
+
+val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
+val_auc = roc_auc_score(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
+print("Validation AUC", val_auc)
+
 #binning = numpy.linspace(0,1,50)
-ax.hist(val_sig_pred.detach().numpy(), bins=50, label="Signal", histtype="step", density=True)
-ax.hist(val_bkg_pred.detach().numpy(), bins=50, label="Background", histtype="step", density=True)
-ax.text(0.04, 0.93, "Training AUC = {:.3f}".format(auc), verticalalignment="bottom", size=10, transform=ax.transAxes)
+fig, ax = plt.subplots()
+binning = numpy.linspace(0,1,50)
+ax.hist(val_sig_pred.detach().numpy(), bins=binning, label="Signal", alpha=0.5, density=True)
+ax.hist(val_bkg_pred.detach().numpy(), bins=binning, label="Background", alpha=0.5, density=True)
+ax.text(0.04, 0.93, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=10, transform=ax.transAxes)
+ax.text(0.04, 0.88, "Standardised kinematics", verticalalignment="bottom", size=10, transform=ax.transAxes)
 ax.legend(loc='upper right')
 ax.set_xlabel("GNN Score", loc="right")
-ax.set_ylabel("Normalised # events / bin", loc="top")
-fig_path = path + "plots/GCN/"
-misc.create_dirs(fig_path)
-fig.savefig(fig_path+"test_pred.pdf", transparent=True)
+ax.set_ylabel("Normalised No. Events", loc="top")
+fig.savefig(str(args.variable)+"_"+str(args.model)+"_validation_pred.pdf", transparent=True)
+
+fig, ax = plt.subplots()
+binning = numpy.linspace(0,1,50)
+ax.hist(train_sig_pred.detach().numpy(), bins=binning, label="Signal", alpha=0.5, density=True)
+ax.hist(train_bkg_pred.detach().numpy(), bins=binning, label="Background", alpha=0.5, density=True)
+ax.text(0.04, 0.93, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=10, transform=ax.transAxes)
+ax.text(0.04, 0.88, "Standardised kinematics", verticalalignment="bottom", size=10, transform=ax.transAxes)
+ax.legend(loc='upper right')
+ax.set_xlabel("GNN Score", loc="right")
+ax.set_ylabel("Normalised No. Events", loc="top")
+fig.savefig(str(args.variable)+"_"+str(args.model)+"_training_pred.pdf", transparent=True)
+
+logging.info("Plotting ROC curves ...")
+fig, ax = plt.subplots()
+plt.plot(train_fpr, train_tpr, label='Training ROC curve (AUC = {:.3f})'.format(train_auc))
+plt.legend(loc="upper left", fontsize=10)
+ymin, ymax = plt.ylim()
+plt.ylim(ymin, ymax*1.2)
+plt.xlim(0,1)
+plt.xlabel("Background Efficiency")
+plt.ylabel("Signal Efficiency")
+plot_name = str(args.variable)+"_"+str(args.model)+"_training_ROC.pdf"
+fig.savefig(plot_name, transparent=True)
+
+fig, ax = plt.subplots()
+plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
+plt.legend(loc="upper left", fontsize=10)
+ymin, ymax = plt.ylim()
+plt.ylim(ymin, ymax*1.2)
+plt.xlim(0,1)
+plt.xlabel("Background Efficiency")
+plt.ylabel("Signal Efficiency")
+plot_name = str(args.variable)+"_"+str(args.model)+"_validation_ROC.pdf"
+fig.savefig(plot_name, transparent=True)

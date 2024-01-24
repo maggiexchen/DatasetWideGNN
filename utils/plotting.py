@@ -22,7 +22,7 @@ def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, labe
   ax.set_ylabel("Normalised # event pairs / bin", loc="top")
   # save
   if label!="": label = "_"+label
-  exts = [".pdf", ".eps", ".png"]
+  exts = [".pdf"]
   for ext in exts:
     fig.savefig(path+"/"+var+"_"+distance+label+"_distances"+ext)
   return 0
@@ -45,7 +45,7 @@ def plot_kinematic_hists(df_sig, df_bkg, var, file_path):
   # save
   save_path = file_path+"/training_kinematics/"
   misc.create_dirs(save_path)
-  exts = [".pdf", ".eps", ".png"]
+  exts = [".pdf"]
   for ext in exts:
     fig.savefig(save_path+"/"+var+ext, transparent=True)
   return 0
