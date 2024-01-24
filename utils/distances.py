@@ -4,11 +4,11 @@ import tensorflow as tf
 
 def cosine(a, b):
     """
-    Function to obtain the cosine distance between two vectors
+    Function to obtain the cosine distance between two kinematics vectors for all events in the input
 
     Args:
-        a (tensorflow tensor) first vector
-        b (tensorflow tensor) secont vector
+        a (tensorflow.tensor): first matrix of events and kinematics
+        b (tensorflow.tensor): second matrix of events and kinematics
 
     Returns:
         (float) cosine distance
@@ -21,11 +21,11 @@ def cosine(a, b):
 
 def euclidean(a, b):
     """
-    Function to obtain the euclidean distance between two vectors
+    Function to obtain the euclidean distance between two kinematics vectors for all events in the input
 
     Args:
-        a (tensorflow tensor) first vector
-        b (tensorflow tensor) secont vector
+        a (tensorflow.tensor): first matrix of events and kinematics
+        b (tensorflow.tensor): second matrix of events and kinematics
 
     Returns:
         (float) euclidean distance
@@ -37,11 +37,11 @@ def euclidean(a, b):
 
 def cityblock(a, b):
     """
-    Function to obtain the cityblock distance between two vectors
+    Function to obtain the cityblock distance between two kinematics vectors for all events in the input
 
     Args:
-        a (tensorflow tensor) first vector
-        b (tensorflow tensor) secont vector
+        a (tensorflow.tensor): first matrix of events and kinematics
+        b (tensorflow.tensor): second matrix of events and kinematics
 
     Returns:
         (float) cityblock distance

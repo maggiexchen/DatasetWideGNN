@@ -13,6 +13,7 @@ from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, au
 import utils.normalisation as norm
 import utils.misc as misc
 import utils.plotting as plotting
+import utils.performance as perf
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -96,23 +97,8 @@ logging.info("Calculating and saving ROC to json ...")
 # the actual tpr we want is the fraction of sigsig below a certain cut: (1-fpr)
 # and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tpr)
 
-def calc_ROC(sig, bkg, sig_wgt, bkg_wgt):
-    y_sig = [0]*len(sig)
-    y_bkg = [1]*len(bkg)
-    x_combined = np.concatenate((sig, bkg))
-    y_combined = np.concatenate((y_sig, y_bkg))
-    wgt_combined = np.concatenate((sig_wgt, bkg_wgt))
-
-    fpr, tpr, cut = roc_curve(y_combined, x_combined, sample_weight=wgt_combined)
-    auc = roc_auc_score(y_combined, x_combined, sample_weight=wgt_combined)
-
-    true_tpr = 1-fpr
-    true_fpr = 1-tpr
-
-    return true_tpr, true_fpr, cut, auc
-
-tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = calc_ROC(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt)
-tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = calc_ROC(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt)
+tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = perf.calc_ROC(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt)
+tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = perf.calc_ROC(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt)
 
 # saving roc and auc to json file
 roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(),

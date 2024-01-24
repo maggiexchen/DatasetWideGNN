@@ -124,8 +124,8 @@ logging.info("chosen model: "+modelname)
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
-train_sig, train_bkg, train_x, train_wgts, train_truth_labels = adj.data_loader(path, "train", kinematics)
-val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader(path, "val", kinematics)
+train_sig, train_bkg, train_x, train_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics)
+val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics)
 
 # read in linking length calculated from sampled training data
 sigsig_eff = eff
@@ -138,7 +138,7 @@ with open(ll_path, 'r') as lfile:
     logging.info("linking length ="+str(linking_length))
 
 # calculate distances and generate adjacency matrix in batches
-logging.info('Calculating training and validaiton distances in batches...')
+logging.info('Calculating training and validation distances in batches...')
 train_adj_mat = adj.generate_adj_mat(train_x, train_wgts, distance, linking_length)
 val_adj_mat = adj.generate_adj_mat(val_x, val_wgts, distance, linking_length)
 
