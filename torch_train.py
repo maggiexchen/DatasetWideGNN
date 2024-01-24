@@ -24,7 +24,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
-from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
 #import torch_geometric
 
 import time
@@ -100,12 +99,30 @@ if args.path:
     path = args.path
     if path[-1]!="/": path += "/"
 
+kinematics = misc.get_kinematics(variable)
+input_size = len(kinematics)
+hidden_sizes = [16, 16, 16]
+LR = 0.01
+epochs = 100
+train_loss = []
+val_loss = []
+
+
+modelname = str(args.model)
+if (modelname.lower() == "gcn"):
+    model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
+elif (modelname.lower() == "dnn"):
+    model = DNNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
+else:
+    raise Exception("Janky, pick a defined model (dnn, gcn)")
+
+
 logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("input/output path: "+path)
 logging.info("desired efficieny: "+str(eff))
+logging.info("chosen model: "+modelname)
 
-kinematics = misc.get_kinematics(variable)
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
@@ -126,20 +143,6 @@ with open(ll_path, 'r') as lfile:
 logging.info('Calculating training and validaiton distances in batches...')
 train_adj_mat = adj.generate_adj_mat(train_x, train_wgts, distance, linking_length)
 val_adj_mat = adj.generate_adj_mat(val_x, val_wgts, distance, linking_length)
-
-input_size = len(kinematics)
-hidden_sizes = [16, 16, 16]
-LR = 0.01
-epochs = 100
-train_loss = []
-val_loss = []
-
-if args.model == "gcn":
-    model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
-elif args.model == "dnn":
-    model = DNNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
-else:
-    print("Janky")
 
 # # Load in training dataset, adjacency matrix, labels
 # # Load in validation dataset, adjacency matrix, labels
@@ -204,7 +207,9 @@ ax.text(0.04, 0.88, "Standardised kinematics", verticalalignment="bottom", size=
 ax.legend(loc='upper right')
 ax.set_xlabel("GNN Score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
-fig.savefig(str(args.variable)+"_"+str(args.model)+"_validation_pred.pdf", transparent=True)
+fig_path = path + "plots/GCN/"
+misc.create_dirs(fig_path)
+fig.savefig(fig_path+variable+"_"+modelname+"_validation_pred.pdf", transparent=True)
 
 fig, ax = plt.subplots()
 binning = numpy.linspace(0,1,50)
@@ -215,7 +220,9 @@ ax.text(0.04, 0.88, "Standardised kinematics", verticalalignment="bottom", size=
 ax.legend(loc='upper right')
 ax.set_xlabel("GNN Score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
-fig.savefig(str(args.variable)+"_"+str(args.model)+"_training_pred.pdf", transparent=True)
+fig_path = path + "plots/GCN/"
+misc.create_dirs(fig_path)
+fig.savefig(fig_path+variable+"_"+modelname+"_training_pred.pdf", transparent=True)
 
 logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
@@ -226,8 +233,9 @@ plt.ylim(ymin, ymax*1.2)
 plt.xlim(0,1)
 plt.xlabel("Background Efficiency")
 plt.ylabel("Signal Efficiency")
-plot_name = str(args.variable)+"_"+str(args.model)+"_training_ROC.pdf"
-fig.savefig(plot_name, transparent=True)
+fig_path = path + "plots/GCN/"
+misc.create_dirs(fig_path)
+fig.savefig(fig_path+variable+"_"+modelname+"_training_ROC.pdf", transparent=True)
 
 fig, ax = plt.subplots()
 plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
@@ -237,5 +245,6 @@ plt.ylim(ymin, ymax*1.2)
 plt.xlim(0,1)
 plt.xlabel("Background Efficiency")
 plt.ylabel("Signal Efficiency")
-plot_name = str(args.variable)+"_"+str(args.model)+"_validation_ROC.pdf"
-fig.savefig(plot_name, transparent=True)
+fig_path = path + "plots/GCN/"
+misc.create_dirs(fig_path)
+fig.savefig(fig_path+variable+"_"+modelname+"_validation_ROC.pdf", transparent=True)
