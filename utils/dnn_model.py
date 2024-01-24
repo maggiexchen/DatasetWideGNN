@@ -22,4 +22,5 @@ class DNNClassifier(nn.Module):
         for layer in self.layers:
             x = F.relu(layer(x))
         output = torch.sigmoid(self.output_layer(x))
+
         return output

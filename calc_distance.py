@@ -16,53 +16,53 @@ import utils.misc as misc
 import utils.plotting as plotting
 
 def GetParser():
-  """Argument parser for reading Ntuples script."""
-  parser = argparse.ArgumentParser(
-      description="Reading Ntuples command line options."
-  )
+    """Argument parser for reading Ntuples script."""
+    parser = argparse.ArgumentParser(
+        description="Reading Ntuples command line options."
+    )
 
-  parser.add_argument(
-      "--variable",
-      "-v",
-      type=str,
-      required=True,
-      help="Specify the type of kinematic variables to calculate distance for",
-  )
+    parser.add_argument(
+        "--variable",
+        "-v",
+        type=str,
+        required=True,
+        help="Specify the type of kinematic variables to calculate distance for",
+    )
 
-  parser.add_argument(
-      "--distance",
-      "-d",
-      type=str,
-      required=True,
-      help="Specify the type of distance to calculate",
-  )
+    parser.add_argument(
+        "--distance",
+        "-d",
+        type=str,
+        required=True,
+        help="Specify the type of distance to calculate",
+    )
 
-  parser.add_argument(
-      "--sample",
-      "-s",
-      action="store_true",
-      help="Specify whether the datasets are sampled",
-  )
+    parser.add_argument(
+        "--sample",
+        "-s",
+        action="store_true",
+        help="Specify whether the datasets are sampled",
+    )
 
-  parser.add_argument(
-      "--path",
-      "-p",
-      type=str,
-      required=False,
-      help="Specify the path to store all the input/output data and results",
-  )
+    parser.add_argument(
+        "--path",
+        "-p",
+        type=str,
+        required=False,
+        help="Specify the path to store all the input/output data and results",
+    )
 
-  parser.add_argument(
-      "--data_dir",
-      "-i",
-      type=str,
-      required=False,
-      help="Specify the path to store all the input/output data and results",
-  )
+    parser.add_argument(
+        "--data_dir",
+        "-i",
+        type=str,
+        required=False,
+        help="Specify the path to store all the input/output data and results",
+    )
 
 
-  args = parser.parse_args()
-  return args
+    args = parser.parse_args()
+    return args
 
 args = GetParser()
 
@@ -131,17 +131,14 @@ if distance == "euclidean":
     sigsig = dis.euclidean(tf_sig, tf_sig)
     sigbkg = dis.euclidean(tf_sig, tf_bkg)
     bkgbkg = dis.euclidean(tf_bkg, tf_bkg)
-
 elif distance == "cityblock":
     sigsig = dis.cityblock(tf_sig, tf_sig)
     sigbkg = dis.cityblock(tf_sig, tf_bkg)
     bkgbkg = dis.cityblock(tf_bkg, tf_bkg)
-
 elif distance == "cosine":
     sigsig = dis.cosine(tf_sig, tf_sig)
     sigbkg = dis.cosine(tf_sig, tf_bkg)
     bkgbkg = dis.cosine(tf_bkg, tf_bkg)
-
 else:
     print("Specify a valid distance please!")
 

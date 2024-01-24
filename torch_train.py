@@ -38,53 +38,53 @@ logging.getLogger().setLevel(logging.INFO)
 #import pdb
 
 def GetParser():
-  """Argument parser for reading Ntuples script."""
-  parser = argparse.ArgumentParser(
-      description="Reading Ntuples command line options."
-  )
+    """Argument parser for reading Ntuples script."""
+    parser = argparse.ArgumentParser(
+        description="Reading Ntuples command line options."
+    )
 
-  parser.add_argument(
-      "--variable",
-      "-v",
-      type=str,
-      required=True,
-      help="Specify the type of kinematic variables to calculate distance for",
-  )
+    parser.add_argument(
+        "--variable",
+        "-v",
+        type=str,
+        required=True,
+        help="Specify the type of kinematic variables to calculate distance for",
+    )
 
-  parser.add_argument(
-      "--distance",
-      "-d",
-      type=str,
-      required=True,
-      help="Specify the type of distance to calculate",
-  )
+    parser.add_argument(
+        "--distance",
+        "-d",
+        type=str,
+        required=True,
+        help="Specify the type of distance to calculate",
+    )
 
-  parser.add_argument(
-      "--eff",
-      "-e",
-      type=float,
-      required=True,
-      help="Specify sig-sig efficiency for the linking length",
-  )
+    parser.add_argument(
+        "--eff",
+        "-e",
+        type=float,
+        required=True,
+        help="Specify sig-sig efficiency for the linking length",
+    )
 
-  parser.add_argument(
-      "--path",
-      "-p",
-      type=str,
-      required=False,
-      help="Specify the path to store all the input/output data and results",
-  )
+    parser.add_argument(
+        "--path",
+        "-p",
+        type=str,
+        required=False,
+        help="Specify the path to store all the input/output data and results",
+    )
 
-  parser.add_argument(
-      "--model",
-      "-m",
-      type=str,
-      required=True,
-      help="Specify the type of model",
-  )
+    parser.add_argument(
+        "--model",
+        "-m",
+        type=str,
+        required=True,
+        help="Specify the type of model",
+    )
 
-  args = parser.parse_args()
-  return args
+    args = parser.parse_args()
+    return args
 
 args = GetParser()
 
@@ -116,13 +116,11 @@ elif (modelname.lower() == "dnn"):
 else:
     raise Exception("Janky, pick a defined model (dnn, gcn)")
 
-
 logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("input/output path: "+path)
 logging.info("desired efficieny: "+str(eff))
 logging.info("chosen model: "+modelname)
-
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
@@ -144,8 +142,8 @@ logging.info('Calculating training and validaiton distances in batches...')
 train_adj_mat = adj.generate_adj_mat(train_x, train_wgts, distance, linking_length)
 val_adj_mat = adj.generate_adj_mat(val_x, val_wgts, distance, linking_length)
 
-# # Load in training dataset, adjacency matrix, labels
-# # Load in validation dataset, adjacency matrix, labels
+# Load in training dataset, adjacency matrix, labels
+# Load in validation dataset, adjacency matrix, labels
 train_dataset = TensorDataset(train_x, train_adj_mat, train_truth_labels)
 val_dataset = TensorDataset(val_x, val_adj_mat, val_truth_labels)
 

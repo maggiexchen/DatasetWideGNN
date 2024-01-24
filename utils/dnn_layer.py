@@ -25,4 +25,5 @@ class DNNLayer(nn.Module):
 
     def forward(self, x):
         output =  torch.matmul(x, self.train_weight)+self.train_bias
+
         return output

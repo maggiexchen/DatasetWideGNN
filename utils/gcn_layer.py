@@ -34,4 +34,5 @@ class GCNLayer(nn.Module):
         output = torch.matmul(torch.matmul(adjacency_matrix,x), self.train_weight)+self.train_bias
         if self.use_batch_norm:
             output = self.batch_norm(output)
+
         return output

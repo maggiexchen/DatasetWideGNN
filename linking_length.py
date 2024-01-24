@@ -15,38 +15,38 @@ import utils.misc as misc
 import utils.plotting as plotting
 
 def GetParser():
-  """Argument parser for reading Ntuples script."""
-  parser = argparse.ArgumentParser(
-      description="Reading Ntuples command line options."
-  )
+    """Argument parser for reading Ntuples script."""
+    parser = argparse.ArgumentParser(
+        description="Reading Ntuples command line options."
+    )
 
-  parser.add_argument(
-      "--variable",
-      "-v",
-      type=str,
-      required=True,
-      help="Specify the type of kinematic variables to calculate distance for",
-  )
+    parser.add_argument(
+        "--variable",
+        "-v",
+        type=str,
+        required=True,
+        help="Specify the type of kinematic variables to calculate distance for",
+    )
 
-  parser.add_argument(
-      "--distance",
-      "-d",
-      type=str,
-      required=True,
-      help="Specify the type of distance to calculate",
-  )
+    parser.add_argument(
+        "--distance",
+        "-d",
+        type=str,
+        required=True,
+        help="Specify the type of distance to calculate",
+    )
 
-  parser.add_argument(
-      "--path",
-      "-p",
-      type=str,
-      required=False,
-      help="Specify the path to store all the input/output data and results",
-  )
+    parser.add_argument(
+        "--path",
+        "-p",
+        type=str,
+        required=False,
+        help="Specify the path to store all the input/output data and results",
+    )
 
 
-  args = parser.parse_args()
-  return args
+    args = parser.parse_args()
+    return args
 
 args = GetParser()
 
@@ -124,7 +124,7 @@ roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(),
 roc_path = path+"plots/MAD_norm_weighted/ROC/"+variable+"_"+distance+"_ROC.json"
 misc.create_dirs(roc_path)
 with open(roc_path, "w") as outfile:
-  json.dump(roc_dict, outfile)
+    json.dump(roc_dict, outfile)
 
 # pick sig-sig efficiencies at 0.7, 0.8, 0.9
 def find_threshold(tpr, fpr, eff, cut):
@@ -154,7 +154,7 @@ length_dict = {"sigsig_eff": sigsig_eff, "length": ss_thresholds}
 ll_path = path+"linking_lengths/"+variable+"_"+distance+"_linking_length.json"
 misc.create_dirs(ll_path)
 with open(ll_path, "w") as lengthfile:
-  json.dump(length_dict, lengthfile)
+    json.dump(length_dict, lengthfile)
 
 logging.info("Plotting distance with linking lengths selected from ROC ...")
 nBins = 100
