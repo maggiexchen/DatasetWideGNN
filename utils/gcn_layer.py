@@ -30,5 +30,6 @@ class GCNLayer(nn.Module):
         # [N x N] x [N x # hidden nodes] = [N x # hidden nodes]
         # output = torch.matmul(adjacency_matrix, torch.matmul(weighted_node_features, self.train_weight)) + self.train_bias
         # weighted_adj_mat = torch.mul(adjacency_matrix, self.node_weights[:, None])
-        output = torch.matmul(adjacency_matrix, torch.matmul(x, self.train_weight))+self.train_bias
+#        output = torch.matmul(adjacency_matrix, torch.matmul(x, self.train_weight))+self.train_bias
+        output =  torch.matmul(x, self.train_weight)+self.train_bias
         return output

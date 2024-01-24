@@ -1,11 +1,8 @@
 import pandas as pd
-import uproot
-import numpy
+import numpy as np
 import h5py
-import random
 import os
 os.environ["NUMEXPR_MAX_THREADS"] = "16"
-from scipy.spatial.distance import pdist, squareform
 import matplotlib.pyplot as plt
 import mplhep as hep
 from sklearn.model_selection import train_test_split
@@ -15,6 +12,8 @@ import argparse
 import tensorflow as tf
 import utils.distances as dis
 import utils.normalisation as norm
+import utils.misc as misc
+import utils.plotting as plotting
 
 def GetParser():
   """Argument parser for reading Ntuples script."""
@@ -45,39 +44,45 @@ def GetParser():
       help="Specify whether the datasets are sampled",
   )
 
+  parser.add_argument(
+      "--path",
+      "-p",
+      type=str,
+      required=False,
+      help="Specify the path to store all the input/output data and results",
+  )
+
 
   args = parser.parse_args()
   return args
 
 args = GetParser()
 
-if args.variable == "mass":
-    # mass-based kinematics
-    #kinematics = ["mH1","mH2","mH3","mHHH","mHcosTheta","meanmH","rmsmH","meanmBB","rmsmBB","meanPt","rmsPt","ht","massfraceta","massfracphi","massfracraw"]
-    kinematics = ["mH1","mH2","mH3","mHHH"]
-elif args.variable == "angular":
-    # angular kinematics
-    kinematics = ["dRH1","dRH2","dRH3","meandRBB"]
-elif args.variable == "shape":
-    # event shape kinematics
-    kinematics = ["sphere3dv2b","sphere3dv2btrans","aplan3dv2b","theta3dv2b"]
-elif args.variable == "combined":
-    kinematics = ["mH1","mH2","mH3","mHHH","dRH1","dRH2","dRH3","meandRBB","sphere3dv2b","sphere3dv2btrans","aplan3dv2b","theta3dv2b"]
-elif args.variable == "mass_and_angular":
-    kinematics = ["mH1","mH2","mH3","mHHH","dRH1","dRH2","dRH3","meandRBB"]
-elif args.variable == "mass_and_shape":
-    kinematics = ["mH1","mH2","mH3","mHHH","sphere3dv2b","sphere3dv2btrans","aplan3dv2b","theta3dv2b"]
-else:
-    print("bruh")
+variable = str(args.variable)
+distance = str(args.distance)
+sample = args.sample
+
+path = "/data/atlas/atlasdata3/maggiechen/gnn_project/"
+if args.path:
+    path = args.path
+    if path[-1]!="/": path += "/"
+
+logging.info("variable set: "+variable)
+logging.info("distance metric: "+distance)
+logging.info("do sampling? "+str(sample))
+logging.info("input/output path: "+path)
+
+kinematics = misc.get_kinematics(variable)
 
 # load in input files
 logging.info('Importing signal and background files...')
-file_path = "/data/atlas/atlasdata3/maggiechen/gnn_project/split_files/"
+file_path = path+"split_files/"
+
 df_sig = pd.read_hdf(file_path+"sig_train.h5", key="sig_train")
 df_bkg = pd.read_hdf(file_path+"bkg_train.h5", key="bkg_train")
 
 # randomly sample from the training datasets for linking length calculation if specified
-if args.sample == True:
+if sample == True:
     logging.info("Sampling...")
     df_sig = df_sig.sample(n=1500)
     df_bkg = df_bkg.sample(n=3000)
@@ -90,7 +95,7 @@ for var in kinematics:
 # convert pandas dataframes to tf tensors
 # only the kinematics used in distance calculation and weights need to be converted to tensors here for matrix multiplications
 
-logging.info("Converting to tf tesnors...")
+logging.info("Converting to tf tensors...")
 tf_sig = df_sig[kinematics]
 tf_bkg = df_bkg[kinematics]
 tf_sig = tf.convert_to_tensor(tf_sig, dtype_hint="float32")
@@ -110,17 +115,17 @@ bkgbkg_wgt = tf.matmul(tf.reshape(bkg_wgt, [-1,1]), tf.reshape(bkg_wgt, [-1,1]),
 
 # calculate distances
 logging.info('Calculating distances...')
-if args.distance == "euclidean":
+if distance == "euclidean":
     sigsig = dis.euclidean(tf_sig, tf_sig)
     sigbkg = dis.euclidean(tf_sig, tf_bkg)
     bkgbkg = dis.euclidean(tf_bkg, tf_bkg)
 
-elif args.distance == "cityblock":
+elif distance == "cityblock":
     sigsig = dis.cityblock(tf_sig, tf_sig)
     sigbkg = dis.cityblock(tf_sig, tf_bkg)
     bkgbkg = dis.cityblock(tf_bkg, tf_bkg)
 
-elif args.distance == "cosine":
+elif distance == "cosine":
     sigsig = dis.cosine(tf_sig, tf_sig)
     sigbkg = dis.cosine(tf_sig, tf_bkg)
     bkgbkg = dis.cosine(tf_bkg, tf_bkg)
@@ -134,7 +139,7 @@ print(tf.reduce_sum(tf.cast(tf.math.is_nan(sigbkg), tf.int32)))
 print(tf.reduce_sum(tf.cast(tf.math.is_nan(bkgbkg), tf.int32)))
 
 # plot the (sampled) MAD-normed distances
-logging.info("Converting distance and weight tensors to numpy arrays for saving and plotting ... ")
+logging.info("Converting distance and weight tensors to np arrays for saving and plotting ... ")
 np_sigsig = sigsig.numpy().flatten()
 np_sigbkg = sigbkg.numpy().flatten()
 np_bkgbkg = bkgbkg.numpy().flatten()
@@ -143,16 +148,14 @@ np_sigbkg_wgt = sigbkg_wgt.numpy().flatten()
 np_bkgbkg_wgt = bkgbkg_wgt.numpy().flatten()
 
 logging.info('Writing to h5...')
-save_path = "/data/atlas/atlasdata3/maggiechen/gnn_project/distances/"
-
-sigsig_file = save_path+str(args.variable)+"_"+str(args.distance)+"_sigsig_sampled_train.h5"
-sigbkg_file = save_path+str(args.variable)+"_"+str(args.distance)+"_sigbkg_sampled_train.h5"
-bkgbkg_file = save_path+str(args.variable)+"_"+str(args.distance)+"_bkgbkg_sampled_train.h5"
+save_path = path+"distances/"
+misc.create_dirs(save_path)
+sigsig_file, sigbkg_file, bkgbkg_file = misc.get_h5_paths(save_path, variable, distance)
 f_sigsig = h5py.File(sigsig_file, "w")
 f_sigbkg = h5py.File(sigbkg_file, "w")
 f_bkgbkg = h5py.File(bkgbkg_file, "w")
 
-dtype = numpy.dtype([('distance', numpy.float32), ('weight', numpy.float32)])
+dtype = np.dtype([('distance', np.float32), ('weight', np.float32)])
 sigsig_dset = f_sigsig.create_dataset("sigsig", shape=(len(np_sigsig),), dtype=dtype, chunks=True, compression="gzip")
 sigbkg_dset = f_sigbkg.create_dataset("sigbkg", shape=(len(np_sigbkg),), dtype=dtype, chunks=True, compression="gzip")
 bkgbkg_dset = f_bkgbkg.create_dataset("bkgbkg", shape=(len(np_bkgbkg),), dtype=dtype, chunks=True, compression="gzip")
@@ -170,22 +173,15 @@ f_sigbkg.close()
 f_bkgbkg.close()
 
 logging.info("Plotting ...")
-nBins=100
-if args.distance == "cityblock":
+if distance == "cityblock":
     x_max = 40
-elif args.distance == "euclidean":
+elif distance == "euclidean":
     x_max = 20
-elif args.distance == "cosine":
+elif distance == "cosine":
     x_max = 2
 else:
-    print('Eh?')
-binning=numpy.linspace(0,max(np_bkgbkg),nBins)
-fig, ax = plt.subplots()
-#binning = numpy.linspace(0,max(sigbkg),nBins)
-ax.hist(np_sigsig, bins=binning, label="sig-sig", alpha=0.5, weights=np_sigsig_wgt, density=True)
-ax.hist(np_sigbkg, bins=binning, label="sig-bkg", alpha=0.5, weights=np_sigbkg_wgt, density=True)
-ax.hist(np_bkgbkg, bins=binning, label="bkg-bkg", alpha=0.5, weights=np_bkgbkg_wgt, density=True)
-ax.legend(loc='upper right')
-ax.set_xlabel(str(args.variable)+"_"+str(args.distance) +" distance", loc="right")
-ax.set_ylabel("Normalised No. Events", loc="top")
-fig.savefig("/data/atlas/atlasdata3/maggiechen/gnn_project/plots/MAD_norm_weighted/"+str(args.variable)+"/"+str(args.variable)+"_"+str(args.distance)+"_distances.pdf")
+    raise Exception('Eh?, pick a better distance metric (cityblock, eucidean, cosine)')
+
+plot_path = path+"plots/MAD_norm_weighted/"+variable+"/"
+misc.create_dirs(plot_path)
+plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path)
