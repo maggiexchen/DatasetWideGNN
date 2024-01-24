@@ -52,6 +52,14 @@ def GetParser():
       help="Specify the path to store all the input/output data and results",
   )
 
+  parser.add_argument(
+      "--data_dir",
+      "-i",
+      type=str,
+      required=False,
+      help="Specify the path to store all the input/output data and results",
+  )
+
 
   args = parser.parse_args()
   return args
@@ -67,19 +75,23 @@ if args.path:
     path = args.path
     if path[-1]!="/": path += "/"
 
+data_dir = "data/hhh_split_files/"
+if args.data_dir:
+    data_dir = args.data_dir
+    if data_dir[-1]!="/": data_dir += "/"
+
 logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("do sampling? "+str(sample))
-logging.info("input/output path: "+path)
+logging.info("output path: "+path)
+logging.info("input path: "+data_dir)
 
 kinematics = misc.get_kinematics(variable)
 
 # load in input files
 logging.info('Importing signal and background files...')
-file_path = path+"split_files/"
-
-df_sig = pd.read_hdf(file_path+"sig_train.h5", key="sig_train")
-df_bkg = pd.read_hdf(file_path+"bkg_train.h5", key="bkg_train")
+df_sig = pd.read_hdf(data_dir+"sig_train.h5", key="sig_train")
+df_bkg = pd.read_hdf(data_dir+"bkg_train.h5", key="bkg_train")
 
 # randomly sample from the training datasets for linking length calculation if specified
 if sample == True:
