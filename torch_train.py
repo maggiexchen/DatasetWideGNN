@@ -139,13 +139,16 @@ with open(ll_path, 'r') as lfile:
 
 # calculate distances and generate adjacency matrix in batches
 logging.info('Calculating training and validation distances in batches...')
-train_adj_mat = adj.generate_adj_mat(train_x, train_wgts, distance, linking_length)
-val_adj_mat = adj.generate_adj_mat(val_x, val_wgts, distance, linking_length)
+# train_adj_mat = adj.generate_adj_mat(train_x, train_wgts, distance, linking_length)
+# val_adj_mat = adj.generate_adj_mat(val_x, val_wgts, distance, linking_length)
+full_x = torch.cat((train_x, val_x), dim=0)
+full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
+full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 
 # Load in training dataset, adjacency matrix, labels
 # Load in validation dataset, adjacency matrix, labels
-train_dataset = TensorDataset(train_x, train_adj_mat, train_truth_labels)
-val_dataset = TensorDataset(val_x, val_adj_mat, val_truth_labels)
+# train_dataset = TensorDataset(train_x, train_adj_mat, train_truth_labels)
+# val_dataset = TensorDataset(val_x, val_adj_mat, val_truth_labels)
 
 # Define loss function for binary classification and ADAM optimiser
 loss_function = nn.BCELoss()
@@ -157,19 +160,21 @@ for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
     if args.model == "gcn":
-        train_outputs = model(train_x, train_adj_mat)
+        full_outputs = model(full_x, full_adj_mat)
     elif args.model == "dnn":
-        train_outputs = model(train_x)
+        full_outputs = model(full_x)
+    train_outputs = full_outputs[:len(train_x)]
+    val_outputs = full_outputs[len(train_x):]
     loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze())
     loss.backward()
     train_loss.append(loss.item())
     optimiser.step()
 
     model.eval()
-    if args.model == "gcn":
-        val_outputs = model(val_x, val_adj_mat)
-    elif args.model == "dnn":
-        val_outputs = model(val_x)
+    # if args.model == "gcn":
+    #     val_outputs = model(val_x, val_adj_mat)
+    # elif args.model == "dnn":
+    #     val_outputs = model(val_x)
     validation_loss = loss_function(val_outputs.squeeze(), val_truth_labels.squeeze())
     val_loss.append(validation_loss.item())
 
