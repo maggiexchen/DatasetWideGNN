@@ -133,22 +133,15 @@ ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_leng
 misc.create_dirs(ll_path)
 with open(ll_path, 'r') as lfile:
     length_dict = json.load(lfile)
-    lengths = length_dict["length"]
+    lengths = length_dict["ss_bb_length"]
     linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
     logging.info("linking length ="+str(linking_length))
 
 # calculate distances and generate adjacency matrix in batches
-logging.info('Calculating training and validation distances in batches...')
-# train_adj_mat = adj.generate_adj_mat(train_x, train_wgts, distance, linking_length)
-# val_adj_mat = adj.generate_adj_mat(val_x, val_wgts, distance, linking_length)
+logging.info('Calculating training and validation distances ...')
 full_x = torch.cat((train_x, val_x), dim=0)
 full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
 full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
-
-# Load in training dataset, adjacency matrix, labels
-# Load in validation dataset, adjacency matrix, labels
-# train_dataset = TensorDataset(train_x, train_adj_mat, train_truth_labels)
-# val_dataset = TensorDataset(val_x, val_adj_mat, val_truth_labels)
 
 # Define loss function for binary classification and ADAM optimiser
 loss_function = nn.BCELoss()
@@ -171,16 +164,11 @@ for epoch in range(epochs):
     optimiser.step()
 
     model.eval()
-    # if args.model == "gcn":
-    #     val_outputs = model(val_x, val_adj_mat)
-    # elif args.model == "dnn":
-    #     val_outputs = model(val_x)
     validation_loss = loss_function(val_outputs.squeeze(), val_truth_labels.squeeze())
     val_loss.append(validation_loss.item())
 
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {loss.item()}, Validation Loss: {validation_loss.item()}')
 
-logging.info("Plotting training outputs ...")
 train_outputs = train_outputs.view(-1)
 train_label_bool = train_truth_labels.bool()
 train_sig_pred = train_outputs[train_label_bool]
@@ -200,54 +188,36 @@ val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().numpy(), val_out
 val_auc = roc_auc_score(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
 print("Validation AUC", val_auc)
 
-#binning = numpy.linspace(0,1,50)
+logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
 binning = numpy.linspace(0,1,50)
-ax.hist(val_sig_pred.detach().numpy(), bins=binning, label="Signal", alpha=0.5, density=True)
-ax.hist(val_bkg_pred.detach().numpy(), bins=binning, label="Background", alpha=0.5, density=True)
-ax.text(0.04, 0.93, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.text(0.04, 0.88, "Standardised kinematics", verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.legend(loc='upper right')
+ax.hist(train_sig_pred.detach().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange")
+ax.hist(train_bkg_pred.detach().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue")
+ax.hist(val_sig_pred.detach().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange")
+ax.hist(val_bkg_pred.detach().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue")
+ax.text(0.04, 0.93, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=8, transform=ax.transAxes)
+ax.text(0.04, 0.88, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=8, transform=ax.transAxes)
+ax.text(0.04, 0.83, "6b Resonant TRSM signal, 5b Data", verticalalignment="bottom", size=8, transform=ax.transAxes)
+ax.text(0.04, 0.78, "Standardised kinematics", verticalalignment="bottom", size=8, transform=ax.transAxes)
+ax.legend(loc='upper right', fontsize=8)
 ax.set_xlabel("GNN Score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
+ymin, ymax = ax.get_ylim()
+ax.set_ylim((ymin, ymax*1.2))
 fig_path = path + "plots/GCN/"
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_validation_pred.pdf", transparent=True)
-
-fig, ax = plt.subplots()
-binning = numpy.linspace(0,1,50)
-ax.hist(train_sig_pred.detach().numpy(), bins=binning, label="Signal", alpha=0.5, density=True)
-ax.hist(train_bkg_pred.detach().numpy(), bins=binning, label="Background", alpha=0.5, density=True)
-ax.text(0.04, 0.93, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.text(0.04, 0.88, "Standardised kinematics", verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.legend(loc='upper right')
-ax.set_xlabel("GNN Score", loc="right")
-ax.set_ylabel("Normalised No. Events", loc="top")
-fig_path = path + "plots/GCN/"
-misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_training_pred.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_training_validation_pred.pdf", transparent=True)
 
 logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
 plt.plot(train_fpr, train_tpr, label='Training ROC curve (AUC = {:.3f})'.format(train_auc))
-plt.legend(loc="upper left", fontsize=10)
-ymin, ymax = plt.ylim()
-plt.ylim(ymin, ymax*1.2)
-plt.xlim(0,1)
-plt.xlabel("Background Efficiency")
-plt.ylabel("Signal Efficiency")
-fig_path = path + "plots/GCN/"
-misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_training_ROC.pdf", transparent=True)
-
-fig, ax = plt.subplots()
 plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
-plt.legend(loc="upper left", fontsize=10)
+plt.legend(loc="upper left", fontsize=8)
 ymin, ymax = plt.ylim()
 plt.ylim(ymin, ymax*1.2)
 plt.xlim(0,1)
-plt.xlabel("Background Efficiency")
-plt.ylabel("Signal Efficiency")
+plt.xlabel("Background Efficiency", loc="right")
+plt.ylabel("Signal Efficiency", loc="top")
 fig_path = path + "plots/GCN/"
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_validation_ROC.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_training_validation_ROC.pdf", transparent=True)
