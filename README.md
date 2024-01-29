@@ -32,3 +32,4 @@ python torch_train.py -v <type of variables> -d <distance> -e <sig-sig eff> -m <
 ```
 The sig-sig efficiencies that are supported so far are `0.6`, `0.7`,` 0.8` and `0.9`. 
 The model can be specified by using either `gcn` or `dnn` in the `-m` flag.
+The adjacency matrix can be normlalised by the inverse of the degree centrality of each event. The normalisation can be $`D^{-1} A`$, or $`D^{-1/2} A D^{-1/2}`$ which can be specified using `D_inv` or `D_half_inv` in the `-n` flag. There is also an option to preseve the self-connections in the adjacency matrix by keep the diagonal elements as one, which can be specified as `D_inv_self` or `D_half_inv_self`.
