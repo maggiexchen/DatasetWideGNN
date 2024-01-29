@@ -84,6 +84,14 @@ def GetParser():
         help="Specify the type of model",
     )
 
+    parser.add_argument(
+        "--normalisation",
+        "-n",
+        type=str,
+        required=True,
+        help="Specify the type of adjacency matrix normalisation ('None', 'D_inv', 'D_inv_self', 'D_half_inv', 'D_half_inv_self')",
+    )
+
     args = parser.parse_args()
     return args
 
@@ -139,6 +147,8 @@ logging.info("chosen model: "+modelname)
 logging.info('Importing signal and background files...')
 train_sig, train_bkg, train_x, train_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics)
 val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics)
+full_sig = torch.cat((train_sig, val_sig), dim=0)
+full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 
 # read in linking length calculated from sampled training data
 sigsig_eff = eff
@@ -156,6 +166,34 @@ full_x = torch.cat((train_x, val_x), dim=0)
 full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
 full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 
+# calcualte centrality
+logging.info("Calculating degree centrality ...")
+deg_cent = torch.sum(full_adj_mat, dim=1)
+deg_cent_numpy = deg_cent.detach().numpy()
+deg_cent_numpy = norm.standardise(deg_cent_numpy)
+sig_deg_cent = deg_cent_numpy[: len(full_sig)]
+bkg_deg_cent = deg_cent_numpy[len(full_sig):]
+
+if args.normalisation == "None":
+    adj_mat = full_adj_mat
+elif args.normalisation == "D_inv":
+    D_inv = torch.inverse(torch.diag(deg_cent))
+    adj_mat = torch.matmul(D_inv, full_adj_mat)
+elif args.normalisation == "D_inv_self":
+    D_inv = torch.inverse(torch.diag(deg_cent))
+    adj_mat = torch.matmul(D_inv, full_adj_mat)
+    diag_mask = torch.eye(adj_mat.size(0))
+    adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+elif args.normalisation == "D_half_inv":
+    D_half_inv = torch.diag(torch.rsqrt(deg_cent))
+    adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
+elif args.normalisation == "D_half_inv_self":
+    D_half_inv = torch.diag(torch.rsqrt(deg_cent))
+    adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
+    diag_mask = torch.eye(adj_mat.size(0))
+    adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+
+
 # Define loss function for binary classification and ADAM optimiser
 loss_function = nn.BCELoss()
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
@@ -166,7 +204,7 @@ for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
     if args.model == "gcn":
-        full_outputs = model(full_x, full_adj_mat)
+        full_outputs = model(full_x, adj_mat)
     elif args.model == "dnn":
         full_outputs = model(full_x)
     train_outputs = full_outputs[:len(train_x)]
@@ -212,7 +250,7 @@ ax.set_xlabel("Epoch", loc="right")
 ax.set_ylabel("Loss", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_training_validation_loss.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_"+args.normalisation+"_training_validation_loss.pdf", transparent=True)
 
 logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
@@ -232,7 +270,7 @@ ymin, ymax = ax.get_ylim()
 ax.set_ylim((ymin, ymax*1.2))
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_training_validation_pred.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_"+args.normalisation+"_training_validation_pred.pdf", transparent=True)
 
 logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
@@ -246,4 +284,4 @@ plt.xlabel("Background Efficiency", loc="right")
 plt.ylabel("Signal Efficiency", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_training_validation_ROC.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_"+args.normalisation+"_training_validation_ROC.pdf", transparent=True)
