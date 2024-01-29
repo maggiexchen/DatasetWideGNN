@@ -188,14 +188,30 @@ val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().numpy(), val_out
 val_auc = roc_auc_score(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
 print("Validation AUC", val_auc)
 
-logging.info("Plotting model outputs ...")
+
 if args.model == "dnn":
+    model_label = "DNN"
     plot_path = "plots/DNN/"
 elif args.model == "gcn":
+    model_label = "GCN"
     plot_path = "plots/GCN/"
 else:
     print("Please specify either dnn or gcn for --model!")
 
+logging.info("Plotting training/validation losses ...")
+fig, ax = plt.subplots()
+x_epoch = numpy.arange(1,epochs+1,1)
+ax.plot(x_epoch, train_loss, label="Training loss")
+ax.plot(x_epoch, val_loss, label="Validation loss")
+ax.legend(loc='upper right', fontsize=9)
+ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.set_xlabel("Epoch", loc="right")
+ax.set_ylabel("Loss", loc="top")
+fig_path = path + plot_path
+misc.create_dirs(fig_path)
+fig.savefig(fig_path+variable+"_"+modelname+"_training_validation_loss.pdf", transparent=True)
+
+logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
 binning = numpy.linspace(0,1,50)
 ax.hist(train_sig_pred.detach().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange")
@@ -207,7 +223,7 @@ ax.text(0.02, 0.91, "Validation AUC = {:.3f}".format(val_auc), verticalalignment
 ax.text(0.02, 0.87, "6b Resonant TRSM signal, 5b Data", verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.text(0.02, 0.83, "Linking length at sig-sig efficiency "+str(args.eff), verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.legend(loc='upper right', fontsize=9)
-ax.set_xlabel("GNN Score", loc="right")
+ax.set_xlabel("Output score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
 ymin, ymax = ax.get_ylim()
 ax.set_ylim((ymin, ymax*1.2))
