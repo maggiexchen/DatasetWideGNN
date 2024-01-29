@@ -189,22 +189,29 @@ val_auc = roc_auc_score(val_truth_labels.detach().numpy(), val_outputs.detach().
 print("Validation AUC", val_auc)
 
 logging.info("Plotting model outputs ...")
+if args.model == "dnn":
+    plot_path = "plots/DNN/"
+elif args.model == "gcn":
+    plot_path = "plots/GCN/"
+else:
+    print("Please specify either dnn or gcn for --model!")
+
 fig, ax = plt.subplots()
 binning = numpy.linspace(0,1,50)
 ax.hist(train_sig_pred.detach().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange")
 ax.hist(train_bkg_pred.detach().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue")
 ax.hist(val_sig_pred.detach().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange")
 ax.hist(val_bkg_pred.detach().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue")
-ax.text(0.04, 0.93, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=8, transform=ax.transAxes)
-ax.text(0.04, 0.88, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=8, transform=ax.transAxes)
-ax.text(0.04, 0.83, "6b Resonant TRSM signal, 5b Data", verticalalignment="bottom", size=8, transform=ax.transAxes)
-ax.text(0.04, 0.78, "Standardised kinematics", verticalalignment="bottom", size=8, transform=ax.transAxes)
-ax.legend(loc='upper right', fontsize=8)
+ax.text(0.02, 0.95, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.text(0.02, 0.91, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.text(0.02, 0.87, "6b Resonant TRSM signal, 5b Data", verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.text(0.02, 0.83, "Linking length at sig-sig efficiency "+str(args.eff), verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.legend(loc='upper right', fontsize=9)
 ax.set_xlabel("GNN Score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
 ymin, ymax = ax.get_ylim()
 ax.set_ylim((ymin, ymax*1.2))
-fig_path = path + "plots/GCN/"
+fig_path = path + plot_path
 misc.create_dirs(fig_path)
 fig.savefig(fig_path+variable+"_"+modelname+"_training_validation_pred.pdf", transparent=True)
 
@@ -212,12 +219,12 @@ logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
 plt.plot(train_fpr, train_tpr, label='Training ROC curve (AUC = {:.3f})'.format(train_auc))
 plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
-plt.legend(loc="upper left", fontsize=8)
+plt.legend(loc="upper left", fontsize=9)
 ymin, ymax = plt.ylim()
 plt.ylim(ymin, ymax*1.2)
 plt.xlim(0,1)
 plt.xlabel("Background Efficiency", loc="right")
 plt.ylabel("Signal Efficiency", loc="top")
-fig_path = path + "plots/GCN/"
+fig_path = path + plot_path
 misc.create_dirs(fig_path)
 fig.savefig(fig_path+variable+"_"+modelname+"_training_validation_ROC.pdf", transparent=True)

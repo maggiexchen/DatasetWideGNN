@@ -99,14 +99,16 @@ if sample == True:
     df_sig = df_sig.sample(n=1500)
     df_bkg = df_bkg.sample(n=3000)
 
-logging.info("MAD scaling...")
-# normalise kinematic values using MAD scaling
+logging.info("Standardising ...")
+# Standardising kinematics 
+df_all = pd.concat([df_sig, df_bkg], axis=0)
 for var in kinematics:
-    df_sig.loc[:, var], df_bkg.loc[:, var] = norm.MAD_norm(df_sig.loc[:, var], df_bkg.loc[:, var])
+    df_all.loc[:, var] = norm.standardise(df_all.loc[:, var])
+df_sig = df_all.iloc[:len(df_sig)]
+df_bkg = df_all.iloc[len(df_sig):]
 
 # convert pandas dataframes to tf tensors
 # only the kinematics used in distance calculation and weights need to be converted to tensors here for matrix multiplications
-
 logging.info("Converting to tf tensors...")
 tf_sig = df_sig[kinematics]
 tf_bkg = df_bkg[kinematics]
@@ -191,6 +193,6 @@ elif distance == "cosine":
 else:
     raise Exception('Eh?, pick a better distance metric (cityblock, eucidean, cosine)')
 
-plot_path = path+"plots/MAD_norm_weighted/"+variable+"/"
+plot_path = path+"plots/standardised_weighted/"+variable+"/"
 misc.create_dirs(plot_path)
 plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path)

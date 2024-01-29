@@ -53,3 +53,18 @@ def reverse_minmax(norm_value, d_min, d_max):
     value = norm_value * (d_max-d_min) + d_min
 
     return value
+
+# standardise the distributions
+def standardise(dist):
+    """
+    Function to normalise a distribution to have zero mean and unit standard deviation.
+
+    Args:
+        dist (numpy.array): array to normalise
+
+    Returns:
+        (numpy.array): standardised array
+    """
+    mean = numpy.mean(dist)
+    std = numpy.std(dist)
+    return (dist-mean)/std

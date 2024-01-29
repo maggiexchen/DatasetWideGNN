@@ -80,6 +80,7 @@ logging.info("Min bgbg distance = "+str(min(bkgbkg_distance))+", Max bgbg distan
 # calculate ROC values for sigsig and bkgbkg
 # Between sigsig (0) and bkgbkg (1)
 # Need to normalise the distances to be between 0 and 1, e.g. using minmax normalisation
+# This normalisation shouldn't change the shape and the relative scale of the distance distributions (can be checked in plots)
 
 logging.info("Minmax normalising distances and plotting ...")
 d_max = max(max(sigbkg_distance), max(bkgbkg_distance))
@@ -87,7 +88,7 @@ norm_sigsig = norm.minmax(sigsig_distance, 0, d_max)
 norm_sigbkg = norm.minmax(sigbkg_distance, 0, d_max)
 norm_bkgbkg = norm.minmax(bkgbkg_distance, 0, d_max)
 
-plot_path = path+"plots/MAD_norm_weighted/"+variable+"/"
+plot_path = path+"plots/standardised_weighted/"+variable+"/"
 misc.create_dirs(plot_path)
 plotting.plot_distances(norm_sigsig, norm_sigbkg, norm_bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, variable, distance, plot_path, label="minmaxNormed")
 
@@ -107,7 +108,7 @@ roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(),
             "ss_sb_sig_cut": cut_ss_sb.tolist(),
             "tpr_sb_bb": tpr_ss_bb.tolist(),
             "fpr_sb_bb": fpr_ss_bb.tolist()}
-roc_path = path+"plots/MAD_norm_weighted/ROC/"+variable+"_"+distance+"_ROC.json"
+roc_path = path+"plots/standardised_weighted/ROC/"+variable+"_"+distance+"_ROC.json"
 misc.create_dirs(roc_path)
 with open(roc_path, "w") as outfile:
     json.dump(roc_dict, outfile)
@@ -156,14 +157,16 @@ ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=a
 ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
 ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
 y_min, y_max = ax.get_ylim()
+x_min, x_max = ax.get_xlim()
 for i, eff in enumerate(sigsig_eff):
-    ax.axvline(x=ss_thresholds[i], ymax=0.7+i*0.02, linestyle="--", color="red")
-    ax.text(x=ss_thresholds[i], y=0.75+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_labels[i], ha='center', va='bottom', fontsize=7)
+    ax.axvline(x=ss_thresholds[i], ymax=0.6+i*0.05, linestyle="--", color="red")
+    ax.text(x=ss_thresholds[i], y=0.65+i*0.05, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_labels[i], ha='center', va='bottom', fontsize=7)
 ax.legend(loc='upper right')
 ax.set_ylim(y_min, y_max*1.2)
+ax.set_xlim(x_min, x_max*0.8)
 ax.set_xlabel(variable + distance +"distance", loc="right")
 ax.set_ylabel("Normalised # event pairs / bin", loc="top")
-ssbb_path = path+"plots/MAD_norm_weighted/linking_lengths/"
+ssbb_path = path+"plots/standardised_weighted/linking_lengths/"
 misc.create_dirs(ssbb_path)
 fig.savefig(ssbb_path+"/"+variable+"_"+distance+"_linking_lengths.pdf", transparent=True)
 
@@ -180,6 +183,6 @@ plt.ylim(0.,1.)
 plt.xlim(0.,1.)
 plt.xlabel("sig(bkg)-bkg Efficiency")
 plt.ylabel("sig-sig Efficiency")
-plot_name = path+"plots/MAD_norm_weighted/ROC/"
+plot_name = path+"plots/standardised_weighted/ROC/"
 misc.create_dirs(plot_name)
 fig.savefig(plot_name+"/"+variable+"_"+distance+"_ROC.pdf", transparent=True)
