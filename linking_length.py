@@ -13,40 +13,41 @@ from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, au
 import utils.normalisation as norm
 import utils.misc as misc
 import utils.plotting as plotting
+import utils.performance as perf
 
 def GetParser():
-  """Argument parser for reading Ntuples script."""
-  parser = argparse.ArgumentParser(
-      description="Reading Ntuples command line options."
-  )
+    """Argument parser for reading Ntuples script."""
+    parser = argparse.ArgumentParser(
+        description="Reading Ntuples command line options."
+    )
 
-  parser.add_argument(
-      "--variable",
-      "-v",
-      type=str,
-      required=True,
-      help="Specify the type of kinematic variables to calculate distance for",
-  )
+    parser.add_argument(
+        "--variable",
+        "-v",
+        type=str,
+        required=True,
+        help="Specify the type of kinematic variables to calculate distance for",
+    )
 
-  parser.add_argument(
-      "--distance",
-      "-d",
-      type=str,
-      required=True,
-      help="Specify the type of distance to calculate",
-  )
+    parser.add_argument(
+        "--distance",
+        "-d",
+        type=str,
+        required=True,
+        help="Specify the type of distance to calculate",
+    )
 
-  parser.add_argument(
-      "--path",
-      "-p",
-      type=str,
-      required=False,
-      help="Specify the path to store all the input/output data and results",
-  )
+    parser.add_argument(
+        "--path",
+        "-p",
+        type=str,
+        required=False,
+        help="Specify the path to store all the input/output data and results",
+    )
 
 
-  args = parser.parse_args()
-  return args
+    args = parser.parse_args()
+    return args
 
 args = GetParser()
 
@@ -96,23 +97,8 @@ logging.info("Calculating and saving ROC to json ...")
 # the actual tpr we want is the fraction of sigsig below a certain cut: (1-fpr)
 # and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tpr)
 
-def calc_ROC(sig, bkg, sig_wgt, bkg_wgt):
-    y_sig = [0]*len(sig)
-    y_bkg = [1]*len(bkg)
-    x_combined = np.concatenate((sig, bkg))
-    y_combined = np.concatenate((y_sig, y_bkg))
-    wgt_combined = np.concatenate((sig_wgt, bkg_wgt))
-
-    fpr, tpr, cut = roc_curve(y_combined, x_combined, sample_weight=wgt_combined)
-    auc = roc_auc_score(y_combined, x_combined, sample_weight=wgt_combined)
-
-    true_tpr = 1-fpr
-    true_fpr = 1-tpr
-
-    return true_tpr, true_fpr, cut, auc
-
-tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = calc_ROC(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt)
-tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = calc_ROC(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt)
+tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = perf.calc_ROC(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt)
+tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = perf.calc_ROC(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt)
 
 # saving roc and auc to json file
 roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(),
@@ -124,7 +110,7 @@ roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(),
 roc_path = path+"plots/MAD_norm_weighted/ROC/"+variable+"_"+distance+"_ROC.json"
 misc.create_dirs(roc_path)
 with open(roc_path, "w") as outfile:
-  json.dump(roc_dict, outfile)
+    json.dump(roc_dict, outfile)
 
 # pick sig-sig efficiencies at 0.7, 0.8, 0.9
 def find_threshold(tpr, fpr, eff, cut):
@@ -154,7 +140,7 @@ length_dict = {"sigsig_eff": sigsig_eff, "length": ss_thresholds}
 ll_path = path+"linking_lengths/"+variable+"_"+distance+"_linking_length.json"
 misc.create_dirs(ll_path)
 with open(ll_path, "w") as lengthfile:
-  json.dump(length_dict, lengthfile)
+    json.dump(length_dict, lengthfile)
 
 logging.info("Plotting distance with linking lengths selected from ROC ...")
 nBins = 100

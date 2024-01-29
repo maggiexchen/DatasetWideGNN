@@ -16,45 +16,53 @@ import utils.misc as misc
 import utils.plotting as plotting
 
 def GetParser():
-  """Argument parser for reading Ntuples script."""
-  parser = argparse.ArgumentParser(
-      description="Reading Ntuples command line options."
-  )
+    """Argument parser for reading Ntuples script."""
+    parser = argparse.ArgumentParser(
+        description="Reading Ntuples command line options."
+    )
 
-  parser.add_argument(
-      "--variable",
-      "-v",
-      type=str,
-      required=True,
-      help="Specify the type of kinematic variables to calculate distance for",
-  )
+    parser.add_argument(
+        "--variable",
+        "-v",
+        type=str,
+        required=True,
+        help="Specify the type of kinematic variables to calculate distance for",
+    )
 
-  parser.add_argument(
-      "--distance",
-      "-d",
-      type=str,
-      required=True,
-      help="Specify the type of distance to calculate",
-  )
+    parser.add_argument(
+        "--distance",
+        "-d",
+        type=str,
+        required=True,
+        help="Specify the type of distance to calculate",
+    )
 
-  parser.add_argument(
-      "--sample",
-      "-s",
-      action="store_true",
-      help="Specify whether the datasets are sampled",
-  )
+    parser.add_argument(
+        "--sample",
+        "-s",
+        action="store_true",
+        help="Specify whether the datasets are sampled",
+    )
 
-  parser.add_argument(
-      "--path",
-      "-p",
-      type=str,
-      required=False,
-      help="Specify the path to store all the input/output data and results",
-  )
+    parser.add_argument(
+        "--path",
+        "-p",
+        type=str,
+        required=False,
+        help="Specify the path to store all the input/output data and results",
+    )
+
+    parser.add_argument(
+        "--data_dir",
+        "-i",
+        type=str,
+        required=False,
+        help="Specify the path to store all the input/output data and results",
+    )
 
 
-  args = parser.parse_args()
-  return args
+    args = parser.parse_args()
+    return args
 
 args = GetParser()
 
@@ -67,19 +75,23 @@ if args.path:
     path = args.path
     if path[-1]!="/": path += "/"
 
+data_dir = "data/hhh_split_files/"
+if args.data_dir:
+    data_dir = args.data_dir
+    if data_dir[-1]!="/": data_dir += "/"
+
 logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("do sampling? "+str(sample))
-logging.info("input/output path: "+path)
+logging.info("output path: "+path)
+logging.info("input path: "+data_dir)
 
 kinematics = misc.get_kinematics(variable)
 
 # load in input files
 logging.info('Importing signal and background files...')
-file_path = path+"split_files/"
-
-df_sig = pd.read_hdf(file_path+"sig_train.h5", key="sig_train")
-df_bkg = pd.read_hdf(file_path+"bkg_train.h5", key="bkg_train")
+df_sig = pd.read_hdf(data_dir+"sig_train.h5", key="sig_train")
+df_bkg = pd.read_hdf(data_dir+"bkg_train.h5", key="bkg_train")
 
 # randomly sample from the training datasets for linking length calculation if specified
 if sample == True:
@@ -119,17 +131,14 @@ if distance == "euclidean":
     sigsig = dis.euclidean(tf_sig, tf_sig)
     sigbkg = dis.euclidean(tf_sig, tf_bkg)
     bkgbkg = dis.euclidean(tf_bkg, tf_bkg)
-
 elif distance == "cityblock":
     sigsig = dis.cityblock(tf_sig, tf_sig)
     sigbkg = dis.cityblock(tf_sig, tf_bkg)
     bkgbkg = dis.cityblock(tf_bkg, tf_bkg)
-
 elif distance == "cosine":
     sigsig = dis.cosine(tf_sig, tf_sig)
     sigbkg = dis.cosine(tf_sig, tf_bkg)
     bkgbkg = dis.cosine(tf_bkg, tf_bkg)
-
 else:
     print("Specify a valid distance please!")
 

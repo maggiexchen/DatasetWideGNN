@@ -38,53 +38,53 @@ logging.getLogger().setLevel(logging.INFO)
 #import pdb
 
 def GetParser():
-  """Argument parser for reading Ntuples script."""
-  parser = argparse.ArgumentParser(
-      description="Reading Ntuples command line options."
-  )
+    """Argument parser for reading Ntuples script."""
+    parser = argparse.ArgumentParser(
+        description="Reading Ntuples command line options."
+    )
 
-  parser.add_argument(
-      "--variable",
-      "-v",
-      type=str,
-      required=True,
-      help="Specify the type of kinematic variables to calculate distance for",
-  )
+    parser.add_argument(
+        "--variable",
+        "-v",
+        type=str,
+        required=True,
+        help="Specify the type of kinematic variables to calculate distance for",
+    )
 
-  parser.add_argument(
-      "--distance",
-      "-d",
-      type=str,
-      required=True,
-      help="Specify the type of distance to calculate",
-  )
+    parser.add_argument(
+        "--distance",
+        "-d",
+        type=str,
+        required=True,
+        help="Specify the type of distance to calculate",
+    )
 
-  parser.add_argument(
-      "--eff",
-      "-e",
-      type=float,
-      required=True,
-      help="Specify sig-sig efficiency for the linking length",
-  )
+    parser.add_argument(
+        "--eff",
+        "-e",
+        type=float,
+        required=True,
+        help="Specify sig-sig efficiency for the linking length",
+    )
 
-  parser.add_argument(
-      "--path",
-      "-p",
-      type=str,
-      required=False,
-      help="Specify the path to store all the input/output data and results",
-  )
+    parser.add_argument(
+        "--path",
+        "-p",
+        type=str,
+        required=False,
+        help="Specify the path to store all the input/output data and results",
+    )
 
-  parser.add_argument(
-      "--model",
-      "-m",
-      type=str,
-      required=True,
-      help="Specify the type of model",
-  )
+    parser.add_argument(
+        "--model",
+        "-m",
+        type=str,
+        required=True,
+        help="Specify the type of model",
+    )
 
-  args = parser.parse_args()
-  return args
+    args = parser.parse_args()
+    return args
 
 args = GetParser()
 
@@ -116,18 +116,16 @@ elif (modelname.lower() == "dnn"):
 else:
     raise Exception("Janky, pick a defined model (dnn, gcn)")
 
-
 logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("input/output path: "+path)
 logging.info("desired efficieny: "+str(eff))
 logging.info("chosen model: "+modelname)
 
-
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
-train_sig, train_bkg, train_x, train_wgts, train_truth_labels = adj.data_loader(path, "train", kinematics)
-val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader(path, "val", kinematics)
+train_sig, train_bkg, train_x, train_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics)
+val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics)
 
 # read in linking length calculated from sampled training data
 sigsig_eff = eff
@@ -140,14 +138,17 @@ with open(ll_path, 'r') as lfile:
     logging.info("linking length ="+str(linking_length))
 
 # calculate distances and generate adjacency matrix in batches
-logging.info('Calculating training and validaiton distances in batches...')
-train_adj_mat = adj.generate_adj_mat(train_x, train_wgts, distance, linking_length)
-val_adj_mat = adj.generate_adj_mat(val_x, val_wgts, distance, linking_length)
+logging.info('Calculating training and validation distances in batches...')
+# train_adj_mat = adj.generate_adj_mat(train_x, train_wgts, distance, linking_length)
+# val_adj_mat = adj.generate_adj_mat(val_x, val_wgts, distance, linking_length)
+full_x = torch.cat((train_x, val_x), dim=0)
+full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
+full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 
-# # Load in training dataset, adjacency matrix, labels
-# # Load in validation dataset, adjacency matrix, labels
-train_dataset = TensorDataset(train_x, train_adj_mat, train_truth_labels)
-val_dataset = TensorDataset(val_x, val_adj_mat, val_truth_labels)
+# Load in training dataset, adjacency matrix, labels
+# Load in validation dataset, adjacency matrix, labels
+# train_dataset = TensorDataset(train_x, train_adj_mat, train_truth_labels)
+# val_dataset = TensorDataset(val_x, val_adj_mat, val_truth_labels)
 
 # Define loss function for binary classification and ADAM optimiser
 loss_function = nn.BCELoss()
@@ -159,19 +160,21 @@ for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
     if args.model == "gcn":
-        train_outputs = model(train_x, train_adj_mat)
+        full_outputs = model(full_x, full_adj_mat)
     elif args.model == "dnn":
-        train_outputs = model(train_x)
+        full_outputs = model(full_x)
+    train_outputs = full_outputs[:len(train_x)]
+    val_outputs = full_outputs[len(train_x):]
     loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze())
     loss.backward()
     train_loss.append(loss.item())
     optimiser.step()
 
     model.eval()
-    if args.model == "gcn":
-        val_outputs = model(val_x, val_adj_mat)
-    elif args.model == "dnn":
-        val_outputs = model(val_x)
+    # if args.model == "gcn":
+    #     val_outputs = model(val_x, val_adj_mat)
+    # elif args.model == "dnn":
+    #     val_outputs = model(val_x)
     validation_loss = loss_function(val_outputs.squeeze(), val_truth_labels.squeeze())
     val_loss.append(validation_loss.item())
 
