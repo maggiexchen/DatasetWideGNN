@@ -133,7 +133,7 @@ ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_leng
 misc.create_dirs(ll_path)
 with open(ll_path, 'r') as lfile:
     length_dict = json.load(lfile)
-    lengths = length_dict["ss_bb_length"]
+    lengths = length_dict["length"]
     linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
     logging.info("linking length ="+str(linking_length))
 
