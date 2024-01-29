@@ -32,10 +32,6 @@ def euclidean(a, b):
     a_expanded = torch.unsqueeze(a, dim=1)
     b_expanded = torch.unsqueeze(b, dim=0)
 
-    print(a_expanded)
-    print(b_expanded)
-    print(a_expanded-b_expanded)
-
     return torch.transpose(torch.sqrt(torch.sum(torch.square(a_expanded-b_expanded),dim=-1)),0,1)
 
 def cityblock(a, b):

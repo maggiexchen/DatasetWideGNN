@@ -5,6 +5,7 @@ import h5py
 import json
 import math
 import random
+import yaml
 import os
 os.environ["NUMEXPR_MAX_THREADS"] = "16"
 from scipy.spatial.distance import pdist, squareform
@@ -87,6 +88,16 @@ def GetParser():
     return args
 
 args = GetParser()
+if args.model == "dnn":
+    model_label = "DNN"
+    plot_path = "plots/DNN/"
+    config_path = "config/dnn.yaml"
+elif args.model == "gcn":
+    model_label = "GCN"
+    plot_path = "plots/GCN/"
+    config_path = "config/gcn.yaml"
+else:
+    print("Please specify either dnn or gcn for --model!")
 
 variable = str(args.variable)
 distance = str(args.distance)
@@ -101,12 +112,14 @@ if args.path:
 
 kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
-hidden_sizes = [16, 16, 16]
-LR = 0.01
-epochs = 100
+
+train_config = misc.load_config(config_path)
+hidden_sizes = train_config[args.model]["hidden_sizes"]
+LR = train_config[args.model]["LR"]
+epochs = train_config[args.model]["epochs"]
+
 train_loss = []
 val_loss = []
-
 
 modelname = str(args.model)
 if (modelname.lower() == "gcn"):
@@ -187,16 +200,6 @@ fig, ax = plt.subplots()
 val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
 val_auc = roc_auc_score(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
 print("Validation AUC", val_auc)
-
-
-if args.model == "dnn":
-    model_label = "DNN"
-    plot_path = "plots/DNN/"
-elif args.model == "gcn":
-    model_label = "GCN"
-    plot_path = "plots/GCN/"
-else:
-    print("Please specify either dnn or gcn for --model!")
 
 logging.info("Plotting training/validation losses ...")
 fig, ax = plt.subplots()
