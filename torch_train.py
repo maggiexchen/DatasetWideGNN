@@ -18,6 +18,7 @@ import utils.torch_distances as dis
 import utils.adj_mat as adj
 import utils.misc as misc
 import utils.performance as perf
+import utils.plotting as plotting
 from utils.gcn_model import GCNClassifier
 from utils.dnn_model import DNNClassifier
 
@@ -169,10 +170,7 @@ full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 # calcualte centrality
 logging.info("Calculating degree centrality ...")
 deg_cent = torch.sum(full_adj_mat, dim=1)
-deg_cent_numpy = deg_cent.detach().numpy()
-deg_cent_numpy = norm.standardise(deg_cent_numpy)
-sig_deg_cent = deg_cent_numpy[: len(full_sig)]
-bkg_deg_cent = deg_cent_numpy[len(full_sig):]
+plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
 
 if args.normalisation == "None":
     adj_mat = full_adj_mat
@@ -192,6 +190,18 @@ elif args.normalisation == "D_half_inv_self":
     adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
     diag_mask = torch.eye(adj_mat.size(0))
     adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+elif args.normalisation == "D_frac_inv":
+    D_frac_inv = torch.diag(deg_cent / len(full_x))
+    adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
+elif args.normalisation == "D_frac_inv_self":
+    D_frac_inv = torch.diag(deg_cent / len(full_x))
+    adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
+    diag_mask = torch.eye(adj_mat.size(0))
+    adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+
+print("Normalised adjacency matrix\n", adj_mat)
+plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+args.normalisation)
+plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+args.normalisation)
 
 
 # Define loss function for binary classification and ADAM optimiser
