@@ -14,6 +14,7 @@ import utils.normalisation as norm
 import utils.misc as misc
 import utils.plotting as plotting
 import utils.performance as perf
+import utils.graph_definition as graph_def
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -113,12 +114,7 @@ misc.create_dirs(roc_path)
 with open(roc_path, "w") as outfile:
     json.dump(roc_dict, outfile)
 
-# pick sig-sig efficiencies at 0.7, 0.8, 0.9
-def find_threshold(tpr, fpr, eff, cut):
-    # the tpr here is in reverse order with the discriminant cut, so it's <=
-    tpr_index = np.argmax(tpr <= eff)
-    return [tpr[tpr_index], fpr[tpr_index]], cut[tpr_index]
-
+# pick sig-sig efficiencies at 0.6, 0.7, 0.8, 0.9
 sigsig_eff = [0.6, 0.7, 0.8, 0.9]
 eff_labels = ["60%", "70%", "80%", "90%"]
 ss_sb_roc_cuts = []
@@ -129,10 +125,10 @@ ss_thresholds = []
 # finding the tpr, fpr and distance thresholds for each efficiency, then reverse minmax the distance threshold
 # note the ss_bb and ss_sb thresholds are the same as they are just determined as the threshold for the given ss efficiency.
 for eff in sigsig_eff:
-    ss_sb_roc_cut, ss_sb_threshold = find_threshold(tpr_ss_sb,fpr_ss_sb, eff, cut_ss_sb)
+    ss_sb_roc_cut, ss_sb_threshold = graph_def.find_threshold(tpr_ss_sb,fpr_ss_sb, eff, cut_ss_sb)
     ss_sb_roc_cuts.append(ss_sb_roc_cut)
     ss_sb_thresholds.append(norm.reverse_minmax(ss_sb_threshold, 0 ,d_max))
-    ss_bb_roc_cut, ss_bb_threshold = find_threshold(tpr_ss_bb,fpr_ss_bb, eff, cut_ss_bb)
+    ss_bb_roc_cut, ss_bb_threshold = graph_def.find_threshold(tpr_ss_bb,fpr_ss_bb, eff, cut_ss_bb)
     ss_bb_roc_cuts.append(ss_bb_roc_cut)
     ss_thresholds.append(norm.reverse_minmax(ss_bb_threshold, 0 ,d_max))
 
