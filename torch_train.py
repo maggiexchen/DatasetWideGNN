@@ -93,6 +93,12 @@ def GetParser():
         help="Specify the type of adjacency matrix normalisation ('None', 'D_inv', 'D_inv_self', 'D_half_inv', 'D_half_inv_self')",
     )
 
+    parser.add_argument(
+        "--self",
+        action="store_true",
+        help="Specify whether to presever self-connections in adjacency matrix or not"
+    )
+
     args = parser.parse_args()
     return args
 
@@ -177,31 +183,26 @@ if args.normalisation == "None":
 elif args.normalisation == "D_inv":
     D_inv = torch.inverse(torch.diag(deg_cent))
     adj_mat = torch.matmul(D_inv, full_adj_mat)
-elif args.normalisation == "D_inv_self":
-    D_inv = torch.inverse(torch.diag(deg_cent))
-    adj_mat = torch.matmul(D_inv, full_adj_mat)
-    diag_mask = torch.eye(adj_mat.size(0))
-    adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
 elif args.normalisation == "D_half_inv":
     D_half_inv = torch.diag(torch.rsqrt(deg_cent))
     adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
-elif args.normalisation == "D_half_inv_self":
-    D_half_inv = torch.diag(torch.rsqrt(deg_cent))
-    adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
-    diag_mask = torch.eye(adj_mat.size(0))
     adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
 elif args.normalisation == "D_frac_inv":
     D_frac_inv = torch.diag(deg_cent / len(full_x))
     adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
-elif args.normalisation == "D_frac_inv_self":
-    D_frac_inv = torch.diag(deg_cent / len(full_x))
-    adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
+else:
+    print("Specify a sensible normalisation for the adjacency matrix!")
+norm_label = args.normalisation
+
+# Option to preserve self-connections in adjacency matrix
+if args.self:
     diag_mask = torch.eye(adj_mat.size(0))
     adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+    norm_label = norm_label + "_self"
 
 print("Normalised adjacency matrix\n", adj_mat)
-plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+args.normalisation)
-plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+args.normalisation)
+plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+norm_label)
+plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+norm_label)
 
 
 # Define loss function for binary classification and ADAM optimiser
@@ -260,7 +261,7 @@ ax.set_xlabel("Epoch", loc="right")
 ax.set_ylabel("Loss", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_"+args.normalisation+"_training_validation_loss.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_loss.pdf", transparent=True)
 
 logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
@@ -280,7 +281,7 @@ ymin, ymax = ax.get_ylim()
 ax.set_ylim((ymin, ymax*1.2))
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_"+args.normalisation+"_training_validation_pred.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_pred.pdf", transparent=True)
 
 logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
@@ -294,4 +295,4 @@ plt.xlabel("Background Efficiency", loc="right")
 plt.ylabel("Signal Efficiency", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_"+args.normalisation+"_training_validation_ROC.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_ROC.pdf", transparent=True)
