@@ -63,8 +63,12 @@ def plot_kinematic_hists(df_sig, df_bkg, var, file_path):
     # plot
     fig, ax = plt.subplots()
     binning = np.linspace(min(df_bkg.loc[:, var]),max(df_bkg.loc[:, var]), 50)
-    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="MAD-normed sig (6b TRSM)", alpha=0.3, density=True, color="steelblue")
-    yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="MAD-normed bkg (5b data)", alpha=0.3, density=True, color="red")
+    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal (6b TRSM)", alpha=0.3, density=True, color="steelblue")
+    yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background (5b data)", alpha=0.3, density=True, color="red")
+    ax.text(0.04, 0.93, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.04, 0.88, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.04, 0.83, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.04, 0.78, r"Linking length at sig-sig eff 0.8", verticalalignment="bottom", size=10, transform=ax.transAxes)
     # aesthetics
     hep.atlas.label(ax=ax, data=False, label="Internal", lumi="129")
     ax.legend(loc='upper right')
