@@ -120,10 +120,11 @@ eff = args.eff
 if eff not in [0.6, 0.7, 0.8, 0.9]:
     raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
 
-path = "/data/atlas/atlasdata3/maggiechen/gnn_project/"
 if args.path:
     path = args.path
     if path[-1]!="/": path += "/"
+else:
+    path = "/data/atlas/atlasdata3/maggiechen/gnn_project/"
 
 kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
