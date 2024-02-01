@@ -173,8 +173,8 @@ full_x = torch.cat((train_x, val_x), dim=0)
 full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
 full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 
-# calcualte centrality
-logging.info("Calculating degree centrality ...")
+# calculate centrality
+logging.info("Calculating centrality ...")
 deg_cent = torch.sum(full_adj_mat, dim=1)
 plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
 
@@ -187,7 +187,7 @@ elif args.normalisation == "D_half_inv":
     D_half_inv = torch.diag(torch.rsqrt(deg_cent))
     adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
     adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
-elif args.normalisation == "D_frac_inv":
+elif args.normalisation == "D_frac":
     D_frac_inv = torch.diag(deg_cent / len(full_x))
     adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
 else:
