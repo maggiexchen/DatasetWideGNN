@@ -57,7 +57,7 @@ def GetParser():
         "--distance",
         "-d",
         type=str,
-        required=True,
+        required=False,
         help="Specify the type of distance to calculate",
     )
 
@@ -65,7 +65,7 @@ def GetParser():
         "--eff",
         "-e",
         type=float,
-        required=True,
+        required=False,
         help="Specify sig-sig efficiency for the linking length",
     )
 
@@ -90,7 +90,7 @@ def GetParser():
         "-n",
         type=str,
         required=False,
-        help="Specify the type of adjacency matrix normalisation ('None', 'D_inv', 'D_inv_self', 'D_half_inv', 'D_half_inv_self')",
+        help="Specify the type of adjacency matrix normalisation ('None', 'D_inv', 'D_half_inv')",
     )
 
     parser.add_argument(
@@ -99,10 +99,12 @@ def GetParser():
         help="Specify whether to presever self-connections in adjacency matrix or not"
     )
 
-    args = parser.parse_args()
-    return args
+    #args = parser.parse_args()
+    return parser
 
-args = GetParser()
+parser = GetParser()
+args = parser.parse_args()
+
 if args.model == "dnn":
     model_label = "DNN"
     plot_path = "plots/DNN/"
@@ -111,14 +113,18 @@ elif args.model == "gcn":
     model_label = "GCN"
     plot_path = "plots/GCN/"
     config_path = "config/gcn.yaml"
+
+    if args.distance is None:
+        parser.error("Need to specify a type of distance metric for the adjacency matrix")
+    elif args.eff is None:
+        parser.error("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn")
+
+    distance = str(args.distance)
+    eff = args.eff
+    if eff not in [0.6, 0.7, 0.8, 0.9]:
+        raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
 else:
     print("Please specify either dnn or gcn for --model!")
-
-variable = str(args.variable)
-distance = str(args.distance)
-eff = args.eff
-if eff not in [0.6, 0.7, 0.8, 0.9]:
-    raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
 
 if args.path:
     path = args.path
@@ -126,6 +132,7 @@ if args.path:
 else:
     path = "/data/atlas/atlasdata3/maggiechen/gnn_project/"
 
+variable = str(args.variable)
 kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
 
@@ -139,18 +146,17 @@ train_loss = []
 val_loss = []
 
 modelname = str(args.model)
+logging.info("chosen model: "+modelname)
+logging.info("variable set: "+variable)
+logging.info("input/output path: "+path)
 if (modelname.lower() == "gcn"):
     model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1, dropout_rate=dropout_rate)
+    logging.info("distance metric: "+distance)
+    logging.info("desired efficieny: "+str(eff))
 elif (modelname.lower() == "dnn"):
     model = DNNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1, dropout_rate=dropout_rate)
 else:
     raise Exception("Janky, pick a defined model (dnn, gcn)")
-
-logging.info("variable set: "+variable)
-logging.info("distance metric: "+distance)
-logging.info("input/output path: "+path)
-logging.info("desired efficieny: "+str(eff))
-logging.info("chosen model: "+modelname)
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
@@ -159,21 +165,22 @@ val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader("data", "v
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 
-# read in linking length calculated from sampled training data
-sigsig_eff = eff
-ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_length.json"
-misc.create_dirs(ll_path)
-with open(ll_path, 'r') as lfile:
-    length_dict = json.load(lfile)
-    lengths = length_dict["length"]
-    linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
-    logging.info("linking length ="+str(linking_length))
-
-# calculate distances and generate adjacency matrix in batches
-logging.info('Calculating training and validation distances ...')
 full_x = torch.cat((train_x, val_x), dim=0)
 full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
+
 if args.model=="gcn":
+    # read in linking length calculated from sampled training data
+    sigsig_eff = eff
+    ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_length.json"
+    misc.create_dirs(ll_path)
+
+    with open(ll_path, 'r') as lfile:
+        length_dict = json.load(lfile)
+        lengths = length_dict["length"]
+        linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
+        logging.info("linking length ="+str(linking_length))
+    
+    logging.info("Calculating distances and adjacency matrix ...")
     full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 
     # calculate centrality
