@@ -6,7 +6,7 @@ import math
 
 class DNNLayer(nn.Module):
     # TODO add attention layer ...
-    def __init__(self, dim_in, dim_out, use_batch_norm=True):
+    def __init__(self, dim_in, dim_out, dropout_rate, use_batch_norm=True):
         """
         dim_in: dimension of input node features
         dim_out: dimension of output features (for binary classification is 1 for final layer)
@@ -17,10 +17,12 @@ class DNNLayer(nn.Module):
         self.dim_out = dim_out
         self.train_weight = nn.Parameter(torch.FloatTensor(dim_in, dim_out))
         self.train_bias = nn.Parameter(torch.FloatTensor(dim_out))
+
         
         if self.use_batch_norm:
             self.batch_norm = nn.BatchNorm1d(dim_out)
 
+        self.dropout = nn.Dropout(p=dropout_rate)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -32,5 +34,7 @@ class DNNLayer(nn.Module):
         
         if self.use_batch_norm:
             output = self.batch_norm(output)
+
+        output = self.dropout(output)
 
         return output

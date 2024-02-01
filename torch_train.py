@@ -89,7 +89,7 @@ def GetParser():
         "--normalisation",
         "-n",
         type=str,
-        required=True,
+        required=False,
         help="Specify the type of adjacency matrix normalisation ('None', 'D_inv', 'D_inv_self', 'D_half_inv', 'D_half_inv_self')",
     )
 
@@ -132,6 +132,7 @@ input_size = len(kinematics)
 train_config = misc.load_config(config_path)
 hidden_sizes = train_config[args.model]["hidden_sizes"]
 LR = train_config[args.model]["LR"]
+dropout_rate = train_config[args.model]["dropout_rate"]
 epochs = train_config[args.model]["epochs"]
 
 train_loss = []
@@ -139,9 +140,9 @@ val_loss = []
 
 modelname = str(args.model)
 if (modelname.lower() == "gcn"):
-    model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
+    model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1, dropout_rate=dropout_rate)
 elif (modelname.lower() == "dnn"):
-    model = DNNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
+    model = DNNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1, dropout_rate=dropout_rate)
 else:
     raise Exception("Janky, pick a defined model (dnn, gcn)")
 
@@ -179,21 +180,23 @@ logging.info("Calculating centrality ...")
 deg_cent = torch.sum(full_adj_mat, dim=1)
 plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
 
-if args.normalisation == "None":
-    adj_mat = full_adj_mat
-elif args.normalisation == "D_inv":
-    D_inv = torch.inverse(torch.diag(deg_cent))
-    adj_mat = torch.matmul(D_inv, full_adj_mat)
-elif args.normalisation == "D_half_inv":
-    D_half_inv = torch.diag(torch.rsqrt(deg_cent))
-    adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
-    adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
-elif args.normalisation == "D_frac":
-    D_frac_inv = torch.diag(deg_cent / len(full_x))
-    adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
+if args.normalisation:
+    norm_label = args.normalisation
+    if args.normalisation == "D_inv":
+        D_inv = torch.inverse(torch.diag(deg_cent))
+        adj_mat = torch.matmul(D_inv, full_adj_mat)
+    elif args.normalisation == "D_half_inv":
+        D_half_inv = torch.diag(torch.rsqrt(deg_cent))
+        adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
+        adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+    elif args.normalisation == "D_frac":
+        D_frac_inv = torch.diag(deg_cent / len(full_x))
+        adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
+    else:
+        print("Specify a sensible normalisation for the adjacency matrix!")
 else:
-    print("Specify a sensible normalisation for the adjacency matrix!")
-norm_label = args.normalisation
+    adj_mat = full_adj_mat
+    norm_label = ""
 
 # Option to preserve self-connections in adjacency matrix
 if args.self:
@@ -202,8 +205,8 @@ if args.self:
     norm_label = norm_label + "_self"
 
 print("Normalised adjacency matrix\n", adj_mat)
-plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+norm_label)
-plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+norm_label)
+plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label)
+plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label)
 
 
 # Define loss function for binary classification and ADAM optimiser
