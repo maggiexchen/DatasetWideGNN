@@ -90,7 +90,7 @@ def GetParser():
         "-n",
         type=str,
         required=False,
-        help="Specify the type of adjacency matrix normalisation ('None', 'D_inv', 'D_half_inv')",
+        help="Specify the type of adjacency matrix normalisation ('D_inv', 'D_half_inv', 'D_frac')",
     )
 
     parser.add_argument(
@@ -196,7 +196,6 @@ if args.model=="gcn":
         elif args.normalisation == "D_half_inv":
             D_half_inv = torch.diag(torch.rsqrt(deg_cent))
             adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
-            adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
         elif args.normalisation == "D_frac":
             D_frac_inv = torch.diag(deg_cent / len(full_x))
             adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
@@ -223,8 +222,7 @@ else:
 loss_function = nn.BCELoss()
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 
-## TODO: load in the training the validation data differently
-## TODO: define the training and evaluation steps as functions
+logging.info("Training ...")
 for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
@@ -275,7 +273,8 @@ val_auc = roc_auc_score(val_truth_labels.detach().numpy(), val_outputs.detach().
 print("Validation AUC", val_auc)
 
 # save performance to json
-perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, val_loss, val_fpr, val_tpr, val_cut, model_path)
+perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc, val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
+perf.save_metadata(len(train_sig), len(train_bkg), len(val_sig), len(val_bkg), hidden_sizes, LR, dropout_rate, epochs, model_path)
 
 logging.info("Plotting training/validation losses ...")
 fig, ax = plt.subplots()

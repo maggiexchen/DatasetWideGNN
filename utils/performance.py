@@ -73,25 +73,37 @@ def doShap(gcn_model, train_x, kinematics, path):
     shap.plots.beeswarm(shap_values)
     shap.summary_plot(shap_values, train_x[:200, :], feature_names=kinematics)
     plt.tight_layout()
-    plt.savefig(save_path+"mass_euclidean_x+conv_x_shapley_beeswarm.pdf")
-  
-    ax.legend(loc='upper right')
-    ax.set_xlabel("GNN Score", loc="right")
-    ax.set_ylabel("Normalised # events / bin", loc="top")
-    fig.savefig(save_path+"mass_test_pred_x_standardised.pdf", transparent=True)
+    plt.savefig(save_path+"shapley_beeswarm.pdf")
 
-def save_performance(train_loss, train_fpr, train_tpr, train_threshold, val_loss, val_fpr, val_tpr, val_threshold, path):
+def save_performance(train_loss, train_fpr, train_tpr, train_threshold, train_auc, val_loss, val_fpr, val_tpr, val_threshold, val_auc, path):
     perf_dict = {
         'train_loss': train_loss,
         'train_fpr': train_fpr.tolist(),
         'train_tpr': train_tpr.tolist(),
         'train_threshold': train_threshold.tolist(),
+        'train_auc': train_auc.tolist(),
         'val_loss': train_loss,
         'val_fpr': train_fpr.tolist(),
         'val_tpr': train_tpr.tolist(),
         'val_threshold': train_threshold.tolist(),
+        'val_auc': val_auc.tolist(),
     }
     save_path = path+"performance.json"
     with open(save_path, "w") as outfile:
         json.dump(perf_dict, outfile)
+    
+def save_metadata(train_sig_size, train_bkg_size, val_sig_size, val_bkg_size, hidden_sizes, LR, dropout_rate, epochs, path):
+    meta_dict = {
+        'train_sig_size': train_sig_size,
+        'train_bkg_size': train_bkg_size,
+        'val_sig_size': val_sig_size,
+        'val_bkg_size': val_bkg_size,
+        'hidden_sizes': hidden_sizes,
+        'LR': LR,
+        'dropout_rate': dropout_rate,
+        'epochs': epochs
+    }
+    save_path = path+"metadata.json"
+    with open(save_path, "w") as outfile:
+        json.dump(meta_dict, outfile)
     
