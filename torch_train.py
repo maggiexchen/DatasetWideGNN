@@ -173,41 +173,44 @@ with open(ll_path, 'r') as lfile:
 logging.info('Calculating training and validation distances ...')
 full_x = torch.cat((train_x, val_x), dim=0)
 full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
-full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
+if args.model=="gcn":
+    full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 
-# calculate centrality
-logging.info("Calculating centrality ...")
-deg_cent = torch.sum(full_adj_mat, dim=1)
-plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
+    # calculate centrality
+    logging.info("Calculating centrality ...")
+    deg_cent = torch.sum(full_adj_mat, dim=1)
+    plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
 
-if args.normalisation:
-    norm_label = args.normalisation
-    if args.normalisation == "D_inv":
-        D_inv = torch.inverse(torch.diag(deg_cent))
-        adj_mat = torch.matmul(D_inv, full_adj_mat)
-    elif args.normalisation == "D_half_inv":
-        D_half_inv = torch.diag(torch.rsqrt(deg_cent))
-        adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
-        adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
-    elif args.normalisation == "D_frac":
-        D_frac_inv = torch.diag(deg_cent / len(full_x))
-        adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
+    if args.normalisation:
+        norm_label = "_"+args.normalisation
+        if args.normalisation == "D_inv":
+            D_inv = torch.inverse(torch.diag(deg_cent))
+            adj_mat = torch.matmul(D_inv, full_adj_mat)
+        elif args.normalisation == "D_half_inv":
+            D_half_inv = torch.diag(torch.rsqrt(deg_cent))
+            adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
+            adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+        elif args.normalisation == "D_frac":
+            D_frac_inv = torch.diag(deg_cent / len(full_x))
+            adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
+        else:
+            print("Specify a sensible normalisation for the adjacency matrix!")
     else:
-        print("Specify a sensible normalisation for the adjacency matrix!")
+        adj_mat = full_adj_mat
+        norm_label = ""
+
+    # Option to preserve self-connections in adjacency matrix
+    if args.self:
+        diag_mask = torch.eye(adj_mat.size(0))
+        adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+        norm_label = norm_label + "_self"
+
+    print("Normalised adjacency matrix\n", adj_mat)
+    plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+args.normalisation)
+    plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+args.normalisation)
+
 else:
-    adj_mat = full_adj_mat
-    norm_label = ""
-
-# Option to preserve self-connections in adjacency matrix
-if args.self:
-    diag_mask = torch.eye(adj_mat.size(0))
-    adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
-    norm_label = norm_label + "_self"
-
-print("Normalised adjacency matrix\n", adj_mat)
-plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label)
-plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label)
-
+    norm_label=""
 
 # Define loss function for binary classification and ADAM optimiser
 loss_function = nn.BCELoss()
@@ -235,6 +238,16 @@ for epoch in range(epochs):
 
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {loss.item()}, Validation Loss: {validation_loss.item()}')
 
+# save trained model
+logging.info("Saving trained model and performance...")
+model_path = path+"models/"+modelname+norm_label+"/"
+misc.create_dirs(model_path)
+model_file_name = "model.pth"
+torch.save({
+    'model_state': model.state_dict(),
+    'optimiser_state': optimiser.state_dict(),
+}, model_path+model_file_name)
+
 train_outputs = train_outputs.view(-1)
 train_label_bool = train_truth_labels.bool()
 train_sig_pred = train_outputs[train_label_bool]
@@ -254,6 +267,9 @@ val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().numpy(), val_out
 val_auc = roc_auc_score(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
 print("Validation AUC", val_auc)
 
+# save performance to json
+perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, val_loss, val_fpr, val_tpr, val_cut, model_path)
+
 logging.info("Plotting training/validation losses ...")
 fig, ax = plt.subplots()
 x_epoch = numpy.arange(1,epochs+1,1)
@@ -265,7 +281,7 @@ ax.set_xlabel("Epoch", loc="right")
 ax.set_ylabel("Loss", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_loss.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+norm_label+"_training_validation_loss.pdf", transparent=True)
 
 logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
@@ -285,7 +301,7 @@ ymin, ymax = ax.get_ylim()
 ax.set_ylim((ymin, ymax*1.2))
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_pred.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+norm_label+"_training_validation_pred.pdf", transparent=True)
 
 logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
@@ -299,4 +315,4 @@ plt.xlabel("Background Efficiency", loc="right")
 plt.ylabel("Signal Efficiency", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_ROC.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+norm_label+"_training_validation_ROC.pdf", transparent=True)

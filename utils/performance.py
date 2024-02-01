@@ -2,6 +2,7 @@ import shap
 import matplotlib.pyplot as plt
 import utils.misc as misc
 import numpy as np
+import json
 from sklearn.metrics import roc_curve, roc_auc_score
 
 # fpr here is the fraction of sigsig above a certain cut
@@ -79,3 +80,18 @@ def doShap(gcn_model, train_x, kinematics, path):
     ax.set_ylabel("Normalised # events / bin", loc="top")
     fig.savefig(save_path+"mass_test_pred_x_standardised.pdf", transparent=True)
 
+def save_performance(train_loss, train_fpr, train_tpr, train_threshold, val_loss, val_fpr, val_tpr, val_threshold, path):
+    perf_dict = {
+        'train_loss': train_loss,
+        'train_fpr': train_fpr.tolist(),
+        'train_tpr': train_tpr.tolist(),
+        'train_threshold': train_threshold.tolist(),
+        'val_loss': train_loss,
+        'val_fpr': train_fpr.tolist(),
+        'val_tpr': train_tpr.tolist(),
+        'val_threshold': train_threshold.tolist(),
+    }
+    save_path = path+"performance.json"
+    with open(save_path, "w") as outfile:
+        json.dump(perf_dict, outfile)
+    
