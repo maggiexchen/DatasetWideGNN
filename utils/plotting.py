@@ -111,7 +111,7 @@ def plot_conv_kinematics(adj_mat, sig, bkg, kinematics, file_path):
         ax.set_ylim((ymin, ymax*1.4))
         ax.set_xlabel(str(var)+" [GeV]", loc="right")
         ax.set_ylabel("Normalised No. Events", loc="top")
-        fig.savefig(file_path+"/"+var+".pdf", transparent=True)
+        fig.savefig(file_path+"/conv_"+var+".pdf", transparent=True)
 
 def plot_conv_conv_kinematics(adj_mat, sig, bkg, kinematics, file_path):
     x = torch.cat((sig, bkg), dim=0)
@@ -140,7 +140,7 @@ def plot_conv_conv_kinematics(adj_mat, sig, bkg, kinematics, file_path):
         ax.set_ylim((ymin, ymax*1.4))
         ax.set_xlabel(str(var)+" [GeV]", loc="right")
         ax.set_ylabel("Normalised No. Events", loc="top")
-        fig.savefig(file_path+"/"+var+".pdf", transparent=True)
+        fig.savefig(file_path+"/conv_conv_"+var+".pdf", transparent=True)
 
 def plot_centrality(centrality, sig, bkg, file_path, eff):
     degree_centrality = centrality / (len(sig)+len(bkg))
