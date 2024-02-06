@@ -51,10 +51,9 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000):
     torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
     # concatenating signal and background events / weights
     torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
-    torch_wgts = torch.concat((torch_sig_wgts, torch_bkg_wgts), dim=0)
     truth_labels = torch.tensor(numpy.concatenate((sig_label, bkg_label)), dtype=torch.float32)
 
-    return torch_sig, torch_bkg, torch_all, torch_wgts, truth_labels
+    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, truth_labels
 
 def create_adj_mat(a, length):
     """

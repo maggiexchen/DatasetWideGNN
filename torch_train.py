@@ -160,13 +160,14 @@ else:
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
-train_sig, train_bkg, train_x, train_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics)
-val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics)
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 
-full_x = torch.cat((train_x, val_x), dim=0)
-full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
+full_x = torch.cat((full_sig, full_bkg), dim=0)
+full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)
+
 
 if args.model=="gcn":
     # read in linking length calculated from sampled training data
@@ -182,6 +183,8 @@ if args.model=="gcn":
     
     logging.info("Calculating distances and adjacency matrix ...")
     full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
+    edge_frac = torch.sum(full_adj_mat == 1).item() / len(full_adj_mat)**2
+    print("Fraction of edges: ", edge_frac)
 
     # calculate centrality
     logging.info("Calculating centrality ...")
@@ -203,7 +206,7 @@ if args.model=="gcn":
             print("Specify a sensible normalisation for the adjacency matrix!")
     else:
         adj_mat = full_adj_mat
-        norm_label = ""
+        norm_label = "_AX"
 
     # Option to preserve self-connections in adjacency matrix
     if args.self:
@@ -212,8 +215,8 @@ if args.model=="gcn":
         norm_label = norm_label + "_self"
 
     print("Normalised adjacency matrix\n", adj_mat)
-    plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+args.normalisation)
-    plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+args.normalisation)
+    plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label)
+    plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label)
 
 else:
     norm_label=""
@@ -230,8 +233,11 @@ for epoch in range(epochs):
         full_outputs = model(full_x, adj_mat)
     elif args.model == "dnn":
         full_outputs = model(full_x)
-    train_outputs = full_outputs[:len(train_x)]
-    val_outputs = full_outputs[len(train_x):]
+
+    # splitting outputs into training/validation set
+    # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
+    train_outputs = torch.cat((full_outputs[:len(train_sig)], full_outputs[(len(train_sig)+len(val_sig)):(len(train_sig)+len(val_sig)+len(train_bkg))]), dim=0)
+    val_outputs = torch.cat((full_outputs[(len(train_sig)):(len(train_sig)+len(val_sig))], full_outputs[-len(val_bkg):]), dim=0)
     loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze())
     loss.backward()
     train_loss.append(loss.item())
@@ -314,8 +320,6 @@ fig, ax = plt.subplots()
 plt.plot(train_fpr, train_tpr, label='Training ROC curve (AUC = {:.3f})'.format(train_auc))
 plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
 plt.legend(loc="upper left", fontsize=9)
-ymin, ymax = plt.ylim()
-plt.ylim(ymin, ymax*1.2)
 plt.xlim(0,1)
 plt.xlabel("Background Efficiency", loc="right")
 plt.ylabel("Signal Efficiency", loc="top")

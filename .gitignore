@@ -15,4 +15,4 @@ deepsets_baseline/*.pdf
 **/*.pdf
 MADnormed_distances/
 standardised_distances/
-model/
+models/
