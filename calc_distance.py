@@ -164,6 +164,6 @@ elif distance == "cosine":
 else:
     raise Exception('Eh?, pick a better distance metric (cityblock, eucidean, cosine)')
 
-plot_path = path+"plots/standardised_weighed/"+variable+"/"
+plot_path = path+"plots/standardised_weighted/"+variable+"/"
 misc.create_dirs(plot_path)
 plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path)
