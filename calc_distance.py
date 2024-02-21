@@ -70,7 +70,8 @@ variable = str(args.variable)
 distance = str(args.distance)
 sample = args.sample
 
-path = "/data/atlas/atlasdata3/maggiechen/gnn_project/"
+# path = "/data/atlas/atlasdata3/maggiechen/gnn_project/" # maggies path
+path = "/home/srutherford/GNN_shared/hhhgraph/data/" # sebs path
 if args.path:
     path = args.path
     if path[-1]!="/": path += "/"
