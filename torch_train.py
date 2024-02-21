@@ -1,10 +1,10 @@
 import pandas as pd
-import uproot
+# import uproot
 import numpy
-import h5py
-import json
-import math
-import random
+# import h5py
+# import json
+# import math
+# import random
 import os
 os.environ["NUMEXPR_MAX_THREADS"] = "16"
 from scipy.spatial.distance import pdist, squareform
@@ -20,11 +20,13 @@ import utils.performance as perf
 from utils.gcn_model import GCNClassifier
 from utils.dnn_model import DNNClassifier
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 #import torch_geometric
+# import pdb
 
 import time
 st = time.time()
@@ -94,10 +96,13 @@ eff = args.eff
 if eff not in [0.6, 0.7, 0.8, 0.9]:
     raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
 
-path = "/data/atlas/atlasdata3/maggiechen/gnn_project/"
+# path = "/data/atlas/atlasdata3/maggiechen/gnn_project/" #maggies path
+path = "/home/srutherford/GNN_shared/hhhgraph/data/" # sebs path
 if args.path:
     path = args.path
     if path[-1]!="/": path += "/"
+
+print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 
 kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
@@ -128,14 +133,14 @@ train_sig, train_bkg, train_x, train_wgts, train_truth_labels = adj.data_loader(
 val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics)
 
 # read in linking length calculated from sampled training data
-sigsig_eff = eff
-ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_length.json"
-misc.create_dirs(ll_path)
-with open(ll_path, 'r') as lfile:
-    length_dict = json.load(lfile)
-    lengths = length_dict["length"]
-    linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
-    logging.info("linking length ="+str(linking_length))
+# sigsig_eff = eff
+# ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_length.json"
+# misc.create_dirs(ll_path)
+# with open(ll_path, 'r') as lfile:
+#     length_dict = json.load(lfile)
+#     lengths = length_dict["length"]
+#     linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
+#     logging.info("linking length ="+str(linking_length))
 
 # calculate distances and generate adjacency matrix in batches
 logging.info('Calculating training and validation distances in batches...')
@@ -143,7 +148,14 @@ logging.info('Calculating training and validation distances in batches...')
 # val_adj_mat = adj.generate_adj_mat(val_x, val_wgts, distance, linking_length)
 full_x = torch.cat((train_x, val_x), dim=0)
 full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
+linking_length = 2.0
 full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
+
+# indices = full_adj_mat.nonzero().t()
+# full_adj_mat = torch.sparse_coo_tensor(indices, np.ones(len(indices[0])), full_adj_mat.size())
+# full_adj_mat = full_adj_mat.coalesce()
+
+full_adj_mat = full_adj_mat.to_sparse_csr()
 
 # Load in training dataset, adjacency matrix, labels
 # Load in validation dataset, adjacency matrix, labels
