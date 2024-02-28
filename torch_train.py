@@ -160,10 +160,18 @@ else:
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics)
+# un-normalised signal and background kinematics (for checking and plotting)
+raw_train_sig, raw_train_bkg, _, _, _, _ = adj.data_loader("data", "train", kinematics, norm_kin=False)
+raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader("data", "val", kinematics, norm_kin=False)
+
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics, norm_kin=True)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics, norm_kin=True)
+
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
+
+raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
+raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
 full_x = torch.cat((full_sig, full_bkg), dim=0)
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)
@@ -210,22 +218,25 @@ if args.model=="gcn":
 
     # Option to preserve self-connections in adjacency matrix
     if args.self:
-        diag_mask = torch.eye(adj_mat.size(0))
-        adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+        diagonal = adj_mat.diagonal()
+        diagonal.fill_(1)
         norm_label = norm_label + "_self"
 
     print("Normalised adjacency matrix\n", adj_mat)
-    plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label)
-    plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label)
+    plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=True)
+    plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=True)
+
+    plotting.plot_conv_kinematics(adj_mat, raw_full_sig, raw_full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=False)
+    plotting.plot_conv_conv_kinematics(adj_mat, raw_full_sig, raw_full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=False)
 
 else:
     norm_label=""
 
+logging.info("Training ...")
 # Define loss function for binary classification and ADAM optimiser
 loss_function = nn.BCELoss()
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 
-logging.info("Training ...")
 for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
