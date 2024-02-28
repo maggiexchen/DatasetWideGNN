@@ -131,7 +131,11 @@ kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
 
 train_config = misc.load_config(config_path)
-hidden_sizes = train_config[args.model]["hidden_sizes"]
+if args.model == "dnn":
+    hidden_sizes = train_config[args.model]["hidden_sizes"]
+elif args.model == "gcn":
+    hidden_sizes_gcn = train_config[args.model]["hidden_sizes_gcn"]
+    hidden_sizes_mlp = train_config[args.model]["hidden_sizes_mlp"]
 LR = train_config[args.model]["LR"]
 epochs = train_config[args.model]["epochs"]
 
@@ -140,7 +144,7 @@ val_loss = []
 
 modelname = str(args.model)
 if (modelname.lower() == "gcn"):
-    model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
+    model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1)
 elif (modelname.lower() == "dnn"):
     model = DNNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
 else:
