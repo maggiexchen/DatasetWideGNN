@@ -15,7 +15,6 @@ def cosine(a, b):
     """
     numerator = tf.linalg.matmul(a, b, transpose_b=True)
     denominator = tf.math.sqrt(tf.tensordot(tf.math.reduce_sum(tf.math.square(a),axis=1), tf.math.reduce_sum(tf.math.square(b),axis=1), axes=0))
-    print(1 - numerator / denominator)
 
     return 1 - numerator / denominator
 

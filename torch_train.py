@@ -5,6 +5,7 @@ import numpy
 # import json
 # import math
 # import random
+# import yaml
 import os
 os.environ["NUMEXPR_MAX_THREADS"] = "16"
 from scipy.spatial.distance import pdist, squareform
@@ -17,6 +18,7 @@ import utils.torch_distances as dis
 import utils.adj_mat as adj
 import utils.misc as misc
 import utils.performance as perf
+import utils.plotting as plotting
 from utils.gcn_model import GCNClassifier
 from utils.dnn_model import DNNClassifier
 
@@ -85,10 +87,34 @@ def GetParser():
         help="Specify the type of model",
     )
 
+    parser.add_argument(
+        "--normalisation",
+        "-n",
+        type=str,
+        required=True,
+        help="Specify the type of adjacency matrix normalisation ('None', 'D_inv', 'D_inv_self', 'D_half_inv', 'D_half_inv_self')",
+    )
+
+    parser.add_argument(
+        "--self",
+        action="store_true",
+        help="Specify whether to presever self-connections in adjacency matrix or not"
+    )
+
     args = parser.parse_args()
     return args
 
 args = GetParser()
+if args.model == "dnn":
+    model_label = "DNN"
+    plot_path = "plots/DNN/"
+    config_path = "config/dnn.yaml"
+elif args.model == "gcn":
+    model_label = "GCN"
+    plot_path = "plots/GCN/"
+    config_path = "config/gcn.yaml"
+else:
+    print("Please specify either dnn or gcn for --model!")
 
 variable = str(args.variable)
 distance = str(args.distance)
@@ -96,22 +122,25 @@ eff = args.eff
 if eff not in [0.6, 0.7, 0.8, 0.9]:
     raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
 
-# path = "/data/atlas/atlasdata3/maggiechen/gnn_project/" #maggies path
-path = "/home/srutherford/GNN_shared/hhhgraph/data/" # sebs path
 if args.path:
     path = args.path
     if path[-1]!="/": path += "/"
+else:
+    # path = "/data/atlas/atlasdata3/maggiechen/gnn_project/" #maggies path
+    path = "/home/srutherford/GNN_shared/hhhgraph/data/" # sebs path
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 
 kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
-hidden_sizes = [16, 16, 16]
-LR = 0.01
-epochs = 100
+
+train_config = misc.load_config(config_path)
+hidden_sizes = train_config[args.model]["hidden_sizes"]
+LR = train_config[args.model]["LR"]
+epochs = train_config[args.model]["epochs"]
+
 train_loss = []
 val_loss = []
-
 
 modelname = str(args.model)
 if (modelname.lower() == "gcn"):
@@ -131,6 +160,8 @@ logging.info("chosen model: "+modelname)
 logging.info('Importing signal and background files...')
 train_sig, train_bkg, train_x, train_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics)
 val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics)
+full_sig = torch.cat((train_sig, val_sig), dim=0)
+full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 
 # read in linking length calculated from sampled training data
 # sigsig_eff = eff
@@ -143,19 +174,52 @@ val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader("data", "v
 #     logging.info("linking length ="+str(linking_length))
 
 # calculate distances and generate adjacency matrix in batches
-logging.info('Calculating training and validation distances in batches...')
-# train_adj_mat = adj.generate_adj_mat(train_x, train_wgts, distance, linking_length)
-# val_adj_mat = adj.generate_adj_mat(val_x, val_wgts, distance, linking_length)
+logging.info('Calculating training and validation distances ...')
 full_x = torch.cat((train_x, val_x), dim=0)
 full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
 linking_length = 2.0
 full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 
+# # calculate centrality
+# logging.info("Calculating centrality ...")
+# deg_cent = torch.sum(full_adj_mat, dim=1)
+# plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
+
+# if args.normalisation == "None":
+#     adj_mat = full_adj_mat
+# elif args.normalisation == "D_inv":
+#     D_inv = torch.inverse(torch.diag(deg_cent))
+#     adj_mat = torch.matmul(D_inv, full_adj_mat)
+# elif args.normalisation == "D_half_inv":
+#     D_half_inv = torch.diag(torch.rsqrt(deg_cent))
+#     adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
+#     # adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+# elif args.normalisation == "D_frac":
+#     D_frac_inv = torch.diag(deg_cent / len(full_x))
+#     adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
+# else:
+#     print("Specify a sensible normalisation for the adjacency matrix!")
+norm_label = args.normalisation
+
+# # Option to preserve self-connections in adjacency matrix
+# if args.self:
+#     diag_mask = torch.eye(adj_mat.size(0))
+#     adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
+#     norm_label = norm_label + "_self"
+
+# print("Normalised adjacency matrix\n", adj_mat)
+# # plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+norm_label)
+# # plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+norm_label)
+# plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/home/srutherford/GNN_shared/hhhgraph/data/training_kinematics/"+norm_label)
+# plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/home/srutherford/GNN_shared/hhhgraph/data/training_kinematics/"+norm_label)
+
+
+
 # indices = full_adj_mat.nonzero().t()
 # full_adj_mat = torch.sparse_coo_tensor(indices, np.ones(len(indices[0])), full_adj_mat.size())
 # full_adj_mat = full_adj_mat.coalesce()
 
-full_adj_mat = full_adj_mat.to_sparse_csr()
+adj_mat = full_adj_mat.to_sparse_csr()
 
 # Load in training dataset, adjacency matrix, labels
 # Load in validation dataset, adjacency matrix, labels
@@ -172,7 +236,7 @@ for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
     if args.model == "gcn":
-        full_outputs = model(full_x, full_adj_mat)
+        full_outputs = model(full_x, adj_mat)
     elif args.model == "dnn":
         full_outputs = model(full_x)
     train_outputs = full_outputs[:len(train_x)]
@@ -183,16 +247,11 @@ for epoch in range(epochs):
     optimiser.step()
 
     model.eval()
-    # if args.model == "gcn":
-    #     val_outputs = model(val_x, val_adj_mat)
-    # elif args.model == "dnn":
-    #     val_outputs = model(val_x)
     validation_loss = loss_function(val_outputs.squeeze(), val_truth_labels.squeeze())
     val_loss.append(validation_loss.item())
 
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {loss.item()}, Validation Loss: {validation_loss.item()}')
 
-logging.info("Plotting training outputs ...")
 train_outputs = train_outputs.view(-1)
 train_label_bool = train_truth_labels.bool()
 train_sig_pred = train_outputs[train_label_bool]
@@ -212,54 +271,49 @@ val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().numpy(), val_out
 val_auc = roc_auc_score(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
 print("Validation AUC", val_auc)
 
-#binning = numpy.linspace(0,1,50)
+logging.info("Plotting training/validation losses ...")
 fig, ax = plt.subplots()
-binning = numpy.linspace(0,1,50)
-ax.hist(val_sig_pred.detach().numpy(), bins=binning, label="Signal", alpha=0.5, density=True)
-ax.hist(val_bkg_pred.detach().numpy(), bins=binning, label="Background", alpha=0.5, density=True)
-ax.text(0.04, 0.93, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.text(0.04, 0.88, "Standardised kinematics", verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.legend(loc='upper right')
-ax.set_xlabel("GNN Score", loc="right")
-ax.set_ylabel("Normalised No. Events", loc="top")
-fig_path = path + "plots/GCN/"
+x_epoch = numpy.arange(1,epochs+1,1)
+ax.plot(x_epoch, train_loss, label="Training loss")
+ax.plot(x_epoch, val_loss, label="Validation loss")
+ax.legend(loc='upper right', fontsize=9)
+ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.set_xlabel("Epoch", loc="right")
+ax.set_ylabel("Loss", loc="top")
+fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_validation_pred.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_loss.pdf", transparent=True)
 
+logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
 binning = numpy.linspace(0,1,50)
-ax.hist(train_sig_pred.detach().numpy(), bins=binning, label="Signal", alpha=0.5, density=True)
-ax.hist(train_bkg_pred.detach().numpy(), bins=binning, label="Background", alpha=0.5, density=True)
-ax.text(0.04, 0.93, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.text(0.04, 0.88, "Standardised kinematics", verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.legend(loc='upper right')
-ax.set_xlabel("GNN Score", loc="right")
+ax.hist(train_sig_pred.detach().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange")
+ax.hist(train_bkg_pred.detach().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue")
+ax.hist(val_sig_pred.detach().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange")
+ax.hist(val_bkg_pred.detach().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue")
+ax.text(0.02, 0.95, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.text(0.02, 0.91, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.text(0.02, 0.87, "6b Resonant TRSM signal, 5b Data", verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.text(0.02, 0.83, "Linking length at sig-sig efficiency "+str(args.eff), verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.legend(loc='upper right', fontsize=9)
+ax.set_xlabel("Output score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
-fig_path = path + "plots/GCN/"
+ymin, ymax = ax.get_ylim()
+ax.set_ylim((ymin, ymax*1.2))
+fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_training_pred.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_pred.pdf", transparent=True)
 
 logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
 plt.plot(train_fpr, train_tpr, label='Training ROC curve (AUC = {:.3f})'.format(train_auc))
-plt.legend(loc="upper left", fontsize=10)
-ymin, ymax = plt.ylim()
-plt.ylim(ymin, ymax*1.2)
-plt.xlim(0,1)
-plt.xlabel("Background Efficiency")
-plt.ylabel("Signal Efficiency")
-fig_path = path + "plots/GCN/"
-misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_training_ROC.pdf", transparent=True)
-
-fig, ax = plt.subplots()
 plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
-plt.legend(loc="upper left", fontsize=10)
+plt.legend(loc="upper left", fontsize=9)
 ymin, ymax = plt.ylim()
 plt.ylim(ymin, ymax*1.2)
 plt.xlim(0,1)
-plt.xlabel("Background Efficiency")
-plt.ylabel("Signal Efficiency")
-fig_path = path + "plots/GCN/"
+plt.xlabel("Background Efficiency", loc="right")
+plt.ylabel("Signal Efficiency", loc="top")
+fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_validation_ROC.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_ROC.pdf", transparent=True)

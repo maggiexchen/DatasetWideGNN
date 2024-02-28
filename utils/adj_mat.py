@@ -28,18 +28,21 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000):
 
     df_sig =  pd.read_hdf(path+"/hhh_split_files/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
     df_bkg =  pd.read_hdf(path+"/hhh_split_files/bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
-    df_sig = df_sig.sample(n=n_sig)
-    df_bkg = df_bkg.sample(n=n_bkg)
+    df_sig = df_sig.sample(n=n_sig, random_state=42)
+    df_bkg = df_bkg.sample(n=n_bkg, random_state=42)
     df_sig_wgts = df_sig["eventWeight"]
     df_bkg_wgts = df_bkg["eventWeight"]
     df_sig = df_sig[kinematics]
     df_bkg = df_bkg[kinematics]
+    df_all = pd.concat([df_sig, df_bkg], axis=0)
     # set truth labels for is signal
     sig_label = [1]*len(df_sig)
     bkg_label = [0]*len(df_bkg)
-    # MAD scaling
+    # Standardising kinematics
     for var in kinematics:
-        df_sig.loc[:, var], df_bkg.loc[:, var] = norm.MAD_norm(df_sig.loc[:, var], df_bkg.loc[:, var])
+        df_all.loc[:, var] = norm.standardise(df_all.loc[:, var])
+        df_sig = df_all.iloc[:len(df_sig)]
+        df_bkg = df_all.iloc[len(df_sig):]
         plot.plot_kinematic_hists(df_sig, df_bkg, var, path)
     # convert pd dataframes to torch tensors
     torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)

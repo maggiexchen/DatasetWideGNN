@@ -1,4 +1,5 @@
 import os
+import yaml
 
 def create_dirs(path):
     """
@@ -76,3 +77,12 @@ def get_h5_paths(path, variable, distance, label="sampled_train"):
     files = [prefix+"_"+t+"_"+label+".h5" for t in types]
 
     return files[0], files[1], files[2]
+
+
+def load_config(file_path):
+    """
+    Function that loads in the training config file for a specific model
+    """
+    with open(file_path, "r") as yaml_file:
+        config = yaml.safe_load(yaml_file)
+    return config
