@@ -27,8 +27,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
-#import torch_geometric
-# import pdb
 
 import time
 st = time.time()
@@ -38,8 +36,6 @@ from sklearn.utils import shuffle
 import shap
 import logging
 logging.getLogger().setLevel(logging.INFO)
-
-#import pdb
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -87,13 +83,13 @@ def GetParser():
         help="Specify the type of model",
     )
 
-    parser.add_argument(
-        "--normalisation",
-        "-n",
-        type=str,
-        required=True,
-        help="Specify the type of adjacency matrix normalisation ('None', 'D_inv', 'D_inv_self', 'D_half_inv', 'D_half_inv_self')",
-    )
+    # parser.add_argument(
+    #     "--normalisation",
+    #     "-n",
+    #     type=str,
+    #     required=True,
+    #     help="Specify the type of adjacency matrix normalisation ('None', 'D_inv', 'D_inv_self', 'D_half_inv', 'D_half_inv_self')",
+    # )
 
     parser.add_argument(
         "--self",
@@ -163,6 +159,7 @@ val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader("data", "v
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 
+### NOTE: this is where the linking length is loaded in, not doing this in seb development branch
 # read in linking length calculated from sampled training data
 # sigsig_eff = eff
 # ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_length.json"
@@ -177,14 +174,16 @@ full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 logging.info('Calculating training and validation distances ...')
 full_x = torch.cat((train_x, val_x), dim=0)
 full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
-linking_length = 2.0
+linking_length = 2.0 ### NOTE: setting linking length manually for seb development branch
 full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 
+
+### NOTE: this is where the normalisation is done, not necessary with pytorch geometric
+### (normalisation is done in the gcn conv layer)
 # # calculate centrality
 # logging.info("Calculating centrality ...")
 # deg_cent = torch.sum(full_adj_mat, dim=1)
 # plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
-
 # if args.normalisation == "None":
 #     adj_mat = full_adj_mat
 # elif args.normalisation == "D_inv":
@@ -199,7 +198,7 @@ full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 #     adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
 # else:
 #     print("Specify a sensible normalisation for the adjacency matrix!")
-norm_label = args.normalisation
+# norm_label = args.normalisation
 
 # # Option to preserve self-connections in adjacency matrix
 # if args.self:
@@ -207,19 +206,20 @@ norm_label = args.normalisation
 #     adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
 #     norm_label = norm_label + "_self"
 
+### NOTE: currently not ploting conv kinematics in seb development branch
 # print("Normalised adjacency matrix\n", adj_mat)
 # # plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+norm_label)
 # # plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+norm_label)
 # plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/home/srutherford/GNN_shared/hhhgraph/data/training_kinematics/"+norm_label)
 # plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/home/srutherford/GNN_shared/hhhgraph/data/training_kinematics/"+norm_label)
 
-
-
+### dense tensor to coo tensor
 # indices = full_adj_mat.nonzero().t()
 # full_adj_mat = torch.sparse_coo_tensor(indices, np.ones(len(indices[0])), full_adj_mat.size())
 # full_adj_mat = full_adj_mat.coalesce()
 
-adj_mat = full_adj_mat.to_sparse_csr()
+adj_mat = full_adj_mat.to_sparse_csr() ### densor tensor to csr tensor
+norm_label = "D_half_inv_pyg" ### pyg layer use D_half_inv normalisation
 
 # Load in training dataset, adjacency matrix, labels
 # Load in validation dataset, adjacency matrix, labels

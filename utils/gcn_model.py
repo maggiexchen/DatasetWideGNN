@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-from utils.gcn_layer import GCNLayer
+# from utils.gcn_layer import GCNLayer
 from torch_geometric.nn import GCNConv
 
 class GCNClassifier(nn.Module):
