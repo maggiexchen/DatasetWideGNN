@@ -13,17 +13,19 @@ class GCNClassifier(nn.Module):
         """
         super(GCNClassifier, self).__init__()
         self.layers = nn.ModuleList()
+        self.batch_norms = nn.ModuleList()
         for i in range(len(hidden_sizes)):
             # self.layers.append(GCNLayer(input_size, hidden_sizes[i]))
             self.layers.append(GCNConv(input_size, hidden_sizes[i]))
+            self.batch_norms.append(nn.BatchNorm1d(hidden_sizes[i]))
             input_size = hidden_sizes[i]
         
         
         # self.output_layer = GCNLayer(input_size, output_size)
         self.output_layer = GCNConv(input_size, output_size)
-
+            
     def forward(self, x, edge_index):
-        for layer in self.layers:
-            x = F.relu(layer(x, edge_index))
+        for layer, batch_norm in zip(self.layers, self.batch_norms):
+            x = F.relu(batch_norm(layer(x, edge_index)))
         output = torch.sigmoid(self.output_layer(x, edge_index))
         return output
