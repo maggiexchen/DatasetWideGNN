@@ -9,8 +9,8 @@ from sklearn.model_selection import train_test_split
 import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
-import tensorflow as tf
-import utils.distances as dis
+import torch
+import utils.torch_distances as dis
 import utils.normalisation as norm
 import utils.misc as misc
 import utils.plotting as plotting
@@ -115,57 +115,46 @@ for var in kinematics:
 df_sig = df_all.iloc[:len(df_sig)]
 df_bkg = df_all.iloc[len(df_sig):]
 
-# convert pandas dataframes to tf tensors
+# convert pandas dataframes to torch tensors
 # only the kinematics used in distance calculation and weights need to be converted to tensors here for matrix multiplications
-logging.info("Converting to tf tensors...")
-tf_sig = df_sig[kinematics]
-tf_bkg = df_bkg[kinematics]
-tf_sig = tf.convert_to_tensor(tf_sig, dtype_hint="float32")
-tf_bkg = tf.convert_to_tensor(tf_bkg, dtype_hint="float32")
-y_sig = df_sig["target"]
-y_bkg = df_bkg["target"]
-
-# mutliple events kinematics by the corresponding event weights and calcualte distances
-logging.info('Getting MC event weights and calcualte weight matrix ...')
-# The scale factor that scales 5b data down to the expected 6b yields, this is just taken as the ratio between 5b data/4b data for now
+logging.info("Converting to torch tensors...")
 SF_4b5b = 0.07
-sig_wgt = tf.convert_to_tensor(df_sig["eventWeight"], dtype_hint="float32")
-bkg_wgt = tf.convert_to_tensor(df_bkg["eventWeight"]*SF_4b5b, dtype_hint="float32")
-sigsig_wgt = tf.matmul(tf.reshape(sig_wgt, [-1,1]), tf.reshape(sig_wgt, [-1,1]), transpose_b=True)
-sigbkg_wgt = tf.matmul(tf.reshape(sig_wgt, [-1,1]), tf.reshape(bkg_wgt, [-1,1]), transpose_b=True)
-bkgbkg_wgt = tf.matmul(tf.reshape(bkg_wgt, [-1,1]), tf.reshape(bkg_wgt, [-1,1]), transpose_b=True)
+df_sig_wgts = df_sig["eventWeight"]
+df_bkg_wgts = df_bkg["eventWeight"]*SF_4b5b
+df_sig = df_sig[kinematics]
+df_bkg = df_bkg[kinematics]
+torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)
+torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)
+torch_sig_wgts = torch.tensor(df_sig_wgts.values, dtype=torch.float32)
+torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
 
 # calculate distances
 logging.info('Calculating distances...')
 if distance == "euclidean":
-    sigsig = dis.euclidean(tf_sig, tf_sig)
-    sigbkg = dis.euclidean(tf_sig, tf_bkg)
-    bkgbkg = dis.euclidean(tf_bkg, tf_bkg)
+    sigsig = dis.euclidean(torch_sig, torch_sig)
+    sigbkg = dis.euclidean(torch_sig, torch_bkg)
+    bkgbkg = dis.euclidean(torch_bkg, torch_bkg)
 elif distance == "cityblock":
-    sigsig = dis.cityblock(tf_sig, tf_sig)
-    sigbkg = dis.cityblock(tf_sig, tf_bkg)
-    bkgbkg = dis.cityblock(tf_bkg, tf_bkg)
+    sigsig = dis.cityblock(torch_sig, torch_sig)
+    sigbkg = dis.cityblock(torch_sig, torch_bkg)
+    bkgbkg = dis.cityblock(torch_bkg, torch_bkg)
 elif distance == "cosine":
-    sigsig = dis.cosine(tf_sig, tf_sig)
-    sigbkg = dis.cosine(tf_sig, tf_bkg)
-    bkgbkg = dis.cosine(tf_bkg, tf_bkg)
+    sigsig = dis.cosine(torch_sig, torch_sig)
+    sigbkg = dis.cosine(torch_sig, torch_bkg)
+    bkgbkg = dis.cosine(torch_bkg, torch_bkg)
 else:
     print("Specify a valid distance please!")
 
 logging.info("Checking for NaNs in distances ... ")
-print(tf.reduce_sum(tf.cast(tf.math.is_nan(sigsig), tf.int32)))
-print(tf.reduce_sum(tf.cast(tf.math.is_nan(sigbkg), tf.int32)))
-print(tf.reduce_sum(tf.cast(tf.math.is_nan(bkgbkg), tf.int32)))
+print(torch.sum(torch.isnan(sigsig)).item())
+print(torch.sum(torch.isnan(sigbkg)).item())
+print(torch.sum(torch.isnan(bkgbkg)).item())
 
 # plot the (sampled) MAD-normed distances
 logging.info("Converting distance and weight tensors to np arrays for saving and plotting ... ")
 np_sigsig = sigsig.numpy().flatten()
 np_sigbkg = sigbkg.numpy().flatten()
 np_bkgbkg = bkgbkg.numpy().flatten()
-np_sigsig_wgt = sigsig_wgt.numpy().flatten()
-np_sigbkg_wgt = sigbkg_wgt.numpy().flatten()
-np_bkgbkg_wgt = bkgbkg_wgt.numpy().flatten()
-
 logging.info('Writing to h5...')
 save_path = path+"distances/"
 misc.create_dirs(save_path)
@@ -181,11 +170,8 @@ bkgbkg_dset = f_bkgbkg.create_dataset("bkgbkg", shape=(len(np_bkgbkg),), dtype=d
 # writing distances, and weights in chunks
 
 sigsig_dset['distance'] = np_sigsig
-sigsig_dset['weight'] = np_sigsig_wgt
 sigbkg_dset['distance'] = np_sigbkg
-sigbkg_dset['weight'] = np_sigbkg_wgt
 bkgbkg_dset['distance'] = np_bkgbkg
-bkgbkg_dset['weight'] = np_bkgbkg_wgt
 
 f_sigsig.close()
 f_sigbkg.close()
@@ -203,4 +189,4 @@ else:
 
 plot_path = path+"plots/standardised_weighted/"+variable+"/"
 misc.create_dirs(plot_path)
-plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path)
+plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, variable, distance, plot_path)

@@ -6,7 +6,7 @@ import utils.normalisation as norm
 import utils.misc as misc
 import numpy
 
-def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, label=""):
+def plot_distances(ss, sb, bb, var, distance, path, label=""):
     """
     Function to plot distances for sig-sig, sig-bkg and bkg-bkg on one figure.
 
@@ -25,17 +25,15 @@ def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, labe
     Returns:
             void
     """
-    print(type(ss))
-    print(type(ss_wgt))
     # bin/range
     x_max = max(max(bb),max(max(ss),max(sb)))
     n_bins=100
     binning=np.linspace(0,x_max,n_bins)
     # plot
     fig, ax = plt.subplots()
-    ax.hist(ss, bins=binning, label="sig-sig", alpha=0.5, weights=ss_wgt, density=True)
-    ax.hist(sb, bins=binning, label="sig-bkg", alpha=0.5, weights=sb_wgt, density=True)
-    ax.hist(bb, bins=binning, label="bkg-bkg", alpha=0.5, weights=bb_wgt, density=True)
+    ax.hist(ss, bins=binning, label="sig-sig", alpha=0.5, density=True)
+    ax.hist(sb, bins=binning, label="sig-bkg", alpha=0.5, density=True)
+    ax.hist(bb, bins=binning, label="bkg-bkg", alpha=0.5, density=True)
     # aesthesics
     ax.legend(loc='upper right')
     ax.set_xlabel(var+"_"+distance +" distance", loc="right")
