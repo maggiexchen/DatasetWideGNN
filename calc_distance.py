@@ -40,6 +40,7 @@ def GetParser():
     parser.add_argument(
         "--sample",
         "-s",
+        default=True,
         action="store_true",
         help="Specify whether the datasets are sampled",
     )
@@ -91,17 +92,23 @@ kinematics = misc.get_kinematics(variable)
 
 # load in input files
 logging.info('Importing signal and background files...')
-df_sig = pd.read_hdf(data_dir+"sig_train.h5", key="sig_train")
-df_bkg = pd.read_hdf(data_dir+"bkg_train.h5", key="bkg_train")
+df_sig_train = pd.read_hdf(data_dir+"sig_train.h5", key="sig_train")
+df_bkg_train = pd.read_hdf(data_dir+"bkg_train.h5", key="bkg_train")
+df_sig_val = pd.read_hdf(data_dir+"sig_val.h5", key="sig_val")
+df_bkg_val = pd.read_hdf(data_dir+"bkg_val.h5", key="bkg_val")
 
 # randomly sample from the training datasets for linking length calculation if specified
 if sample == True:
     logging.info("Sampling...")
-    df_sig = df_sig.sample(n=1500)
-    df_bkg = df_bkg.sample(n=3000)
+    df_sig_train = df_sig_train.sample(n=1000, random_state=42)
+    df_bkg_train = df_bkg_train.sample(n=1000, random_state=42)
+    df_sig_val = df_sig_val.sample(n=1000, random_state=42)
+    df_bkg_val = df_bkg_val.sample(n=1000, random_state=42)
 
 logging.info("Standardising ...")
-# Standardising kinematics 
+# Standardising kinematics
+df_sig = pd.concat([df_sig_train, df_sig_val], axis=0)
+df_bkg = pd.concat([df_bkg_train, df_bkg_val], axis=0)
 df_all = pd.concat([df_sig, df_bkg], axis=0)
 for var in kinematics:
     df_all.loc[:, var] = norm.standardise(df_all.loc[:, var])
