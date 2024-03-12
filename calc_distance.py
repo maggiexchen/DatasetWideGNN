@@ -128,6 +128,12 @@ torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)
 torch_sig_wgts = torch.tensor(df_sig_wgts.values, dtype=torch.float32)
 torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
 
+# calculaing the pair-wise event weights
+logging.info("Calculating weights between events ...")
+sigsig_wgts = torch.ger(torch_sig_wgts, torch_sig_wgts)
+sigbkg_wgts = torch.ger(torch_sig_wgts, torch_bkg_wgts)
+bkgbkg_wgts = torch.ger(torch_bkg_wgts, torch_bkg_wgts)
+
 # calculate distances
 logging.info('Calculating distances...')
 if distance == "euclidean":
@@ -155,6 +161,10 @@ logging.info("Converting distance and weight tensors to np arrays for saving and
 np_sigsig = sigsig.numpy().flatten()
 np_sigbkg = sigbkg.numpy().flatten()
 np_bkgbkg = bkgbkg.numpy().flatten()
+np_sigsig_wgts = sigsig_wgts.numpy().flatten()
+np_sigbkg_wgts = sigbkg_wgts.numpy().flatten()
+np_bkgbkg_wgts = bkgbkg_wgts.numpy().flatten()
+
 logging.info('Writing to h5...')
 save_path = path+"distances/"
 misc.create_dirs(save_path)
@@ -170,8 +180,11 @@ bkgbkg_dset = f_bkgbkg.create_dataset("bkgbkg", shape=(len(np_bkgbkg),), dtype=d
 # writing distances, and weights in chunks
 
 sigsig_dset['distance'] = np_sigsig
+sigsig_dset['weight'] = np_sigsig_wgts
 sigbkg_dset['distance'] = np_sigbkg
+sigbkg_dset['weight'] = np_sigbkg_wgts
 bkgbkg_dset['distance'] = np_bkgbkg
+bkgbkg_dset['weight'] = np_bkgbkg_wgts
 
 f_sigsig.close()
 f_sigbkg.close()
@@ -189,4 +202,4 @@ else:
 
 plot_path = path+"plots/standardised_weighted/"+variable+"/"
 misc.create_dirs(plot_path)
-plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, variable, distance, plot_path)
+plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgts, np_sigbkg_wgts, np_bkgbkg_wgts, variable, distance, plot_path)
