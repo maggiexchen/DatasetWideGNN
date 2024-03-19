@@ -75,22 +75,6 @@ def GetParser():
         help="Specify the path to store all the input/output data and results",
     )
 
-    # parser.add_argument(
-    #     "--model",
-    #     "-m",
-    #     type=str,
-    #     required=True,
-    #     help="Specify the type of model",
-    # )
-
-    # parser.add_argument(
-    #     "--normalisation",
-    #     "-n",
-    #     type=str,
-    #     required=False,
-    #     help="Specify the type of adjacency matrix normalisation ('D_inv', 'D_half_inv', 'D_frac')",
-    # )
-
     parser.add_argument(
         "--self",
         action="store_true",
@@ -102,27 +86,6 @@ def GetParser():
 
 parser = GetParser()
 args = parser.parse_args()
-
-# if args.model == "dnn":
-#     model_label = "DNN"
-#     plot_path = "plots/DNN/"
-#     config_path = "config/dnn.yaml"
-# elif args.model == "gcn":
-#     model_label = "GCN"
-#     plot_path = "plots/GCN/"
-#     config_path = "config/gcn.yaml"
-
-#     if args.distance is None:
-#         parser.error("Need to specify a type of distance metric for the adjacency matrix")
-#     elif args.eff is None:
-#         parser.error("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn")
-
-#     distance = str(args.distance)
-#     eff = args.eff
-#     if eff not in [0.6, 0.7, 0.8, 0.9]:
-#         raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
-# else:
-#     print("Please specify either dnn or gcn for --model!")
 
 if args.path:
     path = args.path
@@ -139,9 +102,6 @@ input_size = len(kinematics)
 
 config_path = "config/new_config.yaml"
 train_config = misc.load_config(config_path)
-# if args.model == "dnn":
-#     hidden_sizes = train_config[args.model]["hidden_sizes"]
-# elif args.model == "gcn":
 hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
 hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
@@ -168,21 +128,17 @@ if eff not in [0.6, 0.7, 0.8, 0.9]:
 train_loss = []
 val_loss = []
 
-# modelname = str(args.model)
 logging.info("chosen model: "+model_label)
 logging.info("variable set: "+variable)
 logging.info("input/output path: "+path)
-# if (modelname.lower() == "gcn"):
+
 model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates)
 logging.info("distance metric: "+distance)
 logging.info("desired efficieny: "+str(eff))
-# elif (modelname.lower() == "dnn"):
-#     model = DNNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1, dropout_rates=dropout_rates)
-# else:
-#     raise Exception("Janky, pick a defined model (dnn, gcn)")
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
+
 # un-normalised signal and background kinematics (for checking and plotting)
 raw_train_sig, raw_train_bkg, _, _, _, _ = adj.data_loader("data", "train", kinematics, norm_kin=False)
 raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader("data", "val", kinematics, norm_kin=False)
@@ -198,10 +154,7 @@ raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
 full_x = torch.cat((full_sig, full_bkg), dim=0)
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)
-# full_x = torch.cat((train_x, val_x), dim=0)
-# full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
 
-# if args.model=="gcn":
 if len(hidden_sizes_gcn) > 0:
     # read in linking length calculated from sampled training data
     sigsig_eff = eff
@@ -224,31 +177,8 @@ if len(hidden_sizes_gcn) > 0:
     deg_cent = torch.sum(full_adj_mat, dim=1)
     plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
 
-    # if args.normalisation:
-    #     norm_label = "_"+args.normalisation
-    #     if args.normalisation == "D_inv":
-    #         D_inv = torch.inverse(torch.diag(deg_cent))
-    #         adj_mat = torch.matmul(D_inv, full_adj_mat)
-    #     elif args.normalisation == "D_half_inv":
-    #         D_half_inv = torch.diag(torch.rsqrt(deg_cent))
-    #         adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
-    #     elif args.normalisation == "D_frac":
-    #         D_frac_inv = torch.diag(deg_cent / len(full_x))
-    #         adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
-    #     else:
-    #         print("Specify a sensible normalisation for the adjacency matrix!")
-    # else:
-    #     adj_mat = full_adj_mat
-    #     norm_label = "_AX"
-
-    # Option to preserve self-connections in adjacency matrix
-    # if args.self:
-    #     diagonal = adj_mat.diagonal()
-    #     diagonal.fill_(1)
-    #     norm_label = norm_label + "_self"
-
     adj_mat = full_adj_mat.to_sparse_csr() ### densor tensor to csr tensor
-    norm_label = "D_half_inv_pyg" ### pyg layer use D_half_inv normalisation
+    norm_label = "D_half_inv_pyg" ### pyg layer uses D_half_inv normalisation
 
     print("Normalised adjacency matrix\n", adj_mat)
     plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=True)
@@ -269,11 +199,8 @@ optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
-    # if args.model == "gcn":
     full_outputs = model(full_x, adj_mat)
-    # elif args.model == "dnn":
-    #     full_outputs = model(full_x)
-
+    
     # splitting outputs into training/validation set
     # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
     train_outputs = torch.cat((full_outputs[:len(train_sig)], full_outputs[(len(train_sig)+len(val_sig)):(len(train_sig)+len(val_sig)+len(train_bkg))]), dim=0)
