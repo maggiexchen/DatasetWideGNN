@@ -92,15 +92,16 @@ def save_performance(train_loss, train_fpr, train_tpr, train_threshold, train_au
     with open(save_path, "w") as outfile:
         json.dump(perf_dict, outfile)
     
-def save_metadata(train_sig_size, train_bkg_size, val_sig_size, val_bkg_size, hidden_sizes, LR, dropout_rate, epochs, path):
+def save_metadata(train_sig_size, train_bkg_size, val_sig_size, val_bkg_size, hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, path):
     meta_dict = {
         'train_sig_size': train_sig_size,
         'train_bkg_size': train_bkg_size,
         'val_sig_size': val_sig_size,
         'val_bkg_size': val_bkg_size,
-        'hidden_sizes': hidden_sizes,
+        'hidden_sizes_gcn': hidden_sizes_gcn,
+        'hidden_sizes_mlp': hidden_sizes_mlp,
         'LR': LR,
-        'dropout_rate': dropout_rate,
+        'dropout_rates': dropout_rates,
         'epochs': epochs
     }
     save_path = path+"metadata.json"

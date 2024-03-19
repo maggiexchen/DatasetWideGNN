@@ -1,6 +1,7 @@
 gcn:
   name: "gcn"
-  hidden_sizes: [16, 16, 16, 16, 16]
+  hidden_sizes_gcn: [16, 16]
+  hidden_sizes_mlp: [16, 16, 16]
   LR: 0.01
   dropout_rate: 0.0
   epochs: 100
