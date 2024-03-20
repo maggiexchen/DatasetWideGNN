@@ -15,10 +15,4 @@ deepsets_baseline/*.pdf
 **/*.pdf
 MADnormed_distances/
 standardised_distances/
-<<<<<<< HEAD
-LQ_test/
-compare.py
 models/
-=======
-models/
->>>>>>> 48d2ce935ad32a3267c1a2d4bb73aabd7fe13d1c
