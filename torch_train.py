@@ -57,7 +57,7 @@ def GetParser():
         "--distance",
         "-d",
         type=str,
-        required=True,
+        required=False,
         help="Specify the type of distance to calculate",
     )
 
@@ -65,7 +65,7 @@ def GetParser():
         "--eff",
         "-e",
         type=float,
-        required=True,
+        required=False,
         help="Specify sig-sig efficiency for the linking length",
     )
 
@@ -89,8 +89,8 @@ def GetParser():
         "--normalisation",
         "-n",
         type=str,
-        required=True,
-        help="Specify the type of adjacency matrix normalisation ('None', 'D_inv', 'D_inv_self', 'D_half_inv', 'D_half_inv_self')",
+        required=False,
+        help="Specify the type of adjacency matrix normalisation ('D_inv', 'D_half_inv', 'D_frac')",
     )
 
     parser.add_argument(
@@ -99,10 +99,12 @@ def GetParser():
         help="Specify whether to presever self-connections in adjacency matrix or not"
     )
 
-    args = parser.parse_args()
-    return args
+    #args = parser.parse_args()
+    return parser
 
-args = GetParser()
+parser = GetParser()
+args = parser.parse_args()
+
 if args.model == "dnn":
     model_label = "DNN"
     plot_path = "plots/DNN/"
@@ -111,14 +113,18 @@ elif args.model == "gcn":
     model_label = "GCN"
     plot_path = "plots/GCN/"
     config_path = "config/gcn.yaml"
+
+    if args.distance is None:
+        parser.error("Need to specify a type of distance metric for the adjacency matrix")
+    elif args.eff is None:
+        parser.error("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn")
+
+    distance = str(args.distance)
+    eff = args.eff
+    if eff not in [0.6, 0.7, 0.8, 0.9]:
+        raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
 else:
     print("Please specify either dnn or gcn for --model!")
-
-variable = str(args.variable)
-distance = str(args.distance)
-eff = args.eff
-if eff not in [0.6, 0.7, 0.8, 0.9]:
-    raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
 
 if args.path:
     path = args.path
@@ -126,92 +132,111 @@ if args.path:
 else:
     path = "/data/atlas/atlasdata3/maggiechen/gnn_project/"
 
+variable = str(args.variable)
 kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
 
 train_config = misc.load_config(config_path)
 hidden_sizes = train_config[args.model]["hidden_sizes"]
 LR = train_config[args.model]["LR"]
+dropout_rate = train_config[args.model]["dropout_rate"]
 epochs = train_config[args.model]["epochs"]
 
 train_loss = []
 val_loss = []
 
 modelname = str(args.model)
+logging.info("chosen model: "+modelname)
+logging.info("variable set: "+variable)
+logging.info("input/output path: "+path)
 if (modelname.lower() == "gcn"):
-    model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
+    model = GCNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1, dropout_rate=dropout_rate)
+    logging.info("distance metric: "+distance)
+    logging.info("desired efficieny: "+str(eff))
 elif (modelname.lower() == "dnn"):
-    model = DNNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1)
+    model = DNNClassifier(input_size=input_size, hidden_sizes=hidden_sizes, output_size=1, dropout_rate=dropout_rate)
 else:
     raise Exception("Janky, pick a defined model (dnn, gcn)")
 
-logging.info("variable set: "+variable)
-logging.info("distance metric: "+distance)
-logging.info("input/output path: "+path)
-logging.info("desired efficieny: "+str(eff))
-logging.info("chosen model: "+modelname)
-
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
-train_sig, train_bkg, train_x, train_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics)
-val_sig, val_bkg, val_x, val_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics)
+# un-normalised signal and background kinematics (for checking and plotting)
+raw_train_sig, raw_train_bkg, _, _, _, _ = adj.data_loader("data", "train", kinematics, norm_kin=False)
+raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader("data", "val", kinematics, norm_kin=False)
+
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics, norm_kin=True)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics, norm_kin=True)
+
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 
-# read in linking length calculated from sampled training data
-sigsig_eff = eff
-ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_length.json"
-misc.create_dirs(ll_path)
-with open(ll_path, 'r') as lfile:
-    length_dict = json.load(lfile)
-    lengths = length_dict["length"]
-    linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
-    logging.info("linking length ="+str(linking_length))
+raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
+raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
-# calculate distances and generate adjacency matrix in batches
-logging.info('Calculating training and validation distances ...')
-full_x = torch.cat((train_x, val_x), dim=0)
-full_wgts = torch.cat((train_wgts, val_wgts), dim=0)
-full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
+full_x = torch.cat((full_sig, full_bkg), dim=0)
+full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)
 
-# calculate centrality
-logging.info("Calculating centrality ...")
-deg_cent = torch.sum(full_adj_mat, dim=1)
-plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
 
-if args.normalisation == "None":
-    adj_mat = full_adj_mat
-elif args.normalisation == "D_inv":
-    D_inv = torch.inverse(torch.diag(deg_cent))
-    adj_mat = torch.matmul(D_inv, full_adj_mat)
-elif args.normalisation == "D_half_inv":
-    D_half_inv = torch.diag(torch.rsqrt(deg_cent))
-    adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
-    adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
-elif args.normalisation == "D_frac":
-    D_frac_inv = torch.diag(deg_cent / len(full_x))
-    adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
+if args.model=="gcn":
+    # read in linking length calculated from sampled training data
+    sigsig_eff = eff
+    ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_length.json"
+    misc.create_dirs(ll_path)
+
+    with open(ll_path, 'r') as lfile:
+        length_dict = json.load(lfile)
+        lengths = length_dict["length"]
+        linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
+        logging.info("linking length ="+str(linking_length))
+    
+    logging.info("Calculating distances and adjacency matrix ...")
+    full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
+    edge_frac = torch.sum(full_adj_mat == 1).item() / len(full_adj_mat)**2
+    print("Fraction of edges: ", edge_frac)
+
+    # calculate centrality
+    logging.info("Calculating centrality ...")
+    deg_cent = torch.sum(full_adj_mat, dim=1)
+    plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
+
+    if args.normalisation:
+        norm_label = "_"+args.normalisation
+        if args.normalisation == "D_inv":
+            D_inv = torch.inverse(torch.diag(deg_cent))
+            adj_mat = torch.matmul(D_inv, full_adj_mat)
+        elif args.normalisation == "D_half_inv":
+            D_half_inv = torch.diag(torch.rsqrt(deg_cent))
+            adj_mat = torch.matmul(D_half_inv, torch.matmul(full_adj_mat, D_half_inv))
+        elif args.normalisation == "D_frac":
+            D_frac_inv = torch.diag(deg_cent / len(full_x))
+            adj_mat = torch.matmul(D_frac_inv, full_adj_mat)
+        else:
+            print("Specify a sensible normalisation for the adjacency matrix!")
+    else:
+        adj_mat = full_adj_mat
+        norm_label = "_AX"
+
+    # Option to preserve self-connections in adjacency matrix
+    if args.self:
+        diagonal = adj_mat.diagonal()
+        diagonal.fill_(1)
+        norm_label = norm_label + "_self"
+
+    print("Normalised adjacency matrix\n", adj_mat)
+    plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=True)
+    plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=True)
+
+    plotting.plot_conv_kinematics(adj_mat, raw_full_sig, raw_full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=False)
+    plotting.plot_conv_conv_kinematics(adj_mat, raw_full_sig, raw_full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=False)
+
 else:
-    print("Specify a sensible normalisation for the adjacency matrix!")
-norm_label = args.normalisation
+    norm_label=""
 
-# Option to preserve self-connections in adjacency matrix
-if args.self:
-    diag_mask = torch.eye(adj_mat.size(0))
-    adj_mat = adj_mat + (diag_mask - adj_mat.diagonal())
-    norm_label = norm_label + "_self"
-
-print("Normalised adjacency matrix\n", adj_mat)
-plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+norm_label)
-plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, "/data/atlas/atlasdata3/maggiechen/gnn_project/training_kinematics/"+norm_label)
-
-
+logging.info("Training ...")
 # Define loss function for binary classification and ADAM optimiser
 loss_function = nn.BCELoss()
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 
-## TODO: load in the training the validation data differently
-## TODO: define the training and evaluation steps as functions
 for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
@@ -219,8 +244,11 @@ for epoch in range(epochs):
         full_outputs = model(full_x, adj_mat)
     elif args.model == "dnn":
         full_outputs = model(full_x)
-    train_outputs = full_outputs[:len(train_x)]
-    val_outputs = full_outputs[len(train_x):]
+
+    # splitting outputs into training/validation set
+    # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
+    train_outputs = torch.cat((full_outputs[:len(train_sig)], full_outputs[(len(train_sig)+len(val_sig)):(len(train_sig)+len(val_sig)+len(train_bkg))]), dim=0)
+    val_outputs = torch.cat((full_outputs[(len(train_sig)):(len(train_sig)+len(val_sig))], full_outputs[-len(val_bkg):]), dim=0)
     loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze())
     loss.backward()
     train_loss.append(loss.item())
@@ -231,6 +259,16 @@ for epoch in range(epochs):
     val_loss.append(validation_loss.item())
 
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {loss.item()}, Validation Loss: {validation_loss.item()}')
+
+# save trained model
+logging.info("Saving trained model and performance...")
+model_path = path+"models/"+modelname+norm_label+"/"
+misc.create_dirs(model_path)
+model_file_name = "model.pth"
+torch.save({
+    'model_state': model.state_dict(),
+    'optimiser_state': optimiser.state_dict(),
+}, model_path+model_file_name)
 
 train_outputs = train_outputs.view(-1)
 train_label_bool = train_truth_labels.bool()
@@ -251,6 +289,10 @@ val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().numpy(), val_out
 val_auc = roc_auc_score(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
 print("Validation AUC", val_auc)
 
+# save performance to json
+perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc, val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
+perf.save_metadata(len(train_sig), len(train_bkg), len(val_sig), len(val_bkg), hidden_sizes, LR, dropout_rate, epochs, model_path)
+
 logging.info("Plotting training/validation losses ...")
 fig, ax = plt.subplots()
 x_epoch = numpy.arange(1,epochs+1,1)
@@ -262,7 +304,7 @@ ax.set_xlabel("Epoch", loc="right")
 ax.set_ylabel("Loss", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_loss.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+norm_label+"_training_validation_loss.pdf", transparent=True)
 
 logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
@@ -282,18 +324,16 @@ ymin, ymax = ax.get_ylim()
 ax.set_ylim((ymin, ymax*1.2))
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_pred.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+norm_label+"_training_validation_pred.pdf", transparent=True)
 
 logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
 plt.plot(train_fpr, train_tpr, label='Training ROC curve (AUC = {:.3f})'.format(train_auc))
 plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
 plt.legend(loc="upper left", fontsize=9)
-ymin, ymax = plt.ylim()
-plt.ylim(ymin, ymax*1.2)
 plt.xlim(0,1)
 plt.xlabel("Background Efficiency", loc="right")
 plt.ylabel("Signal Efficiency", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+modelname+"_"+norm_label+"_training_validation_ROC.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+modelname+norm_label+"_training_validation_ROC.pdf", transparent=True)
