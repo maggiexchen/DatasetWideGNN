@@ -173,19 +173,19 @@ if len(hidden_sizes_gcn) > 0:
     print("Fraction of edges: ", edge_frac)
 
     # calculate centrality
-    logging.info("Calculating centrality ...")
+    logging.info("Calculating and plotting centrality ...")
     deg_cent = torch.sum(full_adj_mat, dim=1)
     plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
 
     adj_mat = full_adj_mat.to_sparse_csr() ### densor tensor to csr tensor
     norm_label = "D_half_inv_pyg" ### pyg layer uses D_half_inv normalisation
 
-    print("Normalised adjacency matrix\n", adj_mat)
-    plotting.plot_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=True)
-    plotting.plot_conv_conv_kinematics(adj_mat, full_sig, full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=True)
+    logging.info("Plotting convoluted kinematics ... ")
+    plotting.plot_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, args.eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
+    plotting.plot_conv_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, args.eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
 
-    plotting.plot_conv_kinematics(adj_mat, raw_full_sig, raw_full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=False)
-    plotting.plot_conv_conv_kinematics(adj_mat, raw_full_sig, raw_full_bkg, kinematics, path+"/training_kinematics/"+norm_label, standardise=False)
+    print("Normalised adjacency matrix\n", adj_mat)
+
 else:
     adj_mat = None
     norm_label = ""
