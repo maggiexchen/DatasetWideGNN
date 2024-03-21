@@ -1,4 +1,7 @@
-# name: "gcn"
+name: "D_half_inv_pyg"
+variable: "mass"
+distance: "euclidean"
+sigsig_eff: 0.8
 hidden_sizes_gcn: [16, 16]
 hidden_sizes_mlp: [16, 16, 16]
 LR: 0.01

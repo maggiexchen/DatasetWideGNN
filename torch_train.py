@@ -44,30 +44,6 @@ def GetParser():
     )
 
     parser.add_argument(
-        "--variable",
-        "-v",
-        type=str,
-        required=True,
-        help="Specify the type of kinematic variables to calculate distance for",
-    )
-
-    parser.add_argument(
-        "--distance",
-        "-d",
-        type=str,
-        required=False,
-        help="Specify the type of distance to calculate",
-    )
-
-    parser.add_argument(
-        "--eff",
-        "-e",
-        type=float,
-        required=False,
-        help="Specify sig-sig efficiency for the linking length",
-    )
-
-    parser.add_argument(
         "--path",
         "-p",
         type=str,
@@ -75,13 +51,6 @@ def GetParser():
         help="Specify the path to store all the input/output data and results",
     )
 
-    parser.add_argument(
-        "--self",
-        action="store_true",
-        help="Specify whether to presever self-connections in adjacency matrix or not"
-    )
-
-    #args = parser.parse_args()
     return parser
 
 parser = GetParser()
@@ -96,12 +65,9 @@ else:
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 
-variable = str(args.variable)
-kinematics = misc.get_kinematics(variable)
-input_size = len(kinematics)
-
 config_path = "config/new_config.yaml"
 train_config = misc.load_config(config_path)
+training_name = train_config["name"]
 hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
 hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
@@ -114,16 +80,21 @@ if len(hidden_sizes_gcn) == 0:
 else:
     model_label = "GCN"
     plot_path = "plots/GCN/"
-    
-if args.distance is None:
-        parser.error("Need to specify a type of distance metric for the adjacency matrix")
-elif args.eff is None:
-    parser.error("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn")
 
-distance = str(args.distance)
-eff = args.eff
-if eff not in [0.6, 0.7, 0.8, 0.9]:
+variable = train_config["variable"]
+if variable is None:
+    print("Need to specify a type of kinematic variable in the config")
+distance = train_config["distance"]
+if distance is None:
+    print("Need to specify a type of distance metric for the adjacency matrix in the config")
+eff = train_config["sigsig_eff"]
+if eff is None:
+    print("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
+elif eff not in [0.6, 0.7, 0.8, 0.9]:
     raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
+
+kinematics = misc.get_kinematics(variable)
+input_size = len(kinematics)
 
 train_loss = []
 val_loss = []
@@ -175,14 +146,14 @@ if len(hidden_sizes_gcn) > 0:
     # calculate centrality
     logging.info("Calculating and plotting centrality ...")
     deg_cent = torch.sum(full_adj_mat, dim=1)
-    plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", args.eff)
+    plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", eff)
 
     adj_mat = full_adj_mat.to_sparse_csr() ### densor tensor to csr tensor
-    norm_label = "D_half_inv_pyg" ### pyg layer uses D_half_inv normalisation
+    norm_label = training_name ### pyg layer uses D_half_inv normalisation
 
     logging.info("Plotting convoluted kinematics ... ")
-    plotting.plot_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, args.eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
-    plotting.plot_conv_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, args.eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
+    plotting.plot_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
+    plotting.plot_conv_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
 
     print("Normalised adjacency matrix\n", adj_mat)
 
@@ -272,7 +243,7 @@ ax.hist(val_bkg_pred.detach().numpy(), bins=binning, label="Background (validati
 ax.text(0.02, 0.95, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.text(0.02, 0.91, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.text(0.02, 0.87, "6b Resonant TRSM signal, 5b Data", verticalalignment="bottom", size=9, transform=ax.transAxes)
-ax.text(0.02, 0.83, "Linking length at sig-sig efficiency "+str(args.eff), verticalalignment="bottom", size=9, transform=ax.transAxes)
+ax.text(0.02, 0.83, "Linking length at sig-sig efficiency "+str(eff), verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.legend(loc='upper right', fontsize=9)
 ax.set_xlabel("Output score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
