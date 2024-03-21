@@ -42,6 +42,13 @@ def GetParser():
     parser = argparse.ArgumentParser(
         description="Reading Ntuples command line options."
     )
+    parser.add_argument(
+        "--config",
+        "-c",
+        type=str,
+        required=True,
+        help="Specify the config file for training",
+    )
 
     parser.add_argument(
         "--path",
@@ -65,7 +72,7 @@ else:
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 
-config_path = "config/new_config.yaml"
+config_path = args.config
 train_config = misc.load_config(config_path)
 training_name = train_config["name"]
 hidden_sizes_gcn = train_config["hidden_sizes_gcn"]

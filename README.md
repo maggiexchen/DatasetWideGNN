@@ -28,8 +28,9 @@ The linking length used here is the same if generated from comparing sig-sig wit
 ## Training
 Training can be run for a baseline DNN, or a GCN, by running 
 ```
-python torch_train.py -v <type of variables> -d <distance> -e <sig-sig eff> -p <output folder path> --self
+python torch_train.py -c <config file path> -p <output folder path>
 ```
+The config file should contain the name of the training, the type of kinematic variables, the type of distance metric, sig-sig efficiencies, and training hyperparameters.
 The sig-sig efficiencies that are supported so far are `0.6`, `0.7`,` 0.8` and `0.9`. 
 The model can be specified in the config file, including number of gcn and regular mlp layers and their sizes. Note: if there are no hidden gcn layers, model is equivalent to a regular dnn. 
 The adjacency matrix is normalised by default in the GCNConv layer using the $`D^{-1/2} A D^{-1/2}`$ scheme used in the "Semi-supervised Classification with Graph Convolutional Networks" paper (https://arxiv.org/pdf/1609.02907.pdf).
