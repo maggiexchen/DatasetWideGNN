@@ -90,7 +90,20 @@ def plot_kinematic_hists(df_sig, df_bkg, var, file_path, standardise=True):
 
     return 0
 
-def plot_conv_kinematics(adj_mat, sig, bkg, kinematics, file_path, standardise=True):
+def plot_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, normalisation, standardise=True):
+    if normalisation == "D_inv":
+        D_inv = torch.inverse(torch.diag(D))
+        adj_mat = torch.matmul(D_inv, adj_mat)
+        diagonal = adj_mat.diagonal()
+        diagonal.fill_(1)
+    elif normalisation == "D_half_inv":
+        D_half_inv = torch.diag(torch.rsqrt(D))
+        adj_mat = torch.matmul(D_half_inv, torch.matmul(adj_mat, D_half_inv))
+        diagonal = adj_mat.diagonal()
+        diagonal.fill_(1)
+    else: 
+        print("Please specify a normalisation that is either D_inv or D_half_inv")
+
     x = torch.cat((sig, bkg), dim=0)
     conv_x = torch.matmul(adj_mat, x)
     conv_x_numpy = conv_x.detach().numpy()
@@ -114,7 +127,7 @@ def plot_conv_kinematics(adj_mat, sig, bkg, kinematics, file_path, standardise=T
         ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
-        ax.text(0.04, 0.78, r"Linking length at sig-sig eff 0.8", verticalalignment="bottom", size=10, transform=ax.transAxes)
+        ax.text(0.04, 0.78, r"Linking length at sig-sig eff "+str(eff), verticalalignment="bottom", size=10, transform=ax.transAxes)
         if standardise:
             ax.text(0.04, 0.78, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)  
         ax.legend(loc='upper right')
@@ -125,7 +138,20 @@ def plot_conv_kinematics(adj_mat, sig, bkg, kinematics, file_path, standardise=T
         fig.tight_layout()
         fig.savefig(file_path+plot_name+var+".pdf", transparent=True)
     
-def plot_conv_conv_kinematics(adj_mat, sig, bkg, kinematics, file_path, standardise=True):
+def plot_conv_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, normalisation, standardise=True):
+    if normalisation == "D_inv":
+        D_inv = torch.inverse(torch.diag(D))
+        adj_mat = torch.matmul(D_inv, adj_mat)
+        diagonal = adj_mat.diagonal()
+        diagonal.fill_(1)
+    elif normalisation == "D_half_inv":
+        D_half_inv = torch.diag(torch.rsqrt(D))
+        adj_mat = torch.matmul(D_half_inv, torch.matmul(adj_mat, D_half_inv))
+        diagonal = adj_mat.diagonal()
+        diagonal.fill_(1)
+    else: 
+        print("Please specify a normalisation that is either D_inv or D_half_inv")
+
     x = torch.cat((sig, bkg), dim=0)
     conv_conv_x = torch.matmul(adj_mat, torch.matmul(adj_mat, x))
     conv_conv_x_numpy = conv_conv_x.detach().numpy()
@@ -149,7 +175,7 @@ def plot_conv_conv_kinematics(adj_mat, sig, bkg, kinematics, file_path, standard
         ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
-        ax.text(0.04, 0.78, r"Linking length at sig-sig eff 0.8", verticalalignment="bottom", size=10, transform=ax.transAxes)
+        ax.text(0.04, 0.78, r"Linking length at sig-sig eff "+str(eff), verticalalignment="bottom", size=10, transform=ax.transAxes)
         if standardise:
             ax.text(0.04, 0.73, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.legend(loc='upper right')
