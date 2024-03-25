@@ -1,6 +1,0 @@
-dnn:
-  name: "dnn"
-  hidden_sizes: [4, 4]
-  LR: 0.01
-  dropout_rate: 0.1
-  epochs: 100
