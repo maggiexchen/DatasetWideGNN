@@ -126,9 +126,9 @@ logging.info("Converting distance and weight tensors to np arrays for saving and
 np_sigsig = sigsig.numpy().flatten()
 np_sigbkg = sigbkg.numpy().flatten()
 np_bkgbkg = bkgbkg.numpy().flatten()
-np_sigsig_wgts = sigsig_wgts.numpy().flatten()
-np_sigbkg_wgts = sigbkg_wgts.numpy().flatten()
-np_bkgbkg_wgts = bkgbkg_wgts.numpy().flatten()
+np_sigsig_wgt = sigsig_wgt.numpy().flatten()
+np_sigbkg_wgt = sigbkg_wgt.numpy().flatten()
+np_bkgbkg_wgt = bkgbkg_wgt.numpy().flatten()
 
 logging.info('Writing to h5...')
 save_path = path+"distances/"
@@ -145,11 +145,11 @@ bkgbkg_dset = f_bkgbkg.create_dataset("bkgbkg", shape=(len(np_bkgbkg),), dtype=d
 # writing distances, and weights in chunks
 
 sigsig_dset['distance'] = np_sigsig
-sigsig_dset['weight'] = np_sigsig_wgts
+sigsig_dset['weight'] = np_sigsig_wgt
 sigbkg_dset['distance'] = np_sigbkg
-sigbkg_dset['weight'] = np_sigbkg_wgts
+sigbkg_dset['weight'] = np_sigbkg_wgt
 bkgbkg_dset['distance'] = np_bkgbkg
-bkgbkg_dset['weight'] = np_bkgbkg_wgts
+bkgbkg_dset['weight'] = np_bkgbkg_wgt
 
 f_sigsig.close()
 f_sigbkg.close()
@@ -167,4 +167,4 @@ else:
 
 plot_path = path+"plots/standardised_weighted/"+variable+"/"
 misc.create_dirs(plot_path)
-plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgts, np_sigbkg_wgts, np_bkgbkg_wgts, variable, distance, plot_path)
+plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path)
