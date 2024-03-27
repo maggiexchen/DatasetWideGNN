@@ -64,8 +64,8 @@ args = GetParser()
 variable = str(args.variable)
 distance = str(args.distance)
 
-# path = "/data/atlas/atlasdata3/maggiechen/gnn_project/" # maggies path
-path = "/home/srutherford/GNN_shared/hhhgraph/data/" # sebs path
+path = "/data/atlas/atlasdata3/maggiechen/gnn_project/" # maggies path
+#path = "/home/srutherford/GNN_shared/hhhgraph/data/" # sebs path
 if args.path:
     path = args.path
     if path[-1]!="/": path += "/"
@@ -95,9 +95,9 @@ bkg_wgt = torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)*SF_4b5b
 # mutliple events kinematics by the corresponding event weights and calcualte distances
 logging.info('Getting MC event weights and calcualte weight matrix ...')
 # The scale factor that scales 5b data down to the expected 6b yields, this is just taken as the ratio between 5b data/4b data for now
-sigsig_wgt = torch.outer(sig_wgt, sig_wgt)
-sigbkg_wgt = torch.outer(sig_wgt, bkg_wgt)
-bkgbkg_wgt = torch.outer(bkg_wgt, bkg_wgt)
+sigsig_wgt = torch.ger(sig_wgt, sig_wgt)
+sigbkg_wgt = torch.ger(sig_wgt, bkg_wgt)
+bkgbkg_wgt = torch.ger(bkg_wgt, bkg_wgt)
 
 # calculate distances
 logging.info('Calculating distances...')
@@ -105,6 +105,7 @@ if distance == "euclidean":
     sigsig = dis.euclidean(full_sig, full_sig)
     sigbkg = dis.euclidean(full_sig, full_bkg)
     bkgbkg = dis.euclidean(full_bkg, full_bkg)
+
 elif distance == "cityblock":
     sigsig = dis.cityblock(full_sig, full_sig)
     sigbkg = dis.cityblock(full_sig, full_bkg)
