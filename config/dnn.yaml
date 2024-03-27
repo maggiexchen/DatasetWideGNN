@@ -1,5 +1,0 @@
-dnn:
-  name: "dnn"
-  hidden_sizes: [4, 4]
-  LR: 0.01
-  epochs: 100

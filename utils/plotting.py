@@ -42,11 +42,12 @@ def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, labe
     if label!="": label = "_"+label
     exts = [".pdf"]
     for ext in exts:
+        fig.tight_layout()
         fig.savefig(path+"/"+var+"_"+distance+label+"_distances"+ext)
 
     return 0
 
-def plot_kinematic_hists(df_sig, df_bkg, var, file_path):
+def plot_kinematic_hists(df_sig, df_bkg, var, file_path, standardise=True):
     """
     Function to plot the histogram of a kinematic variable for signal and background on one figure.
 
@@ -60,85 +61,131 @@ def plot_kinematic_hists(df_sig, df_bkg, var, file_path):
     """
     # plot
     fig, ax = plt.subplots()
-    binning = np.linspace(min(df_bkg.loc[:, var]),max(df_bkg.loc[:, var]), 50)
-    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal (6b TRSM)", alpha=0.3, density=True, color="steelblue")
-    yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background (5b data)", alpha=0.3, density=True, color="red")
-    ax.text(0.04, 0.93, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
-    ax.text(0.04, 0.88, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
-    ax.text(0.04, 0.83, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    binning = np.linspace(min(min(df_sig.loc[:, var]), min(df_bkg.loc[:, var])), max(max(df_sig.loc[:, var]), max(df_bkg.loc[:, var])), 50)
+    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal (6b TRSM)", alpha=0.3, color="red")
+    yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background (5b data)", alpha=0.3, color="steelblue")
+    ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
     ax.text(0.04, 0.78, r"Linking length at sig-sig eff 0.8", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    if standardise:
+        ax.text(0.04, 0.73, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)
+        plot_name = "/standardised_"
+    else:
+        plot_name = "/"
     # aesthetics
-    hep.atlas.label(ax=ax, data=False, label="Internal", lumi="129")
+    #hep.atlas.label(ax=ax, data=False, label="Internal", lumi="129")
     ax.legend(loc='upper right')
     ax.set_ylim([0.01, 1.2*max(max(ys),max(yb))])
-    ax.set_xlabel(str(var), loc="right")
-    ax.set_ylabel("Normalised No. Events", loc="top")
+    ax.set_xlabel("\n"+str(var) + " [GeV]", loc="right")
+    ax.set_ylabel("No. Events", loc="top")
     # save
-    save_path = file_path+"/training_kinematics/"
+    save_path = file_path+"/training_kinematics"
     misc.create_dirs(save_path)
     exts = [".pdf"]
     for ext in exts:
-        fig.savefig(save_path+"/"+var+ext, transparent=True)
+        fig.tight_layout()
+        fig.savefig(save_path+plot_name+var+ext, transparent=True)
 
     return 0
 
-def plot_conv_kinematics(adj_mat, sig, bkg, kinematics, file_path):
+def plot_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, normalisation, standardise=True):
+    if normalisation == "D_inv":
+        D_inv = torch.inverse(torch.diag(D))
+        adj_mat = torch.matmul(D_inv, adj_mat)
+        diagonal = adj_mat.diagonal()
+        diagonal.fill_(1)
+    elif normalisation == "D_half_inv":
+        D_half_inv = torch.diag(torch.rsqrt(D))
+        adj_mat = torch.matmul(D_half_inv, torch.matmul(adj_mat, D_half_inv))
+        diagonal = adj_mat.diagonal()
+        diagonal.fill_(1)
+    else: 
+        print("Please specify a normalisation that is either D_inv or D_half_inv")
+
     x = torch.cat((sig, bkg), dim=0)
     conv_x = torch.matmul(adj_mat, x)
     conv_x_numpy = conv_x.detach().numpy()
-
-    for v, var in enumerate(kinematics):
-        conv_x_numpy[:,v] = norm.standardise(conv_x_numpy[:, v])
+    if standardise:
+        for v, var in enumerate(kinematics):
+            conv_x_numpy[:,v] = norm.standardise(conv_x_numpy[:, v])
+        plot_name = "/standardised_conv_"
+    else:
+        plot_name = "/conv_"
     conv_sig = conv_x_numpy[: len(sig)]
     conv_bkg = conv_x_numpy[len(sig):]
 
+    # plot standardised convoluted kinematics
     misc.create_dirs(file_path+"/")
     for v, var in enumerate(kinematics):
         fig, ax = plt.subplots()
-        binning = numpy.linspace(min(conv_sig[:,v]),max(conv_sig[:,v]), 50)
+        binning = numpy.linspace(min(conv_bkg[:,v]),max(conv_bkg[:,v]), 50)
         ax.hist(conv_sig[:,v], bins=binning, label="Signal", alpha=0.3, density=True, color="red")
         ax.hist(conv_bkg[:,v], bins=binning, label="Background", alpha=0.3, density=True, color="steelblue")
         ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
-        ax.text(0.04, 0.78, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)
-        ax.text(0.04, 0.73, r"Linking length at sig-sig eff 0.8", verticalalignment="bottom", size=10, transform=ax.transAxes)
+        ax.text(0.04, 0.78, r"Linking length at sig-sig eff "+str(eff), verticalalignment="bottom", size=10, transform=ax.transAxes)
+        if standardise:
+            ax.text(0.04, 0.78, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)  
         ax.legend(loc='upper right')
         ymin, ymax = ax.get_ylim()
         ax.set_ylim((ymin, ymax*1.4))
-        ax.set_xlabel(str(var)+" [GeV]", loc="right")
+        ax.set_xlabel("\n"+str(var)+" [GeV]", loc="right")
         ax.set_ylabel("Normalised No. Events", loc="top")
-        fig.savefig(file_path+"/"+var+".pdf", transparent=True)
+        fig.tight_layout()
+        fig.savefig(file_path+plot_name+var+".pdf", transparent=True)
+    
+def plot_conv_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, normalisation, standardise=True):
+    if normalisation == "D_inv":
+        D_inv = torch.inverse(torch.diag(D))
+        adj_mat = torch.matmul(D_inv, adj_mat)
+        diagonal = adj_mat.diagonal()
+        diagonal.fill_(1)
+    elif normalisation == "D_half_inv":
+        D_half_inv = torch.diag(torch.rsqrt(D))
+        adj_mat = torch.matmul(D_half_inv, torch.matmul(adj_mat, D_half_inv))
+        diagonal = adj_mat.diagonal()
+        diagonal.fill_(1)
+    else: 
+        print("Please specify a normalisation that is either D_inv or D_half_inv")
 
-def plot_conv_conv_kinematics(adj_mat, sig, bkg, kinematics, file_path):
     x = torch.cat((sig, bkg), dim=0)
     conv_conv_x = torch.matmul(adj_mat, torch.matmul(adj_mat, x))
     conv_conv_x_numpy = conv_conv_x.detach().numpy()
-
-    for v, var in enumerate(kinematics):
-        conv_conv_x_numpy[:,v] = norm.standardise(conv_conv_x_numpy[:, v])
+    
+    if standardise:
+        for v, var in enumerate(kinematics):
+            conv_conv_x_numpy[:,v] = norm.standardise(conv_conv_x_numpy[:, v])
+        plot_name = "/standardised_conv_conv_"
+    else:
+        plot_name = "/conv_conv_"
     conv_conv_sig = conv_conv_x_numpy[: len(sig)]
     conv_conv_bkg = conv_conv_x_numpy[len(sig):]
     
     misc.create_dirs(file_path+"/")
     for v, var in enumerate(kinematics):
         fig, ax = plt.subplots()
-        binning = numpy.linspace(min(conv_conv_sig[:,v]),max(conv_conv_sig[:,v]), 50)
+        binning = numpy.linspace(min(conv_conv_bkg[:,v]),max(conv_conv_bkg[:,v]), 50)
         ax.hist(conv_conv_sig[:,v], bins=binning, label="Signal", alpha=0.3, density=True, color="red")
         ax.hist(conv_conv_bkg[:,v], bins=binning, label="Background", alpha=0.3, density=True, color="steelblue")
         ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
-        ax.text(0.04, 0.78, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)
-        ax.text(0.04, 0.73, r"Linking length at sig-sig eff 0.8", verticalalignment="bottom", size=10, transform=ax.transAxes)
+        ax.text(0.04, 0.78, r"Linking length at sig-sig eff "+str(eff), verticalalignment="bottom", size=10, transform=ax.transAxes)
+        if standardise:
+            ax.text(0.04, 0.73, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.legend(loc='upper right')
         ymin, ymax = ax.get_ylim()
         ax.set_ylim((ymin, ymax*1.4))
-        ax.set_xlabel(str(var)+" [GeV]", loc="right")
+        ax.set_xlabel("\n"+str(var)+" [GeV]", loc="right")
         ax.set_ylabel("Normalised No. Events", loc="top")
-        fig.savefig(file_path+"/"+var+".pdf", transparent=True)
+        fig.tight_layout()
+        fig.savefig(file_path+plot_name+var+".pdf", transparent=True)
+
 
 def plot_centrality(centrality, sig, bkg, file_path, eff):
     degree_centrality = centrality / (len(sig)+len(bkg))
@@ -174,6 +221,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
     ax.set_ylim((ymin, ymax*1.4))
     ax.set_xlabel("Degree Centrality", loc="right")
     ax.set_ylabel("Normalised No. Events", loc="top")
+    fig.tight_layout()
     fig.savefig(file_path+"/centrality/degree_centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
 
     fig, ax = plt.subplots()
@@ -190,6 +238,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
     ax.set_ylim((ymin, ymax*1.4))
     ax.set_xlabel("Centrality", loc="right")
     ax.set_ylabel("Normalised No. Events", loc="top")
+    fig.tight_layout()
     fig.savefig(file_path+"/centrality/norm_centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
 
     fig, ax = plt.subplots()
@@ -206,6 +255,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
     ax.set_ylim((ymin, ymax*1.4))
     ax.set_xlabel("Degree Centrality", loc="right")
     ax.set_ylabel("Normalised No. Events", loc="top")
+    fig.tight_layout()
     fig.savefig(file_path+"/centrality/norm_degree_centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
 
 

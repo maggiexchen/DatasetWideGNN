@@ -1,6 +1,0 @@
-gcn:
-  name: "gcn"
-  hidden_sizes_gcn: [16, 16]
-  hidden_sizes_mlp: [16, 16, 16]
-  LR: 0.01
-  epochs: 100

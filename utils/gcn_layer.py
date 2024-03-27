@@ -6,7 +6,7 @@ import math
 
 class GCNLayer(nn.Module):
     # TODO add attention layer ...
-    def __init__(self, dim_in, dim_out, use_batch_norm=True):
+    def __init__(self, dim_in, dim_out, dropout_rate, use_batch_norm=True):
         """
         dim_in: dimension of input node features
         dim_out: dimension of output features (for binary classification is 1 for final layer)
@@ -23,6 +23,7 @@ class GCNLayer(nn.Module):
         if self.use_batch_norm:
             self.batch_norm = nn.BatchNorm1d(dim_out)
         
+        self.dropout = nn.Dropout(p=dropout_rate)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -34,5 +35,6 @@ class GCNLayer(nn.Module):
         output = torch.matmul(torch.matmul(adjacency_matrix,x), self.train_weight)+self.train_bias
         if self.use_batch_norm:
             output = self.batch_norm(output)
+        output = self.dropout(output)
 
         return output
