@@ -28,8 +28,8 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True)
 
     df_sig =  pd.read_hdf(path+"/hhh_split_files/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
     df_bkg =  pd.read_hdf(path+"/hhh_split_files/bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
-    df_sig = df_sig.sample(n=n_sig, random_state=42)
-    df_bkg = df_bkg.sample(n=n_bkg, random_state=42)
+    #df_sig = df_sig.sample(n=n_sig, random_state=42)
+    #df_bkg = df_bkg.sample(n=n_bkg, random_state=42)
     df_sig_wgts = df_sig["eventWeight"]
     df_bkg_wgts = df_bkg["eventWeight"]
     df_sig = df_sig[kinematics]
