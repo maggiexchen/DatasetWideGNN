@@ -9,8 +9,8 @@ from sklearn.model_selection import train_test_split
 import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
-import tensorflow as tf
-import utils.distances as dis
+import torch
+import utils.torch_distances as dis
 import utils.normalisation as norm
 import utils.misc as misc
 import utils.plotting as plotting
@@ -117,9 +117,9 @@ else:
     print("Specify a valid distance please!")
 
 logging.info("Checking for NaNs in distances ... ")
-print(tf.reduce_sum(tf.cast(tf.math.is_nan(sigsig), tf.int32)))
-print(tf.reduce_sum(tf.cast(tf.math.is_nan(sigbkg), tf.int32)))
-print(tf.reduce_sum(tf.cast(tf.math.is_nan(bkgbkg), tf.int32)))
+print(torch.sum(torch.isnan(sigsig)).item())
+print(torch.sum(torch.isnan(sigbkg)).item())
+print(torch.sum(torch.isnan(bkgbkg)).item())
 
 # plot the (sampled) MAD-normed distances
 logging.info("Converting distance and weight tensors to np arrays for saving and plotting ... ")
