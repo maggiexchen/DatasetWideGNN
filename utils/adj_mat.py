@@ -11,7 +11,7 @@ import utils.torch_distances as dis
 import utils.misc as misc
 import utils.plotting as plot
 
-def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000):
+def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True):
     """
     Function to load our sign and bkg data into pandas dataframes
 
@@ -40,10 +40,11 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000):
     bkg_label = [0]*len(df_bkg)
     # Standardising kinematics
     for var in kinematics:
-        df_all.loc[:, var] = norm.standardise(df_all.loc[:, var])
+        if norm_kin:
+            df_all.loc[:, var] = norm.standardise(df_all.loc[:, var])
         df_sig = df_all.iloc[:len(df_sig)]
         df_bkg = df_all.iloc[len(df_sig):]
-        plot.plot_kinematic_hists(df_sig, df_bkg, var, path)
+        plot.plot_kinematic_hists(df_sig, df_bkg, var, path, standardise=norm_kin)
     # convert pd dataframes to torch tensors
     torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)
     torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)
@@ -51,10 +52,9 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000):
     torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
     # concatenating signal and background events / weights
     torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
-    torch_wgts = torch.concat((torch_sig_wgts, torch_bkg_wgts), dim=0)
     truth_labels = torch.tensor(numpy.concatenate((sig_label, bkg_label)), dtype=torch.float32)
 
-    return torch_sig, torch_bkg, torch_all, torch_wgts, truth_labels
+    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, truth_labels
 
 def create_adj_mat(a, length):
     """
