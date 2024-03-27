@@ -9,13 +9,14 @@ from sklearn.model_selection import train_test_split
 import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
-import tensorflow as tf
+import torch
 import utils.torch_distances as dis
 import utils.normalisation as norm
 import utils.misc as misc
 import utils.plotting as plotting
 import utils.adj_mat as adj
 import torch
+torch.manual_seed(42)
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -92,12 +93,12 @@ full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 sig_wgt = torch.cat((train_sig_wgts, val_sig_wgts), dim=0)
 bkg_wgt = torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)*SF_4b5b
 
-# mutliple events kinematics by the corresponding event weights and calcualte distances
-logging.info('Getting MC event weights and calcualte weight matrix ...')
-# The scale factor that scales 5b data down to the expected 6b yields, this is just taken as the ratio between 5b data/4b data for now
-sigsig_wgt = torch.ger(sig_wgt, sig_wgt)
-sigbkg_wgt = torch.ger(sig_wgt, bkg_wgt)
-bkgbkg_wgt = torch.ger(bkg_wgt, bkg_wgt)
+# # mutliple events kinematics by the corresponding event weights and calcualte distances
+# logging.info('Getting MC event weights and calcualte weight matrix ...')
+# # The scale factor that scales 5b data down to the expected 6b yields, this is just taken as the ratio between 5b data/4b data for now
+# sigsig_wgt = torch.ger(sig_wgt, sig_wgt)
+# sigbkg_wgt = torch.ger(sig_wgt, bkg_wgt)
+# bkgbkg_wgt = torch.ger(bkg_wgt, bkg_wgt)
 
 # calculate distances in batches
 logging.info('Calculating distances in batches...')
@@ -114,8 +115,10 @@ def distance_calc(a, b, metric):
     else:
         d = None
         print("Please specify a valid distance metric, from euclidean, cityblock or cosine")
-    return d
-
+    
+    if torch.sum(torch.isnan(d)).item() == 0:
+        return d
+    
 def check_nans(dist):
     nans = tf.reduce_sum(tf.cast(tf.math.is_nan(dist), tf.int32))
 
@@ -125,91 +128,77 @@ num_sig_batches = (num_sig_events + batch_size - 1) // batch_size
 num_bkg_events = full_bkg.shape[0]
 num_bkg_batches = (num_bkg_events + batch_size - 1) // batch_size
 
-misc.create_dirs(path+"/batched_distances")
+save_path = path+"/batched_"+variable +"_"+distance+"_distances/"
+misc.create_dirs(save_path)
 sigsig_batch_counter = 0
+logging.info('Calculating sigsig distances ...')
 for i in range(num_sig_batches):
     start_idx_sig = i * batch_size
     end_idx_sig = min((i + 1) * batch_size, num_sig_events)
     batch_sig = full_sig[start_idx_sig:end_idx_sig]
+    batch_sig_wgt = sig_wgt[start_idx_sig:end_idx_sig]
+
     batch_sigsig = distance_calc(batch_sig, batch_sig, distance)
-    torch.save(batch_sigsig, path+f'batched_distances/sigsig_distances_batch_{sigsig_batch_counter}.pt')
+    batch_sigsig_wgt = torch.ger(batch_sig_wgt, batch_sig_wgt)
+
+    batch_dict = {'distance': batch_sigsig, 'weight': batch_sigsig_wgt}
+    torch.save(batch_dict, save_path + f'sigsig_distances_batch_{sigsig_batch_counter}.pt')
     sigsig_batch_counter += 1
 
+logging.info('Calculating bkgbkg distances ...')
 bkgbkg_batch_counter = 0
 for j in range(num_bkg_batches):
     start_idx_bkg = j * batch_size
     end_idx_bkg = min((j + 1) * batch_size, num_bkg_events)
     batch_bkg = full_bkg[start_idx_bkg:end_idx_bkg]
+    batch_bkg_wgt = bkg_wgt[start_idx_bkg:end_idx_bkg]
+
     batch_bkgbkg = distance_calc(batch_bkg, batch_bkg, distance)
-    torch.save(batch_sigsig, path+f'batched_distances/bkgbkg_distances_batch_{bkgbkg_batch_counter}.pt')
+    batch_bkgbkg_wgt = torch.ger(batch_bkg_wgt, batch_bkg_wgt)
+    
+    batch_dict = {'distance': batch_bkgbkg, 'weight': batch_bkgbkg_wgt}
+    torch.save(batch_dict, save_path + f'bkgbkg_distances_batch_{bkgbkg_batch_counter}.pt')
     bkgbkg_batch_counter += 1
 
+logging.info('Calculating sigbkg distances ...')
 sigbkg_batch_counter = 0
-for i in range(num_sig_batches):
-    start_idx_sig = i * batch_size
-    end_idx_sig = min((i + 1) * batch_size, num_sig_events)
-    batch_sig = full_sig[start_idx_sig:end_idx_sig]
+for j in range(num_bkg_batches):
+    start_idx_bkg = j * batch_size
+    end_idx_bkg = min((j + 1) * batch_size, num_bkg_events)
+    batch_bkg = full_bkg[start_idx_bkg:end_idx_bkg]
+    batch_bkg_wgt = bkg_wgt[start_idx_bkg:end_idx_bkg]
+
     sigbkg_distances = []
-    for j in range(num_bkg_batches):
-        start_idx_bkg = j * batch_size
-        end_idx_bkg = min((j + 1) * batch_size, num_bkg_events)
-        batch_bkg = full_bkg[start_idx_bkg:end_idx_bkg]
+    sigbkg_wgts = []
+    for i in range(num_sig_batches):
+        start_idx_sig = i * batch_size
+        end_idx_sig = min((i + 1) * batch_size, num_sig_events)
+        batch_sig = full_sig[start_idx_sig:end_idx_sig]
+        batch_sig_wgt = sig_wgt[start_idx_sig:end_idx_sig]
+
         batch_sigbkg = distance_calc(batch_sig, batch_bkg, distance)
+        batch_sigbkg_wgt = torch.ger(batch_bkg_wgt, batch_sig_wgt)
+
         sigbkg_distances.append(batch_sigbkg)
+        sigbkg_wgts.append(batch_sigbkg_wgt)
     sigbkg_distances = torch.cat(sigbkg_distances, dim=0)
-    torch.save(sigbkg_distances, path+f'batched_distances/sigbkg_distances_batch_{sigbkg_batch_counter}.pt')
+    sigbkg_wgts = torch.cat(sigbkg_wgts, dim=0)
+    batch_dict = {'distance': sigbkg_distances, 'weight': sigbkg_wgts}
+    torch.save(batch_dict, save_path + f'sigbkg_distances_batch_{sigbkg_batch_counter}.pt')
     sigbkg_batch_counter += 1
 
+# plot the MAD-normed distances from the first batch
+logging.info("Plotting ... ")
+sigsig = torch.load(save_path + 'sigsig_distances_batch_0.pt')
+bkgbkg = torch.load(save_path + 'bkgbkg_distances_batch_0.pt')
+sigbkg = torch.load(save_path + 'sigbkg_distances_batch_0.pt')
+np_sigsig = sigsig['distance'].numpy().flatten()
+np_sigbkg = sigbkg['distance'].numpy().flatten()
+np_bkgbkg = bkgbkg['distance'].numpy().flatten()
+np_sigsig_wgt = sigsig['weight'].numpy().flatten()
+np_sigbkg_wgt = sigbkg['weight'].numpy().flatten()
+np_bkgbkg_wgt = bkgbkg['weight'].numpy().flatten()
 
-# logging.info("Checking for NaNs in distances ... ")
-# print(tf.reduce_sum(tf.cast(tf.math.is_nan(sigsig), tf.int32)))
-# print(tf.reduce_sum(tf.cast(tf.math.is_nan(sigbkg), tf.int32)))
-# print(tf.reduce_sum(tf.cast(tf.math.is_nan(bkgbkg), tf.int32)))
-
-# # plot the (sampled) MAD-normed distances
-# logging.info("Converting distance and weight tensors to np arrays for saving and plotting ... ")
-# np_sigsig = sigsig.numpy().flatten()
-# np_sigbkg = sigbkg.numpy().flatten()
-# np_bkgbkg = bkgbkg.numpy().flatten()
-# np_sigsig_wgt = sigsig_wgt.numpy().flatten()
-# np_sigbkg_wgt = sigbkg_wgt.numpy().flatten()
-# np_bkgbkg_wgt = bkgbkg_wgt.numpy().flatten()
-
-# logging.info('Writing to h5...')
-# save_path = path+"distances/"
-# misc.create_dirs(save_path)
-# sigsig_file, sigbkg_file, bkgbkg_file = misc.get_h5_paths(save_path, variable, distance)
-# f_sigsig = h5py.File(sigsig_file, "w")
-# f_sigbkg = h5py.File(sigbkg_file, "w")
-# f_bkgbkg = h5py.File(bkgbkg_file, "w")
-
-# dtype = np.dtype([('distance', np.float32), ('weight', np.float32)])
-# sigsig_dset = f_sigsig.create_dataset("sigsig", shape=(len(np_sigsig),), dtype=dtype, chunks=True, compression="gzip")
-# sigbkg_dset = f_sigbkg.create_dataset("sigbkg", shape=(len(np_sigbkg),), dtype=dtype, chunks=True, compression="gzip")
-# bkgbkg_dset = f_bkgbkg.create_dataset("bkgbkg", shape=(len(np_bkgbkg),), dtype=dtype, chunks=True, compression="gzip")
-# # writing distances, and weights in chunks
-
-# sigsig_dset['distance'] = np_sigsig
-# sigsig_dset['weight'] = np_sigsig_wgt
-# sigbkg_dset['distance'] = np_sigbkg
-# sigbkg_dset['weight'] = np_sigbkg_wgt
-# bkgbkg_dset['distance'] = np_bkgbkg
-# bkgbkg_dset['weight'] = np_bkgbkg_wgt
-
-# f_sigsig.close()
-# f_sigbkg.close()
-# f_bkgbkg.close()
-
-# logging.info("Plotting ...")
-# if distance == "cityblock":
-#     x_max = 40
-# elif distance == "euclidean":
-#     x_max = 20
-# elif distance == "cosine":
-#     x_max = 2
-# else:
-#     raise Exception('Eh?, pick a better distance metric (cityblock, eucidean, cosine)')
-
-# plot_path = path+"plots/standardised_weighted/"+variable+"/"
-# misc.create_dirs(plot_path)
-# plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path)
+plot_path = path+"plots/standardised_weighted/"+variable+"/"
+misc.create_dirs(plot_path)
+plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path)
