@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import h5py
 import json
+import torch
 import os
 os.environ["NUMEXPR_MAX_THREADS"] = "16"
 import matplotlib.pyplot as plt
@@ -65,19 +66,13 @@ logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("input/output path: "+path)
 
-file_path = path+"distances/"
-sigsig_file, sigbkg_file, bkgbkg_file = misc.get_h5_paths(file_path, variable, distance)
-sigsig = h5py.File(sigsig_file,'r')
-sigsig_distance = sigsig['sigsig']['distance']
-sigsig_wgt = sigsig['sigsig']['weight']
-sigbkg = h5py.File(sigbkg_file,'r')
-sigbkg_distance = sigbkg['sigbkg']['distance']
-sigbkg_wgt = sigbkg['sigbkg']['weight']
-bkgbkg = h5py.File(bkgbkg_file,'r')
-bkgbkg_distance = bkgbkg['bkgbkg']['distance']
-bkgbkg_wgt = bkgbkg['bkgbkg']['weight']
-
-logging.info("Min bgbg distance = "+str(min(bkgbkg_distance))+", Max bgbg distance = "+str(max(bkgbkg_distance)))
+logging.info("Loading sigsig distances in batches")
+sigsig_distance, sigsig_wgt = misc.get_batched_files(path, variable, distance, "sigsig")
+logging.info("Loading sigbkg distances in batches")
+sigbkg_distance, sigbkg_wgt = misc.get_batched_files(path, variable, distance, "sigbkg")
+logging.info("Loading bkgbkg distances in batches")
+bkgbkg_distance, bkgbkg_wgt = misc.get_batched_files(path, variable, distance, "bkgbkg")
+print("finished")
 
 # calculate ROC values for sigsig and bkgbkg
 # Between sigsig (0) and bkgbkg (1)
@@ -85,7 +80,8 @@ logging.info("Min bgbg distance = "+str(min(bkgbkg_distance))+", Max bgbg distan
 # This normalisation shouldn't change the shape and the relative scale of the distance distributions (can be checked in plots)
 
 logging.info("Minmax normalising distances and plotting ...")
-d_max = max(max(sigbkg_distance), max(bkgbkg_distance))
+d_max = max(torch.max(sigbkg_distance), torch.max(bkgbkg_distance))
+print(d_max)
 norm_sigsig = norm.minmax(sigsig_distance, 0, d_max)
 norm_sigbkg = norm.minmax(sigbkg_distance, 0, d_max)
 norm_bkgbkg = norm.minmax(bkgbkg_distance, 0, d_max)
@@ -93,7 +89,7 @@ norm_bkgbkg = norm.minmax(bkgbkg_distance, 0, d_max)
 plot_path = path+"plots/standardised_weighted/"+variable+"/"
 misc.create_dirs(plot_path)
 plotting.plot_distances(norm_sigsig, norm_sigbkg, norm_bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, variable, distance, plot_path, label="minmaxNormed")
-
+"""
 logging.info("Calculating and saving ROC to json ...")
 # fpr here is the fraction of sigsig above a certain cut
 # tpr here is the fraction of sig(bkg)bkg above a certain cut
@@ -183,3 +179,4 @@ plt.ylabel("sig-sig Efficiency")
 plot_name = path+"plots/standardised_weighted/ROC/"
 misc.create_dirs(plot_name)
 fig.savefig(plot_name+"/"+variable+"_"+distance+"_ROC.pdf", transparent=True)
+"""
