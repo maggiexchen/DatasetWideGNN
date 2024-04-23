@@ -2,6 +2,7 @@ import os
 import yaml
 import glob
 import torch
+torch.manual_seed(42)
 
 def create_dirs(path):
     """
@@ -80,7 +81,7 @@ def get_h5_paths(path, variable, distance, label="sampled_train"):
 
     return files[0], files[1], files[2]
 
-def get_batched_files(path, variable, distance, t):
+def get_batched_files(path, variable, distance, t, sample=True):
     """
     Function to obtain a list of .pt path+filenames for sig-sig, sig-bkg and bkg-bkg distance storage. 
 
@@ -89,14 +90,14 @@ def get_batched_files(path, variable, distance, t):
         variable (str): the variable category under consideration
         distance (str): the distance metric under consideration
         t (str): the typeof distance to load (sigsig, sigbkg, or bkgbkg)
+        sample (bool): whether to sample from the distance distribution (default is True)
 
     Returns:
-        (str): sig-sig pt file
-        (str): sig-bkg pt file
-        (str): bkg-bkg pt file
+        (torch tensor): distance tensor
+        (torch tensor): event weight tensor
     """
     prefix = path+"/batched_"+variable +"_"+distance+"_distances/"
-    files = glob.glob(prefix+t+'*0.pt')
+    files = glob.glob(prefix+t+'*.pt')
     distance = []
     wgt = []
     for f in files:
@@ -104,6 +105,11 @@ def get_batched_files(path, variable, distance, t):
         wgt.append(torch.flatten(torch.load(f)["weight"]))
     distance = torch.cat(distance, dim=0)
     wgt = torch.cat(wgt, dim=0)
+    num_sample = 2000
+    if sample:
+        ind = torch.randint(0, len(distance), (num_sample,))
+        distance = distance[ind]
+        wgt = wgt[ind]
     return distance, wgt
 
 def load_config(file_path):
