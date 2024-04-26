@@ -85,20 +85,13 @@ kinematics = misc.get_kinematics(variable)
 
 # load in input files
 logging.info('Importing signal and background files...')
-SF_4b5b = 0.07
+SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
 train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels = adj.data_loader(data_dir, "train", kinematics)
 val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader(data_dir, "val", kinematics)
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 sig_wgt = torch.cat((train_sig_wgts, val_sig_wgts), dim=0)
 bkg_wgt = torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)*SF_4b5b
-
-# # mutliple events kinematics by the corresponding event weights and calcualte distances
-# logging.info('Getting MC event weights and calcualte weight matrix ...')
-# # The scale factor that scales 5b data down to the expected 6b yields, this is just taken as the ratio between 5b data/4b data for now
-# sigsig_wgt = torch.ger(sig_wgt, sig_wgt)
-# sigbkg_wgt = torch.ger(sig_wgt, bkg_wgt)
-# bkgbkg_wgt = torch.ger(bkg_wgt, bkg_wgt)
 
 # calculate distances in batches
 logging.info('Calculating distances in batches...')
@@ -122,7 +115,7 @@ def distance_calc(a, b, metric):
 def check_nans(dist):
     nans = tf.reduce_sum(tf.cast(tf.math.is_nan(dist), tf.int32))
 
-batch_size = 10000
+batch_size = 30000
 num_sig_events = full_sig.shape[0]
 num_sig_batches = (num_sig_events + batch_size - 1) // batch_size
 num_bkg_events = full_bkg.shape[0]
@@ -131,34 +124,47 @@ num_bkg_batches = (num_bkg_events + batch_size - 1) // batch_size
 save_path = path+"/batched_"+variable +"_"+distance+"_distances/"
 misc.create_dirs(save_path)
 sigsig_batch_counter = 0
-logging.info('Calculating sigsig distances ...')
+print("File ", sigsig_batch_counter)
 for i in range(num_sig_batches):
-    start_idx_sig = i * batch_size
-    end_idx_sig = min((i + 1) * batch_size, num_sig_events)
-    batch_sig = full_sig[start_idx_sig:end_idx_sig]
-    batch_sig_wgt = sig_wgt[start_idx_sig:end_idx_sig]
+    start_idx_sig_i = i * batch_size
+    end_idx_sig_i = min((i + 1) * batch_size, num_sig_events)
+    batch_sig_i = full_sig[start_idx_sig_i:end_idx_sig_i]
+    batch_sig_wgt_i = sig_wgt[start_idx_sig_i:end_idx_sig_i]
+    for j in range(num_sig_batches):
+        logging.info('Calculating sigsig distances ...')
+        start_idx_sig_j = j * batch_size
+        end_idx_sig_j = min((j + 1) * batch_size, num_sig_events)
+        batch_sig_j = full_sig[start_idx_sig_j:end_idx_sig_j]
+        batch_sig_wgt_j = sig_wgt[start_idx_sig_j:end_idx_sig_j]
 
-    batch_sigsig = distance_calc(batch_sig, batch_sig, distance)
-    batch_sigsig_wgt = torch.ger(batch_sig_wgt, batch_sig_wgt)
+        batch_sigsig = distance_calc(batch_sig_i, batch_sig_j, distance)
+        batch_sigsig_wgt = torch.ger(batch_sig_wgt_i, batch_sig_wgt_j)
 
-    batch_dict = {'distance': batch_sigsig, 'weight': batch_sigsig_wgt}
-    torch.save(batch_dict, save_path + f'sigsig_distances_batch_{sigsig_batch_counter}.pt')
-    sigsig_batch_counter += 1
+        batch_dict = {'distance': batch_sigsig, 'weight': batch_sigsig_wgt}
+        torch.save(batch_dict, save_path + f'sigsig_distances_batch_{sigsig_batch_counter}.pt')
+        sigsig_batch_counter += 1
 
 logging.info('Calculating bkgbkg distances ...')
 bkgbkg_batch_counter = 0
-for j in range(num_bkg_batches):
-    start_idx_bkg = j * batch_size
-    end_idx_bkg = min((j + 1) * batch_size, num_bkg_events)
-    batch_bkg = full_bkg[start_idx_bkg:end_idx_bkg]
-    batch_bkg_wgt = bkg_wgt[start_idx_bkg:end_idx_bkg]
+bkgbkg_count = 0
+for i in range(num_bkg_batches):
+    start_idx_bkg_i = i * batch_size
+    end_idx_bkg_i = min((i + 1) * batch_size, num_bkg_events)
+    batch_bkg_i = full_bkg[start_idx_bkg_i:end_idx_bkg_i]
+    batch_bkg_wgt_i = bkg_wgt[start_idx_bkg_i:end_idx_bkg_i]
 
-    batch_bkgbkg = distance_calc(batch_bkg, batch_bkg, distance)
-    batch_bkgbkg_wgt = torch.ger(batch_bkg_wgt, batch_bkg_wgt)
-    
-    batch_dict = {'distance': batch_bkgbkg, 'weight': batch_bkgbkg_wgt}
-    torch.save(batch_dict, save_path + f'bkgbkg_distances_batch_{bkgbkg_batch_counter}.pt')
-    bkgbkg_batch_counter += 1
+    for j in range(num_bkg_batches):
+        print("File ", bkgbkg_batch_counter)
+        start_idx_bkg_j = j * batch_size
+        end_idx_bkg_j = min((i + 1) * batch_size, num_bkg_events)
+        batch_bkg_j = full_bkg[start_idx_bkg_j:end_idx_bkg_j]
+        batch_bkg_wgt_j = bkg_wgt[start_idx_bkg_j:end_idx_bkg_j]
+
+        batch_bkgbkg = distance_calc(batch_bkg_i, batch_bkg_j, distance)
+        batch_bkgbkg_wgt = torch.ger(batch_bkg_wgt_i, batch_bkg_wgt_j)
+        batch_dict = {'distance': batch_bkgbkg, 'weight': batch_bkgbkg_wgt}
+        torch.save(batch_dict, save_path + f'bkgbkg_distances_batch_{bkgbkg_batch_counter}.pt')
+        bkgbkg_batch_counter += 1
 
 logging.info('Calculating sigbkg distances ...')
 sigbkg_batch_counter = 0
@@ -171,6 +177,7 @@ for j in range(num_bkg_batches):
     sigbkg_distances = []
     sigbkg_wgts = []
     for i in range(num_sig_batches):
+        print("File ", sigbkg_batch_counter)
         start_idx_sig = i * batch_size
         end_idx_sig = min((i + 1) * batch_size, num_sig_events)
         batch_sig = full_sig[start_idx_sig:end_idx_sig]
