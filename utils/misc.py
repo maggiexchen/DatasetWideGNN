@@ -105,9 +105,9 @@ def get_batched_distances(path, variable, distance, t, sample=True):
         wgt.append(torch.flatten(torch.load(f)["weight"]))
     distance = torch.cat(distance, dim=0)
     wgt = torch.cat(wgt, dim=0)
-    num_sample = 5000
     if sample:
-        ind = torch.randint(0, len(distance), (num_sample,))
+        num_sample = 5000
+        ind = torch.randperm(len(distance))[:num_sample]
         distance = distance[ind]
         wgt = wgt[ind]
     return distance, wgt
