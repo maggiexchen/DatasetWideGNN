@@ -25,7 +25,6 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True)
     Returns:
         (float) cityblock distance
     """
-
     df_sig =  pd.read_hdf(path+"/hhh_split_files/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
     df_bkg =  pd.read_hdf(path+"/hhh_split_files/bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
     #df_sig = df_sig.sample(n=n_sig, random_state=42)
@@ -56,6 +55,7 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True)
 
     return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, truth_labels
 
+
 def create_adj_mat(a, length):
     """
     Function to filter a matrix of distances into a binary adjacency matrix
@@ -69,11 +69,13 @@ def create_adj_mat(a, length):
     """
     return (a < length).float()
 
+
 def create_node_wgts(a, b):
     a_col = a.view(-1,1)
     b_col = b.view(1,-1)
     outer = torch.matmul(a_col, b_col)
     return torch.transpose(outer, 0, 1)
+
 
 def generate_adj_mat(x, x_wgts, distance, linking_length):
     """
@@ -86,7 +88,7 @@ def generate_adj_mat(x, x_wgts, distance, linking_length):
         linking_length (float): linking length
 
     Returns:
-        (float) cityblock distance
+        (pytorch.tensor) adjacency matrix
     """
     # initialise adjacency matrix
     adj_mat = torch.empty((0, len(x)))
@@ -105,3 +107,19 @@ def generate_adj_mat(x, x_wgts, distance, linking_length):
     adj_mat = create_adj_mat(distance_matrix, linking_length)
     print(f"Time taken for adjacency matrix generation: {time.time() - st}")
     return adj_mat
+
+
+def generate_adj_mat_from_batch(distance, linking_length):
+    """
+    Function create a binary adjacency matrix from pre-calculated distances
+
+    Args:
+        distance (pytorch.tensor): pair-wise distances between events
+        linking_length (float): linking length
+
+    Returns:
+        (pytorch.tensor) adjacency matrix
+    """
+    adj_mat = create_adj_mat(distance, linking_length)
+    return adj_mat
+

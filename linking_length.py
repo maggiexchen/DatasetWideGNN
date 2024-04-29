@@ -77,11 +77,11 @@ logging.info("distance metric: "+distance)
 logging.info("input/output path: "+path)
 
 logging.info("Loading sigsig distances in batches")
-sigsig_distance, sigsig_wgt = misc.get_batched_files(path, variable, distance, "sigsig", sample=True)
+sigsig_distance, sigsig_wgt = misc.get_batched_distances(path, variable, distance, "sigsig", sample=True)
 logging.info("Loading sigbkg distances in batches")
-sigbkg_distance, sigbkg_wgt = misc.get_batched_files(path, variable, distance, "sigbkg", sample=True)
+sigbkg_distance, sigbkg_wgt = misc.get_batched_distances(path, variable, distance, "sigbkg", sample=True)
 logging.info("Loading bkgbkg distances in batches")
-bkgbkg_distance, bkgbkg_wgt = misc.get_batched_files(path, variable, distance, "bkgbkg", sample=True)
+bkgbkg_distance, bkgbkg_wgt = misc.get_batched_distances(path, variable, distance, "bkgbkg", sample=True)
 
 # calculate ROC values for sigsig and bkgbkg
 # Between sigsig (0) and bkgbkg (1)
@@ -147,7 +147,7 @@ with open(ll_path, "w") as lengthfile:
     json.dump(length_dict, lengthfile)
 
 logging.info("Plotting distance with linking lengths selected from ROC ...")
-nBins = 100
+nBins = 70
 
 # plotting sig-sig and bkg-bkg distributions and the linking lengths
 # TODO: moving plotting to utils
@@ -168,7 +168,7 @@ for i, eff in enumerate(sigsig_eff):
 ax.legend(loc='upper right')
 ax.set_ylim(y_min, y_max*1.2)
 ax.set_xlim(x_min, x_max*0.8)
-ax.set_xlabel(variable + distance +"distance", loc="right")
+ax.set_xlabel(variable + " " + distance +" distance", loc="right")
 ax.set_ylabel("Normalised # event pairs / bin", loc="top")
 ssbb_path = path+"plots/standardised_weighted/linking_lengths/"
 misc.create_dirs(ssbb_path)

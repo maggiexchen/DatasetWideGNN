@@ -81,7 +81,7 @@ def get_h5_paths(path, variable, distance, label="sampled_train"):
 
     return files[0], files[1], files[2]
 
-def get_batched_files(path, variable, distance, t, sample=True):
+def get_batched_distances(path, variable, distance, t, sample=True):
     """
     Function to obtain a list of .pt path+filenames for sig-sig, sig-bkg and bkg-bkg distance storage. 
 
@@ -89,7 +89,7 @@ def get_batched_files(path, variable, distance, t, sample=True):
         path (str): the path of directories you want to write the h5 files to.
         variable (str): the variable category under consideration
         distance (str): the distance metric under consideration
-        t (str): the typeof distance to load (sigsig, sigbkg, or bkgbkg)
+        t (str): the type of distance to load (sigsig, sigbkg, or bkgbkg)
         sample (bool): whether to sample from the distance distribution (default is True)
 
     Returns:
@@ -105,7 +105,7 @@ def get_batched_files(path, variable, distance, t, sample=True):
         wgt.append(torch.flatten(torch.load(f)["weight"]))
     distance = torch.cat(distance, dim=0)
     wgt = torch.cat(wgt, dim=0)
-    num_sample = 2000
+    num_sample = 5000
     if sample:
         ind = torch.randint(0, len(distance), (num_sample,))
         distance = distance[ind]

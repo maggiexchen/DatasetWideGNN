@@ -121,6 +121,7 @@ logging.info('Importing signal and background files...')
 raw_train_sig, raw_train_bkg, _, _, _, _ = adj.data_loader("data", "train", kinematics, norm_kin=False)
 raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader("data", "val", kinematics, norm_kin=False)
 
+# normalised signal and background kinematics
 train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics, norm_kin=True)
 val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics, norm_kin=True)
 
@@ -144,9 +145,42 @@ if len(hidden_sizes_gcn) > 0:
         lengths = length_dict["length"]
         linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
         logging.info("linking length ="+str(linking_length))
-
+    
+    # TODO: batch load in event distances to apply linking length to
+    # If the distances were to be calculated and stored in advance, then loaded here, the ordering of the events need to be the same!
+    logging.info("Batch loading in the distances ...")
+    sigsig_distance, sigsig_wgt = misc.get_batched_distances(path, variable, distance, "sigsig", sample=False)
+    sigbkg_distance, sigbkg_wgt = misc.get_batched_distances(path, variable, distance, "sigbkg", sample=False)
+    bkgbkg_distance, bkgbkg_wgt = misc.get_batched_distances(path, variable, distance, "bkgbkg", sample=False)
+    logging.info("Reshaping the flattened distances ...")
+    print("full sig",len(full_sig))
+    print("full bkg",len(full_bkg))
+    print("sigsig", len(sigsig_distance))
+    print("sigbkg", len(sigbkg_distance))
+    print("bkgbkg", len(bkgbkg_distance))
+    sigsig_distance = torch.reshape(sigsig_distance, (len(full_sig), len(full_sig)))
+    sigbkg_distance = torch.reshape(sigbkg_distance, (len(full_sig), len(full_bkg)))
+    bkgbkg_distance = torch.reshape(bkgbkg_distance, (len(full_bkg), len(full_bkg)))
+    logging.info("Applying the linking length to get non-zero indices")
+    sigsig_ind = (sigsig_distance <= linking_length).nonzero()
+    sigbkg_ind = (sigbkg_distance <= linking_length).nonzero()
+    bkgbkg_ind = (bkgbkg_distance <= linking_length).nonzero()
+    bkgsig_ind = torch.clone(sigbkg_ind)
+    sigbkg_ind[:, 1] += len(full_sig)
+    bkgsig_ind[:, 0] += len(full_sig)
+    bkgbkg_ind += len(full_sig)
+    logging.info("Patching the indices of sigsig, sigbkg and bkgbkg distances together ...")
+    ones_indices = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind), dim=0)
+    logging.info("Generating sparse adjacency matrix using indices ...")
+    print(ones_indices.size())
+    print(len(full_sig)+len(full_bkg))
+    sparse_adj_mat = torch.sparse_coo_tensor(ones_indices.t(), torch.ones(ones_indices.size(0)), len(full_sig)+len(full_bkg))
+    """
+    logging.info("Generating adjacency matrix ...")
+    full_adj_mat = adj.create_adj_mat(a, length)
     logging.info("Calculating distances and adjacency matrix ...")
-    full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
+    # full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
+
     edge_frac = torch.sum(full_adj_mat == 1).item() / len(full_adj_mat)**2
     print("Fraction of edges: ", edge_frac)
 
@@ -271,3 +305,4 @@ plt.ylabel("Signal Efficiency", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
 fig.savefig(fig_path+variable+"_"+model_label+norm_label+"_training_validation_ROC.pdf", transparent=True)
+"""
