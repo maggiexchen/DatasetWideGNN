@@ -177,6 +177,12 @@ if len(hidden_sizes_gcn) > 0:
     sparse_adj_mat = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+30000)
     print("Shape of sparse adj mat", sparse_adj_mat.shape)
 
+    # saving adjacency matrix
+    # Save the sparse tensor to a .pt file
+    logging.info("Saving sparse adjacency matrix ...")
+    model_path = path+"models/"+model_label+"/"
+    misc.create_dirs(model_path)
+    torch.save(sparse_adj_mat, model_path+'sparse_adjacency_matrix.pt')
     # using the ROW indices of the sparse adj mat to read out the edge weights used for training
     edge_wgts = full_wgts[sparse_adj_mat[0]]
     print("edge weights", edge_wgts)
@@ -212,7 +218,7 @@ optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
-    full_outputs = model(full_x, full_adj_mat, edge_wgts)
+    full_outputs = model(full_x, sparse_adj_mat, edge_wgts)
     
     # splitting outputs into training/validation set
     # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
@@ -231,8 +237,6 @@ for epoch in range(epochs):
 
 # save trained model
 logging.info("Saving trained model and performance...")
-model_path = path+"models/"+model_label+"/"
-misc.create_dirs(model_path)
 model_file_name = "model.pth"
 torch.save({
     'model_state': model.state_dict(),
