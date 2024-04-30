@@ -174,7 +174,7 @@ if len(hidden_sizes_gcn) > 0:
     bkgsig_ind[:,0]+=len(full_sig)
     bkgbkg_ind += len(full_sig)
     logging.info("Generating sparse adjacency matrix ...")
-    sparse_adj_mat = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+30000)
+    sparse_adj_mat = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_x))
     print("Shape of sparse adj mat", sparse_adj_mat.shape)
 
     # saving adjacency matrix

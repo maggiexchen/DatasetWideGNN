@@ -142,7 +142,7 @@ def generate_batched_nonzero_ind(path, variable, distance, t, linking_length, fl
     """
     # Load in files in batches (sigsig, sigbkg, or bkgbkg) by the i and j indices
     prefix = path+"/batched_"+variable +"_"+distance+"_distances/"
-    files = glob.glob(prefix+t+'*0_0.pt')
+    files = glob.glob(prefix+t+'*.pt')
     print(len(files), " files found for "+t+" distances")
     # apply linking length within each batch, and pull out non-zero indices
     indices = torch.empty(0)
