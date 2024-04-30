@@ -146,12 +146,13 @@ if len(hidden_sizes_gcn) > 0:
     # ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_length.json"
     # misc.create_dirs(ll_path)
 
-    with open(ll_path, 'r') as lfile:
-        length_dict = json.load(lfile)
-        lengths = length_dict["length"]
-        linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
-        logging.info("linking length ="+str(linking_length))
-    
+    # with open(ll_path, 'r') as lfile:
+    #     length_dict = json.load(lfile)
+    #     lengths = length_dict["length"]
+    #     linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
+    #     logging.info("linking length ="+str(linking_length))
+    linking_length = 0.1
+
     # TODO: batch load in event distances to apply linking length to
     # If the distances were to be calculated and stored in advance, then loaded here, the ordering of the events need to be the same!
     logging.info("Batch applying the linking length and getting non-zero indices ...")
