@@ -74,6 +74,7 @@ else:
     # path = "/home/srutherford/GNN_shared/hhhgraph/data/" # sebs path
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
+device = torch.device("cuda")
 
 config_path = args.config
 train_config = misc.load_config(config_path)
@@ -114,6 +115,7 @@ logging.info("variable set: "+variable)
 logging.info("input/output path: "+path)
 
 model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates)
+model.cuda()
 logging.info("distance metric: "+distance)
 logging.info("desired efficieny: "+str(eff))
 
@@ -134,8 +136,8 @@ full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
 raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
-full_x = torch.cat((full_sig, full_bkg), dim=0)
-full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)
+full_x = torch.cat((full_sig, full_bkg), dim=0).cuda()
+full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0).cuda()
 
 
 
@@ -144,7 +146,7 @@ if len(hidden_sizes_gcn) > 0:
     sigsig_eff = eff
     ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_length.json"
     misc.create_dirs(ll_path)
-
+    print(ll_path)
     with open(ll_path, 'r') as lfile:
         length_dict = json.load(lfile)
         lengths = length_dict["length"]
@@ -174,7 +176,7 @@ if len(hidden_sizes_gcn) > 0:
     bkgsig_ind[:,0]+=len(full_sig)
     bkgbkg_ind += len(full_sig)
     logging.info("Generating sparse adjacency matrix ...")
-    sparse_adj_mat = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_x))
+    sparse_adj_mat = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_x)).cuda()
     print("Shape of sparse adj mat", sparse_adj_mat.shape)
 
     # saving adjacency matrix
@@ -184,16 +186,16 @@ if len(hidden_sizes_gcn) > 0:
     misc.create_dirs(model_path)
     torch.save(sparse_adj_mat, model_path+'sparse_adjacency_matrix.pt')
     # using the ROW indices of the sparse adj mat to read out the edge weights used for training
-    edge_wgts = full_wgts[sparse_adj_mat[0]]
+    edge_wgts = full_wgts[sparse_adj_mat[0]].cuda()
     print("edge weights", edge_wgts)
 
     # Still keeping the manually computed adjacency matrix
-    # full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
+    # full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length).cuda()
 
 # TODO: Adding plotting functionalities back that work with sparse adjacency matrix
 #     # calculate centrality
 #     logging.info("Calculating and plotting centrality ...")
-#     deg_cent = torch.sum(full_adj_mat, dim=1)
+#     deg_cent = torch.sum(full_adj_mat, dim=1).cuda()
 #     plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", eff)
 
 #     adj_mat = full_adj_mat.to_sparse_csr() ### densor tensor to csr tensor
@@ -218,19 +220,19 @@ optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
-    full_outputs = model(full_x, sparse_adj_mat, edge_wgts)
+    full_outputs = model(full_x, sparse_adj_mat, edge_wgts).cuda()
     
     # splitting outputs into training/validation set
     # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
-    train_outputs = torch.cat((full_outputs[:len(train_sig)], full_outputs[(len(train_sig)+len(val_sig)):(len(train_sig)+len(val_sig)+len(train_bkg))]), dim=0)
-    val_outputs = torch.cat((full_outputs[(len(train_sig)):(len(train_sig)+len(val_sig))], full_outputs[-len(val_bkg):]), dim=0)
-    loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze())
+    train_outputs = torch.cat((full_outputs[:len(train_sig)], full_outputs[(len(train_sig)+len(val_sig)):(len(train_sig)+len(val_sig)+len(train_bkg))]), dim=0).cuda()
+    val_outputs = torch.cat((full_outputs[(len(train_sig)):(len(train_sig)+len(val_sig))], full_outputs[-len(val_bkg):]), dim=0).cuda()
+    loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze().cuda()).cuda()
     loss.backward()
     train_loss.append(loss.item())
     optimiser.step()
 
     model.eval()
-    validation_loss = loss_function(val_outputs.squeeze(), val_truth_labels.squeeze())
+    validation_loss = loss_function(val_outputs.squeeze(), val_truth_labels.squeeze().cuda()).cuda()
     val_loss.append(validation_loss.item())
 
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {loss.item()}, Validation Loss: {validation_loss.item()}')
@@ -248,8 +250,8 @@ train_label_bool = train_truth_labels.bool()
 train_sig_pred = train_outputs[train_label_bool]
 train_bkg_pred = train_outputs[torch.logical_not(train_label_bool)]
 
-train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().numpy(), train_outputs.detach().numpy())
-train_auc = roc_auc_score(train_truth_labels.detach().numpy(), train_outputs.detach().numpy())
+train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy())
+train_auc = roc_auc_score(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy())
 print("Training AUC", train_auc)
 
 val_outputs = val_outputs.view(-1)
@@ -258,8 +260,8 @@ val_sig_pred = val_outputs[val_label_bool]
 val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
 fig, ax = plt.subplots()
 
-val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
-val_auc = roc_auc_score(val_truth_labels.detach().numpy(), val_outputs.detach().numpy())
+val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy())
+val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy())
 print("Validation AUC", val_auc)
 
 # save performance to json
@@ -282,10 +284,10 @@ fig.savefig(fig_path+variable+"_"+model_label+"_training_validation_loss.pdf", t
 logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
 binning = numpy.linspace(0,1,50)
-ax.hist(train_sig_pred.detach().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange")
-ax.hist(train_bkg_pred.detach().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue")
-ax.hist(val_sig_pred.detach().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange")
-ax.hist(val_bkg_pred.detach().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue")
+ax.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange")
+ax.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue")
+ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange")
+ax.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue")
 ax.text(0.02, 0.95, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.text(0.02, 0.91, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.text(0.02, 0.87, "6b Resonant TRSM signal, 5b Data", verticalalignment="bottom", size=9, transform=ax.transAxes)

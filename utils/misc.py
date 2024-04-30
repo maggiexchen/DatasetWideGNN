@@ -15,7 +15,7 @@ def create_dirs(path):
         void
     """
     base = path.split("/")[0]
-    dirs = path.split("/")[1:-1]
+    dirs = path.split("/")[1:]
     tmp_dir = ""
     for folder in dirs:
         tmp_dir = tmp_dir + "/" + folder
