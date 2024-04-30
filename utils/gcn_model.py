@@ -44,7 +44,7 @@ class GCNClassifier(nn.Module):
             
     def forward(self, x, edge_index, edge_weights):
         for layer, batch_norm, dropout in zip(self.layers_gcn, self.batch_norms_gcn, self.dropout_gcn):
-            x = F.relu(dropout(batch_norm(layer(x, edge_index, edge_weight= edge_weights)))) # for GATConv, use edge_attr instead of edge_weight
+            x = F.relu(dropout(batch_norm(layer(x, edge_index, edge_weight=edge_weights)))) # for GATConv, use edge_attr instead of edge_weight
         for layer, batch_norm, dropout in zip(self.layers_mlp, self.batch_norms_mlp, self.dropout_mlp):
             x = F.relu(dropout(batch_norm(layer(x))))
         

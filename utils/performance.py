@@ -5,12 +5,7 @@ import numpy as np
 import json
 from sklearn.metrics import roc_curve, roc_auc_score
 
-# fpr here is the fraction of sigsig above a certain cut
-# tpr here is the fraction of sig(bkg)bkg above a certain cut
-# the actual tpr we want is the fraction of sigsig below a certain cut: (1-fpr)
-# and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tpr)
-
-def calc_ROC(sig, bkg, sig_wgt, bkg_wgt):
+def calc_ROC(sig, bkg, sig_wgt, bkg_wgt, flip=False):
     """
     Function to calculate roc curve
 
@@ -19,6 +14,7 @@ def calc_ROC(sig, bkg, sig_wgt, bkg_wgt):
         bkg (numpy.array): array of signal efficiencies/probabilities for each bkg event
         sig_wgt (numpy.array): array of sig event weights
         bkg_wgt (numpy.array): array of blg event weights
+        flip (bool): flipping the fpr and tpr definitions
 
     Returns:
         (numpy.array): true positive rate: fraction of sig passing a given threshold
@@ -34,16 +30,21 @@ def calc_ROC(sig, bkg, sig_wgt, bkg_wgt):
     y_combined = np.concatenate((y_sig, y_bkg))
     wgt_combined = np.concatenate((sig_wgt, bkg_wgt))
 
-    fpr, tpr, cut = roc_curve(y_combined, x_combined, sample_weight=wgt_combined)
+    sklearn_fpr, sklearn_tpr, cut = roc_curve(y_combined, x_combined, sample_weight=wgt_combined)
     auc = roc_auc_score(y_combined, x_combined, sample_weight=wgt_combined)
 
+    # IN THE CASE WHERE MOST SIGSIG DISTANCES ARE SMALLER THAN BKGBKG DISTANCES (E.G. TRSM HHH SIGNALS)
     # fpr here is the fraction of sigsig above a certain cut
     # tpr here is the fraction of sig(bkg)bkg above a certain cut
-    # the actual tpr we want is the fraction of sigsig below a certain cut: (1-fpr)
-    # and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tpr)
+    # the actual tpr we want is the fraction of sigsig below a certain cut: (1-fnr)
+    # and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tnr)
 
-    true_tpr = 1-fpr
-    true_fpr = 1-tpr
+    if flip:
+        true_tpr = 1-sklearn_fpr
+        true_fpr = 1-sklearn_tpr
+    else:
+        true_tpr = sklearn_tpr
+        true_fpr = sklearn_fpr
 
     return true_tpr, true_fpr, cut, auc
 

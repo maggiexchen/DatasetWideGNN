@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import h5py
 import json
+import torch
 import os
 os.environ["NUMEXPR_MAX_THREADS"] = "16"
 import matplotlib.pyplot as plt
@@ -15,6 +16,7 @@ import utils.misc as misc
 import utils.plotting as plotting
 import utils.performance as perf
 import utils.graph_definition as graph_def
+torch.manual_seed(42)
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -39,12 +41,21 @@ def GetParser():
     )
 
     parser.add_argument(
+        "--flip",
+        "-f",
+        action="store_true",
+        help="Choose whether to flip the ROC curve definition, flip if the sigsig distances are mostly smaller than the bkgbkg distances",
+    )
+
+    parser.add_argument(
         "--path",
         "-p",
         type=str,
         required=False,
         help="Specify the path to store all the input/output data and results",
     )
+
+
 
 
     args = parser.parse_args()
@@ -65,19 +76,12 @@ logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("input/output path: "+path)
 
-file_path = path+"distances/"
-sigsig_file, sigbkg_file, bkgbkg_file = misc.get_h5_paths(file_path, variable, distance)
-sigsig = h5py.File(sigsig_file,'r')
-sigsig_distance = sigsig['sigsig']['distance']
-sigsig_wgt = sigsig['sigsig']['weight']
-sigbkg = h5py.File(sigbkg_file,'r')
-sigbkg_distance = sigbkg['sigbkg']['distance']
-sigbkg_wgt = sigbkg['sigbkg']['weight']
-bkgbkg = h5py.File(bkgbkg_file,'r')
-bkgbkg_distance = bkgbkg['bkgbkg']['distance']
-bkgbkg_wgt = bkgbkg['bkgbkg']['weight']
-
-logging.info("Min bgbg distance = "+str(min(bkgbkg_distance))+", Max bgbg distance = "+str(max(bkgbkg_distance)))
+logging.info("Loading sigsig distances in batches")
+sigsig_distance, sigsig_wgt = misc.get_batched_distances(path, variable, distance, "sigsig", sample=True)
+logging.info("Loading sigbkg distances in batches")
+sigbkg_distance, sigbkg_wgt = misc.get_batched_distances(path, variable, distance, "sigbkg", sample=True)
+logging.info("Loading bkgbkg distances in batches")
+bkgbkg_distance, bkgbkg_wgt = misc.get_batched_distances(path, variable, distance, "bkgbkg", sample=True)
 
 # calculate ROC values for sigsig and bkgbkg
 # Between sigsig (0) and bkgbkg (1)
@@ -85,7 +89,7 @@ logging.info("Min bgbg distance = "+str(min(bkgbkg_distance))+", Max bgbg distan
 # This normalisation shouldn't change the shape and the relative scale of the distance distributions (can be checked in plots)
 
 logging.info("Minmax normalising distances and plotting ...")
-d_max = max(max(sigbkg_distance), max(bkgbkg_distance))
+d_max = max(torch.max(sigbkg_distance), torch.max(bkgbkg_distance))
 norm_sigsig = norm.minmax(sigsig_distance, 0, d_max)
 norm_sigbkg = norm.minmax(sigbkg_distance, 0, d_max)
 norm_bkgbkg = norm.minmax(bkgbkg_distance, 0, d_max)
@@ -95,13 +99,14 @@ misc.create_dirs(plot_path)
 plotting.plot_distances(norm_sigsig, norm_sigbkg, norm_bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, variable, distance, plot_path, label="minmaxNormed")
 
 logging.info("Calculating and saving ROC to json ...")
+# IN THE CASE WHERE MOST SIGSIG DISTANCES ARE SMALLER THAN BKGBKG DISTANCES (E.G. TRSM HHH SIGNALS)
 # fpr here is the fraction of sigsig above a certain cut
 # tpr here is the fraction of sig(bkg)bkg above a certain cut
 # the actual tpr we want is the fraction of sigsig below a certain cut: (1-fpr)
 # and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tpr)
 
-tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = perf.calc_ROC(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt)
-tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = perf.calc_ROC(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt)
+tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = perf.calc_ROC(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt, flip=args.flip)
+tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = perf.calc_ROC(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt, flip=args.flip)
 
 # saving roc and auc to json file
 roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(),
@@ -116,6 +121,7 @@ with open(roc_path, "w") as outfile:
     json.dump(roc_dict, outfile)
 
 # pick sig-sig efficiencies at 0.6, 0.7, 0.8, 0.9
+# TODO: finer granularity for linking length scan?
 sigsig_eff = [0.6, 0.7, 0.8, 0.9]
 eff_labels = ["60%", "70%", "80%", "90%"]
 ss_sb_roc_cuts = []
@@ -131,7 +137,7 @@ for eff in sigsig_eff:
     ss_sb_thresholds.append(norm.reverse_minmax(ss_sb_threshold, 0 ,d_max))
     ss_bb_roc_cut, ss_bb_threshold = graph_def.find_threshold(tpr_ss_bb,fpr_ss_bb, eff, cut_ss_bb)
     ss_bb_roc_cuts.append(ss_bb_roc_cut)
-    ss_thresholds.append(norm.reverse_minmax(ss_bb_threshold, 0 ,d_max))
+    ss_thresholds.append(norm.reverse_minmax(ss_bb_threshold, 0 ,d_max).item())
 
 # saving linking lengths
 length_dict = {"sigsig_eff": sigsig_eff, "length": ss_thresholds}
@@ -141,9 +147,10 @@ with open(ll_path, "w") as lengthfile:
     json.dump(length_dict, lengthfile)
 
 logging.info("Plotting distance with linking lengths selected from ROC ...")
-nBins = 100
+nBins = 70
 
 # plotting sig-sig and bkg-bkg distributions and the linking lengths
+# TODO: moving plotting to utils
 fig, ax = plt.subplots()
 binning = np.linspace(0,12,nBins)
 ax.hist(sigsig_distance, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
@@ -161,7 +168,7 @@ for i, eff in enumerate(sigsig_eff):
 ax.legend(loc='upper right')
 ax.set_ylim(y_min, y_max*1.2)
 ax.set_xlim(x_min, x_max*0.8)
-ax.set_xlabel(variable + distance +"distance", loc="right")
+ax.set_xlabel(variable + " " + distance +" distance", loc="right")
 ax.set_ylabel("Normalised # event pairs / bin", loc="top")
 ssbb_path = path+"plots/standardised_weighted/linking_lengths/"
 misc.create_dirs(ssbb_path)

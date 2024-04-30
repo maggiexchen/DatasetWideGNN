@@ -10,6 +10,8 @@ import utils.normalisation as norm
 import utils.torch_distances as dis
 import utils.misc as misc
 import utils.plotting as plot
+import re
+import glob
 
 def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True):
     """
@@ -25,11 +27,8 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True)
     Returns:
         (float) cityblock distance
     """
-
     df_sig =  pd.read_hdf(path+"/hhh_split_files/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
     df_bkg =  pd.read_hdf(path+"/hhh_split_files/bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
-    df_sig = df_sig.sample(n=n_sig, random_state=42)
-    df_bkg = df_bkg.sample(n=n_bkg, random_state=42)
     df_sig_wgts = df_sig["eventWeight"]
     df_bkg_wgts = df_bkg["eventWeight"]
     df_sig = df_sig[kinematics]
@@ -56,6 +55,7 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True)
 
     return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, truth_labels
 
+
 def create_adj_mat(a, length):
     """
     Function to filter a matrix of distances into a binary adjacency matrix
@@ -67,13 +67,15 @@ def create_adj_mat(a, length):
     Returns:
         (float) cityblock distance
     """
-    return (a < length).float()
+    return (a <= length).float()
+
 
 def create_node_wgts(a, b):
     a_col = a.view(-1,1)
     b_col = b.view(1,-1)
     outer = torch.matmul(a_col, b_col)
     return torch.transpose(outer, 0, 1)
+
 
 def generate_adj_mat(x, x_wgts, distance, linking_length):
     """
@@ -86,7 +88,7 @@ def generate_adj_mat(x, x_wgts, distance, linking_length):
         linking_length (float): linking length
 
     Returns:
-        (float) cityblock distance
+        (pytorch.tensor) adjacency matrix
     """
     # initialise adjacency matrix
     adj_mat = torch.empty((0, len(x)))
@@ -105,3 +107,77 @@ def generate_adj_mat(x, x_wgts, distance, linking_length):
     adj_mat = create_adj_mat(distance_matrix, linking_length)
     print(f"Time taken for adjacency matrix generation: {time.time() - st}")
     return adj_mat
+
+
+def generate_adj_mat_from_batch(distance, linking_length):
+    """
+    Function create a binary adjacency matrix from pre-calculated distances
+
+    Args:
+        distance (pytorch.tensor): pair-wise distances between events
+        linking_length (float): linking length
+
+    Returns:
+        (pytorch.tensor) adjacency matrix
+    """
+    adj_mat = create_adj_mat(distance, linking_length)
+    return adj_mat
+
+
+def generate_batched_nonzero_ind(path, variable, distance, t, linking_length, flip=False):
+    """
+    Function that loads in the distances in batches, within each batch, apply the linking length,
+    and returns non-zero indices within that batch
+
+    Args:
+        path: path to the saved batched distance files
+        variable: kinematic variable type in the file names
+        distance: distance metric type in the file names
+        t: type of distance (sigsig, sigbkg or bkgbkg)
+        linking length: chosen linking length to apply
+        flip: True (default) if the sigisg distances are smaller than bkgbkg distances
+    
+    Returns:
+        indices of 
+    """
+    # Load in files in batches (sigsig, sigbkg, or bkgbkg) by the i and j indices
+    prefix = path+"/batched_"+variable +"_"+distance+"_distances/"
+    files = glob.glob(prefix+t+'*0_0.pt')
+    print(len(files), " files found for "+t+" distances")
+    # apply linking length within each batch, and pull out non-zero indices
+    indices = torch.empty(0)
+    for f in files:
+        # get the i and j batch numbers
+        i_ind = int(re.findall(r'\d+', f)[0])
+        j_ind = int(re.findall(r'\d+', f)[1])
+        print("File ", i_ind, j_ind)
+        distance = torch.load(f)["distance"]
+        wgt = torch.load(f)["weight"]
+        i_batch = distance.size(0)
+        j_batch = distance.size(1)
+        # apply the linking length to the distances in that batch
+        if flip:
+            ind = (distance <= linking_length).nonzero()
+        else:
+            ind = (distance >= linking_length).nonzero()
+        # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
+        ind[:,0] += i_ind*i_batch
+        ind[:,1] += j_ind*j_batch
+        indices = torch.cat((indices, ind))
+    
+    return indices
+
+def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
+    """
+    sigsig - indices of sigsig distances that have passed the linking length requirement
+    sigbkg - indices of sigbkg distances that have passed the linking length requirement
+    bkgsig - indices of bkgsig distances that have passed the linking length requirement
+    bkgbkg - indices of bkgbkg distances that have passed the linking length requirement
+    N - the length of signal+background in the final full adjacency matrix (N x N)
+    """
+    full_ind = torch.cat((sigsig, sigbkg, bkgsig, bkgbkg))
+    # sparse_adj_mat = torch.sparse_csr_tensor(full_ind[:,0], full_ind[:,1], torch.ones(full_ind.size(1)), (N, N), dtype=torch.float32)
+    sparse_adj_mat = torch.sparse_coo_tensor(full_ind.t(), torch.ones(full_ind.shape[0]), [N, N], dtype=torch.float32)
+    edge_frac = sparse_adj_mat._nnz() / sparse_adj_mat.numel()
+    print("Fraction of edges: ", edge_frac)
+    return sparse_adj_mat.coalesce().indices()

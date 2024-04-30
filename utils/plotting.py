@@ -36,7 +36,7 @@ def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, labe
     ax.hist(bb, bins=binning, label="bkg-bkg", alpha=0.5, weights=bb_wgt, density=True)
     # aesthesics
     ax.legend(loc='upper right')
-    ax.set_xlabel(var+"_"+distance +" distance", loc="right")
+    ax.set_xlabel(var+" "+distance +" distance", loc="right")
     ax.set_ylabel("Normalised # event pairs / bin", loc="top")
     # save
     if label!="": label = "_"+label

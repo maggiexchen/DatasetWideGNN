@@ -1,5 +1,8 @@
 import os
 import yaml
+import glob
+import torch
+torch.manual_seed(42)
 
 def create_dirs(path):
     """
@@ -78,6 +81,37 @@ def get_h5_paths(path, variable, distance, label="sampled_train"):
 
     return files[0], files[1], files[2]
 
+def get_batched_distances(path, variable, distance, t, sample=True):
+    """
+    Function to obtain a list of .pt path+filenames for sig-sig, sig-bkg and bkg-bkg distance storage. 
+
+    Args:
+        path (str): the path of directories you want to write the h5 files to.
+        variable (str): the variable category under consideration
+        distance (str): the distance metric under consideration
+        t (str): the type of distance to load (sigsig, sigbkg, or bkgbkg)
+        sample (bool): whether to sample from the distance distribution (default is True)
+
+    Returns:
+        (torch tensor): distance tensor
+        (torch tensor): event weight tensor
+    """
+    prefix = path+"/batched_"+variable +"_"+distance+"_distances/"
+    files = glob.glob(prefix+t+'*.pt')
+    distance = []
+    wgt = []
+    for f in files:
+        print(t+" distance", torch.load(f)["distance"].shape)
+        distance.append(torch.flatten(torch.load(f)["distance"]))
+        wgt.append(torch.flatten(torch.load(f)["weight"]))
+    distance = torch.cat(distance, dim=0)
+    wgt = torch.cat(wgt, dim=0)
+    if sample:
+        num_sample = 5000
+        ind = torch.randperm(len(distance))[:num_sample]
+        distance = distance[ind]
+        wgt = wgt[ind]
+    return distance, wgt
 
 def load_config(file_path):
     """
