@@ -6,6 +6,8 @@ import json
 # import math
 # import random
 # import yaml
+import glob
+import re
 import os
 os.environ["NUMEXPR_MAX_THREADS"] = "16"
 from scipy.spatial.distance import pdist, squareform
@@ -23,6 +25,7 @@ from utils.gcn_model import GCNClassifier
 from utils.dnn_model import DNNClassifier
 
 import numpy as np
+import pdb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -134,6 +137,8 @@ raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 full_x = torch.cat((full_sig, full_bkg), dim=0)
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)
 
+
+
 if len(hidden_sizes_gcn) > 0:
     # read in linking length calculated from sampled training data
     sigsig_eff = eff
@@ -148,59 +153,55 @@ if len(hidden_sizes_gcn) > 0:
     
     # TODO: batch load in event distances to apply linking length to
     # If the distances were to be calculated and stored in advance, then loaded here, the ordering of the events need to be the same!
-    logging.info("Batch loading in the distances ...")
-    sigsig_distance, sigsig_wgt = misc.get_batched_distances(path, variable, distance, "sigsig", sample=False)
-    sigbkg_distance, sigbkg_wgt = misc.get_batched_distances(path, variable, distance, "sigbkg", sample=False)
-    bkgbkg_distance, bkgbkg_wgt = misc.get_batched_distances(path, variable, distance, "bkgbkg", sample=False)
-    logging.info("Reshaping the flattened distances ...")
-    print("full sig",len(full_sig))
-    print("full bkg",len(full_bkg))
-    print("sigsig", len(sigsig_distance))
-    print("sigbkg", len(sigbkg_distance))
-    print("bkgbkg", len(bkgbkg_distance))
-    sigsig_distance = torch.reshape(sigsig_distance, (len(full_sig), len(full_sig)))
-    sigbkg_distance = torch.reshape(sigbkg_distance, (len(full_sig), len(full_bkg)))
-    bkgbkg_distance = torch.reshape(bkgbkg_distance, (len(full_bkg), len(full_bkg)))
-    logging.info("Applying the linking length to get non-zero indices")
-    sigsig_ind = (sigsig_distance <= linking_length).nonzero()
-    sigbkg_ind = (sigbkg_distance <= linking_length).nonzero()
-    bkgbkg_ind = (bkgbkg_distance <= linking_length).nonzero()
+    logging.info("Batch applying the linking length and getting non-zero indices ...")
+    logging.info("For sigsig ...")
+    sigsig_ind = adj.generate_batched_nonzero_ind(path, variable, distance, "sigsig", linking_length, flip=True)
+    print(sigsig_ind.shape)
+    logging.info("For sigbkg ...")
+    sigbkg_ind = adj.generate_batched_nonzero_ind(path, variable, distance, "sigbkg", linking_length, flip=True)
+    print(sigbkg_ind.shape)
+    logging.info("For bkgsig ...")
     bkgsig_ind = torch.clone(sigbkg_ind)
-    sigbkg_ind[:, 1] += len(full_sig)
-    bkgsig_ind[:, 0] += len(full_sig)
+    bkgsig_ind = bkgsig_ind[:, [1, 0]]
+    print(bkgsig_ind.shape)
+    logging.info("For bkgbkg ...")
+    bkgbkg_ind = adj.generate_batched_nonzero_ind(path, variable, distance, "bkgbkg", linking_length, flip=True)
+    print(bkgbkg_ind.shape)
+
+    # adding to the indices to form the full matrix indices
+    logging.info("Stitching together the non-zero indices ...")
+    sigbkg_ind[:,1]+=len(full_sig)
+    bkgsig_ind[:,0]+=len(full_sig)
     bkgbkg_ind += len(full_sig)
-    logging.info("Patching the indices of sigsig, sigbkg and bkgbkg distances together ...")
-    ones_indices = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind), dim=0)
-    logging.info("Generating sparse adjacency matrix using indices ...")
-    print(ones_indices.size())
-    print(len(full_sig)+len(full_bkg))
-    sparse_adj_mat = torch.sparse_coo_tensor(ones_indices.t(), torch.ones(ones_indices.size(0)), len(full_sig)+len(full_bkg))
-    """
-    logging.info("Generating adjacency matrix ...")
-    full_adj_mat = adj.create_adj_mat(a, length)
-    logging.info("Calculating distances and adjacency matrix ...")
+    logging.info("Generating sparse adjacency matrix ...")
+    sparse_adj_mat = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+30000)
+    print("Shape of sparse adj mat", sparse_adj_mat.shape)
+
+    # using the ROW indices of the sparse adj mat to read out the edge weights used for training
+    edge_wgts = full_wgts[sparse_adj_mat[0]]
+    print("edge weights", edge_wgts)
+
+    # Still keeping the manually computed adjacency matrix
     # full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length)
 
-    edge_frac = torch.sum(full_adj_mat == 1).item() / len(full_adj_mat)**2
-    print("Fraction of edges: ", edge_frac)
+# TODO: Adding plotting functionalities back that work with sparse adjacency matrix
+#     # calculate centrality
+#     logging.info("Calculating and plotting centrality ...")
+#     deg_cent = torch.sum(full_adj_mat, dim=1)
+#     plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", eff)
 
-    # calculate centrality
-    logging.info("Calculating and plotting centrality ...")
-    deg_cent = torch.sum(full_adj_mat, dim=1)
-    plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", eff)
+#     adj_mat = full_adj_mat.to_sparse_csr() ### densor tensor to csr tensor
+#     norm_label = training_name ### pyg layer uses D_half_inv normalisation
 
-    adj_mat = full_adj_mat.to_sparse_csr() ### densor tensor to csr tensor
-    norm_label = training_name ### pyg layer uses D_half_inv normalisation
+#     logging.info("Plotting convoluted kinematics ... ")
+#     plotting.plot_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
+#     plotting.plot_conv_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
 
-    logging.info("Plotting convoluted kinematics ... ")
-    plotting.plot_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
-    plotting.plot_conv_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
+#     print("Normalised adjacency matrix\n", adj_mat)
 
-    print("Normalised adjacency matrix\n", adj_mat)
-
-else:
-    adj_mat = None
-    norm_label = ""
+# else:
+#     adj_mat = None
+#     norm_label = ""
 
 
 logging.info("Training ...")
@@ -211,7 +212,7 @@ optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
-    full_outputs = model(full_x, adj_mat)
+    full_outputs = model(full_x, full_adj_mat, edge_wgts)
     
     # splitting outputs into training/validation set
     # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
@@ -230,7 +231,7 @@ for epoch in range(epochs):
 
 # save trained model
 logging.info("Saving trained model and performance...")
-model_path = path+"models/"+model_label+norm_label+"/"
+model_path = path+"models/"+model_label+"/"
 misc.create_dirs(model_path)
 model_file_name = "model.pth"
 torch.save({
@@ -272,7 +273,7 @@ ax.set_xlabel("Epoch", loc="right")
 ax.set_ylabel("Loss", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+model_label+norm_label+"_training_validation_loss.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
 
 logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
@@ -292,7 +293,7 @@ ymin, ymax = ax.get_ylim()
 ax.set_ylim((ymin, ymax*1.2))
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+model_label+norm_label+"_training_validation_pred.pdf", transparent=True)
+fig.savefig(fig_path+variable+"_"+model_label+"_training_validation_pred.pdf", transparent=True)
 
 logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
@@ -304,5 +305,4 @@ plt.xlabel("Background Efficiency", loc="right")
 plt.ylabel("Signal Efficiency", loc="top")
 fig_path = path + plot_path
 misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+model_label+norm_label+"_training_validation_ROC.pdf", transparent=True)
-"""
+fig.savefig(fig_path+variable+"_"+model_label+"_training_validation_ROC.pdf", transparent=True)

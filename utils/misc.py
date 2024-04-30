@@ -101,6 +101,7 @@ def get_batched_distances(path, variable, distance, t, sample=True):
     distance = []
     wgt = []
     for f in files:
+        print(t+" distance", torch.load(f)["distance"].shape)
         distance.append(torch.flatten(torch.load(f)["distance"]))
         wgt.append(torch.flatten(torch.load(f)["weight"]))
     distance = torch.cat(distance, dim=0)
