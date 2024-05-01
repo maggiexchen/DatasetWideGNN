@@ -127,19 +127,24 @@ raw_train_sig, raw_train_bkg, _, _, _, _ = adj.data_loader("data", "train", kine
 raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader("data", "val", kinematics, norm_kin=False)
 
 # normalised signal and background kinematics
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels = adj.data_loader("data", "train", kinematics, norm_kin=True)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels  = adj.data_loader("data", "train", kinematics, norm_kin=True)
 val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics, norm_kin=True)
 
 full_sig = torch.cat((train_sig, val_sig), dim=0)
-full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
+full_bkg = torch.cat((train_bkg, val_bkg), dim=0)#[:30000]
 
 raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
 raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
+# full_x = torch.cat((full_sig, full_bkg), dim=0).cuda()
+# full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0).cuda()
+# train_truth_labels = torch.cat((train_truth_sig_labels, train_truth_bkg_labels))
+# full_x = torch.cat((full_sig, full_bkg), dim=0)[:(len(full_sig)+30000)].cuda()
 full_x = torch.cat((full_sig, full_bkg), dim=0).cuda()
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0).cuda()
-
-
+# full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)[:(len(full_sig)+30000)].cuda()
+# train_truth_labels = train_truth_labels[:20000]
+# val_truth_labels = train_truth_labels[:(len(full_x)-20000)]
 
 if len(hidden_sizes_gcn) > 0:
     # read in linking length calculated from sampled training data
@@ -152,6 +157,7 @@ if len(hidden_sizes_gcn) > 0:
         lengths = length_dict["length"]
         linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
         logging.info("linking length ="+str(linking_length))
+    #linking_length = 0.1
     
     # TODO: batch load in event distances to apply linking length to
     # If the distances were to be calculated and stored in advance, then loaded here, the ordering of the events need to be the same!
@@ -176,17 +182,17 @@ if len(hidden_sizes_gcn) > 0:
     bkgsig_ind[:,0]+=len(full_sig)
     bkgbkg_ind += len(full_sig)
     logging.info("Generating sparse adjacency matrix ...")
-    sparse_adj_mat = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_x)).cuda()
-    print("Shape of sparse adj mat", sparse_adj_mat.shape)
+    edge_ind, sparse_adj_mat = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_x)).cuda()
+    # print("Shape of sparse adj mat", sparse_adj_mat.shape)
 
     # saving adjacency matrix
     # Save the sparse tensor to a .pt file
     logging.info("Saving sparse adjacency matrix ...")
     model_path = path+"models/"+model_label+"/"
     misc.create_dirs(model_path)
-    torch.save(sparse_adj_mat, model_path+'sparse_adjacency_matrix.pt')
-    # using the ROW indices of the sparse adj mat to read out the edge weights used for training
-    edge_wgts = full_wgts[sparse_adj_mat[0]].cuda()
+    torch.save(sparse_adj_mat, model_path+'sparse_adjacency_matrix_'+str(eff)+'.pt')
+    # # using the ROW indices of the sparse adj mat to read out the edge weights used for training
+    edge_wgts = full_wgts[edge_ind].cuda()
     print("edge weights", edge_wgts)
 
     # Still keeping the manually computed adjacency matrix
@@ -217,15 +223,23 @@ logging.info("Training ...")
 loss_function = nn.BCELoss()
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 
+print("full x", len(full_x))
+print("train truth labels", len(train_truth_labels))
+print("val truth labels", len(val_truth_labels))
+
 for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
-    full_outputs = model(full_x, sparse_adj_mat, edge_wgts).cuda()
+    full_outputs = model(full_x, sparse_adj_mat).cuda()
     
     # splitting outputs into training/validation set
     # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
     train_outputs = torch.cat((full_outputs[:len(train_sig)], full_outputs[(len(train_sig)+len(val_sig)):(len(train_sig)+len(val_sig)+len(train_bkg))]), dim=0).cuda()
+    # train_outputs = full_outputs[:20000]
+    # print("train outputs", len(train_outputs))
     val_outputs = torch.cat((full_outputs[(len(train_sig)):(len(train_sig)+len(val_sig))], full_outputs[-len(val_bkg):]), dim=0).cuda()
+    # val_outputs = full_outputs[20000:33532]
+    # print("val outputs", len(val_outputs))
     loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze().cuda()).cuda()
     loss.backward()
     train_loss.append(loss.item())

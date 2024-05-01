@@ -38,9 +38,9 @@ class GCNClassifier(nn.Module):
         # self.output_layer = GCNConv(input_size, output_size)
         self.output_layer = nn.Linear(input_size, output_size)
             
-    def forward(self, x, edge_index, edge_weights):
+    def forward(self, x, edge_index):
         for layer, batch_norm, dropout in zip(self.layers_gcn, self.batch_norms_gcn, self.dropout_gcn):
-            x = F.relu(dropout(batch_norm(layer(x, edge_index, edge_weight=edge_weights))))
+            x = F.relu(dropout(batch_norm(layer(x, edge_index))))
         for layer, batch_norm, dropout in zip(self.layers_mlp, self.batch_norms_mlp, self.dropout_mlp):
             x = F.relu(dropout(batch_norm(layer(x))))
         

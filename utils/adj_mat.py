@@ -11,6 +11,7 @@ import utils.torch_distances as dis
 import utils.misc as misc
 import utils.plotting as plot
 import re
+import pdb
 import glob
 
 def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True):
@@ -176,8 +177,10 @@ def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
     N - the length of signal+background in the final full adjacency matrix (N x N)
     """
     full_ind = torch.cat((sigsig, sigbkg, bkgsig, bkgbkg))
+    edge_ind = full_ind[:,0]
     # sparse_adj_mat = torch.sparse_csr_tensor(full_ind[:,0], full_ind[:,1], torch.ones(full_ind.size(1)), (N, N), dtype=torch.float32)
     sparse_adj_mat = torch.sparse_coo_tensor(full_ind.t(), torch.ones(full_ind.shape[0]), [N, N], dtype=torch.float32)
     edge_frac = sparse_adj_mat._nnz() / sparse_adj_mat.numel()
     print("Fraction of edges: ", edge_frac)
-    return sparse_adj_mat.coalesce().indices()
+    # return sparse_adj_mat.coalesce().indices()
+    return sparse_adj_mat.to_sparse_csr(), edge_ind
