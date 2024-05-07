@@ -149,22 +149,44 @@ def generate_batched_nonzero_ind(path, variable, distance, t, linking_length, fl
     indices = torch.empty(0)
     for f in files:
         # get the i and j batch numbers
-        i_ind = int(re.findall(r'\d+', f)[0])
-        j_ind = int(re.findall(r'\d+', f)[1])
-        print("File ", i_ind, j_ind)
-        distance = torch.load(f)["distance"]
-        wgt = torch.load(f)["weight"]
-        i_batch = distance.size(0)
-        j_batch = distance.size(1)
-        # apply the linking length to the distances in that batch
-        if flip:
-            ind = (distance <= linking_length).nonzero()
+#        print(re.findall(r'\d+', f))
+        # use -1 and -2 here to count from back - to account for possible numbers earlier in the file path (e.g. atlas3)
+        i_ind = int(re.findall(r'\d+', f)[-2])
+        j_ind = int(re.findall(r'\d+', f)[-1])
+        if t=="sigsig" or t=="bkgbkg":
+            if i_ind >= j_ind: 
+                print("File ", i_ind, j_ind)
+                distance = torch.load(f)["distance"]
+                wgt = torch.load(f)["weight"]
+                i_batch = distance.size(0)
+                j_batch = distance.size(1)
+                # apply the linking length to the distances in that batch
+                if flip:
+                    ind = (distance <= linking_length).nonzero()
+                else:
+                    ind = (distance >= linking_length).nonzero()
+                # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
+                ind[:,0] += i_ind*i_batch
+                ind[:,1] += j_ind*j_batch
+                indices = torch.cat((indices, ind))
+                if i_ind != j_ind:
+                    ind_lowerleft = ind[:,torch.tensor([0, 1])][:, torch.tensor([1, 0])]
+                    indices = torch.cat((indices, ind_lowerleft))
         else:
-            ind = (distance >= linking_length).nonzero()
-        # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
-        ind[:,0] += i_ind*i_batch
-        ind[:,1] += j_ind*j_batch
-        indices = torch.cat((indices, ind))
+            print("File ", i_ind, j_ind)
+            distance = torch.load(f)["distance"]
+            wgt = torch.load(f)["weight"]
+            i_batch = distance.size(0)
+            j_batch = distance.size(1)
+            # apply the linking length to the distances in that batch
+            if flip:
+                ind = (distance <= linking_length).nonzero()
+            else:
+                ind = (distance >= linking_length).nonzero()
+            # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
+            ind[:,0] += i_ind*i_batch
+            ind[:,1] += j_ind*j_batch
+            indices = torch.cat((indices, ind))
     
     return indices
 
