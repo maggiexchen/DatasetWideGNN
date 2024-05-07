@@ -145,7 +145,7 @@ nBins = 100
 
 # plotting sig-sig and bkg-bkg distributions and the linking lengths
 fig, ax = plt.subplots()
-binning = np.linspace(0,18,nBins)
+binning = np.linspace(0,12,nBins)
 ax.hist(sigsig_distance, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
 ax.hist(sigbkg_distance, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="darkorange")
 ax.hist(bkgbkg_distance, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt, alpha=0.5, density=True, color="forestgreen")
@@ -156,8 +156,8 @@ ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", siz
 y_min, y_max = ax.get_ylim()
 x_min, x_max = ax.get_xlim()
 for i, eff in enumerate(sigsig_eff):
-    ax.axvline(x=ss_thresholds[i], ymax=0.6+i*0.05, linestyle="--", color="red")
-    ax.text(x=ss_thresholds[i], y=0.65+i*0.05, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_labels[i], ha='center', va='bottom', fontsize=7)
+    ax.axvline(x=ss_thresholds[i], ymax=0.6+i*0.02, linestyle="--", color="red")
+    ax.text(x=ss_thresholds[i], y=0.65+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_labels[i], ha='center', va='bottom', fontsize=7)
 ax.legend(loc='upper right')
 ax.set_ylim(y_min, y_max*1.2)
 ax.set_xlim(x_min, x_max*0.8)
