@@ -104,9 +104,9 @@ def plot_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, norma
     else: 
         print("Please specify a normalisation that is either D_inv or D_half_inv")
 
-    x = torch.cat((sig, bkg), dim=0)
+    x = torch.cat((sig, bkg), dim=0).cuda()
     conv_x = torch.matmul(adj_mat, x)
-    conv_x_numpy = conv_x.detach().numpy()
+    conv_x_numpy = conv_x.detach().cpu().numpy()
     if standardise:
         for v, var in enumerate(kinematics):
             conv_x_numpy[:,v] = norm.standardise(conv_x_numpy[:, v])
@@ -152,9 +152,9 @@ def plot_conv_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, 
     else: 
         print("Please specify a normalisation that is either D_inv or D_half_inv")
 
-    x = torch.cat((sig, bkg), dim=0)
+    x = torch.cat((sig, bkg), dim=0).cuda()
     conv_conv_x = torch.matmul(adj_mat, torch.matmul(adj_mat, x))
-    conv_conv_x_numpy = conv_conv_x.detach().numpy()
+    conv_conv_x_numpy = conv_conv_x.detach().cpu().numpy()
     
     if standardise:
         for v, var in enumerate(kinematics):
@@ -188,14 +188,14 @@ def plot_conv_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, 
 
 
 def plot_centrality(centrality, sig, bkg, file_path, eff):
-    degree_centrality = centrality / (len(sig)+len(bkg))
-    norm_centrality = norm.standardise(centrality.detach().numpy())
-    norm_degree_centrality = norm.standardise(degree_centrality.detach().numpy())
+    degree_centrality = centrality.detach().cpu().numpy() / (len(sig)+len(bkg))
+    norm_centrality = norm.standardise(centrality.detach().cpu().numpy())
+    norm_degree_centrality = norm.standardise(degree_centrality)
     misc.create_dirs(file_path+"/centrality/")
     
     fig, ax = plt.subplots()
-    ax.hist(centrality[: len(sig)], bins=50, label="Signal", alpha=0.3, density=True, color="red")
-    ax.hist(centrality[len(sig):], bins=50, label="Signal", alpha=0.3, density=True, color="steelblue")
+    ax.hist(centrality[: len(sig)].detach().cpu().numpy(), bins=50, label="Signal", alpha=0.3, density=True, color="red")
+    ax.hist(centrality[len(sig):].detach().cpu().numpy(), bins=50, label="Signal", alpha=0.3, density=True, color="steelblue")
     ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
     ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
     ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
