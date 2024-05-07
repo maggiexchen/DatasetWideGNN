@@ -75,6 +75,12 @@ else:
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 device = torch.device("cuda")
+print(torch.cuda.mem_get_info())
+t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
+r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
+a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
+f = r-a  # free inside reserved
+print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
 
 config_path = args.config
 train_config = misc.load_config(config_path)
@@ -131,7 +137,7 @@ train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_label
 val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics, norm_kin=True)
 
 full_sig = torch.cat((train_sig, val_sig), dim=0)
-full_bkg = torch.cat((train_bkg, val_bkg), dim=0)#[:30000]
+full_bkg = torch.cat((train_bkg, val_bkg), dim=0)[:30000]
 
 raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
 raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
@@ -141,7 +147,8 @@ raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 # train_truth_labels = torch.cat((train_truth_sig_labels, train_truth_bkg_labels))
 # full_x = torch.cat((full_sig, full_bkg), dim=0)[:(len(full_sig)+30000)].cuda()
 full_x = torch.cat((full_sig, full_bkg), dim=0).cuda()
-full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0).cuda()
+#full_x = torch.cat((full_sig, full_bkg), dim=0)
+full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)#.cuda()
 # full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)[:(len(full_sig)+30000)].cuda()
 # train_truth_labels = train_truth_labels[:20000]
 # val_truth_labels = train_truth_labels[:(len(full_x)-20000)]
@@ -157,7 +164,7 @@ if len(hidden_sizes_gcn) > 0:
         lengths = length_dict["length"]
         linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
         logging.info("linking length ="+str(linking_length))
-    #linking_length = 0.1
+    linking_length = 0.5
     
     # TODO: batch load in event distances to apply linking length to
     # If the distances were to be calculated and stored in advance, then loaded here, the ordering of the events need to be the same!
@@ -182,18 +189,41 @@ if len(hidden_sizes_gcn) > 0:
     bkgsig_ind[:,0]+=len(full_sig)
     bkgbkg_ind += len(full_sig)
     logging.info("Generating sparse adjacency matrix ...")
-    edge_ind, sparse_adj_mat = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_x)).cuda()
+    sparse_adj_mat, edge_ind, crow_ind, col_ind, values = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+30000)
+
+    t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
+    r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
+    a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
+    f = r-a  # free inside reserved
+    print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
+
+    pdb.set_trace()
     # print("Shape of sparse adj mat", sparse_adj_mat.shape)
 
     # saving adjacency matrix
     # Save the sparse tensor to a .pt file
     logging.info("Saving sparse adjacency matrix ...")
     model_path = path+"models/"+model_label+"/"
+#    model_path = "/home/pacey/GNN/hhgraph_sparse/hhhgraph/models"+model_label+"/"
     misc.create_dirs(model_path)
-    torch.save(sparse_adj_mat, model_path+'sparse_adjacency_matrix_'+str(eff)+'.pt')
+    #torch.save(sparse_adj_mat, model_path+'sparse_adjacency_matrix.pt')
+    torch.save(edge_ind, model_path+'coo_row.pt')
+    torch.save(crow_ind, model_path+'csr_row.pt')
+    torch.save(col_ind, model_path+'csr_col.pt')
+    torch.save(values, model_path+'csr_values.pt')
     # # using the ROW indices of the sparse adj mat to read out the edge weights used for training
-    edge_wgts = full_wgts[edge_ind].cuda()
-    print("edge weights", edge_wgts)
+
+    t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
+    r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
+    a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
+    f = r-a  # free inside reserved
+    print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
+    del crow_ind, col_ind, values
+    torch.cuda.empty_cache() 
+    pdb.set_trace()
+#    edge_wgts = full_wgts[edge_ind]#.cuda()
+#    edge_wgts = full_wgts[edge_ind]
+ #   print("edge weights", edge_wgts)
 
     # Still keeping the manually computed adjacency matrix
     # full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length).cuda()
@@ -230,7 +260,17 @@ print("val truth labels", len(val_truth_labels))
 for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
+
+    t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
+    r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
+    a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
+    f = r-a  # free inside reserved
+    print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
+    torch.cuda.empty_cache()
+
     full_outputs = model(full_x, sparse_adj_mat).cuda()
+#    full_outputs = model(full_x, sparse_adj_mat)
+
     
     # splitting outputs into training/validation set
     # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
