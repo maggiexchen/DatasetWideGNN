@@ -124,6 +124,7 @@ num_bkg_batches = (num_bkg_events + batch_size - 1) // batch_size
 save_path = path+"/batched_"+variable +"_"+distance+"_distances/"
 misc.create_dirs(save_path)
 sigsig_batch_counter_i = 0
+logging.info('Calculating sigsig distances ...')
 for i in range(num_sig_batches):
     start_idx_sig_i = i * batch_size
     end_idx_sig_i = min((i + 1) * batch_size, num_sig_events)
@@ -131,7 +132,8 @@ for i in range(num_sig_batches):
     batch_sig_wgt_i = sig_wgt[start_idx_sig_i:end_idx_sig_i]
     sigsig_batch_counter_j = 0
     for j in range(num_sig_batches):
-        logging.info('Calculating sigsig distances ...')
+        # don't need to save the redundant ones.
+        if (i < j): continue
         start_idx_sig_j = j * batch_size
         end_idx_sig_j = min((j + 1) * batch_size, num_sig_events)
         batch_sig_j = full_sig[start_idx_sig_j:end_idx_sig_j]
@@ -157,16 +159,17 @@ for i in range(num_bkg_batches):
 
     bkgbkg_batch_counter_j = 0
     for j in range(num_bkg_batches):
+        # don't need to save the redundant ones.
+        if (i < j): continue
         start_idx_bkg_j = j * batch_size
-        end_idx_bkg_j = min((i + 1) * batch_size, num_bkg_events)
+        end_idx_bkg_j = min((j + 1) * batch_size, num_bkg_events)
         batch_bkg_j = full_bkg[start_idx_bkg_j:end_idx_bkg_j]
         batch_bkg_wgt_j = bkg_wgt[start_idx_bkg_j:end_idx_bkg_j]
-
         batch_bkgbkg = distance_calc(batch_bkg_i, batch_bkg_j, distance)
         batch_bkgbkg_wgt = torch.ger(batch_bkg_wgt_i, batch_bkg_wgt_j)
         batch_dict = {'distance': batch_bkgbkg, 'weight': batch_bkgbkg_wgt}
         print("Bkgbkg file ", bkgbkg_batch_counter_i, bkgbkg_batch_counter_j)
-        torch.save(batch_dict, save_path + f'bkgbkg_distances_batch_{bkgbkg_batch_counter_i}_{bkgbkg_batch_counter_j}.pt')
+#        torch.save(batch_dict, save_path + f'bkgbkg_distances_batch_{bkgbkg_batch_counter_i}_{bkgbkg_batch_counter_j}.pt')
         bkgbkg_batch_counter_j += 1
     bkgbkg_batch_counter_i += 1
 
