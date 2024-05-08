@@ -31,6 +31,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+from torchinfo import summary
 
 import time
 st = time.time()
@@ -126,6 +127,7 @@ logging.info("input/output path: "+path)
 
 model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates)
 model.to(device)
+summary(model)
 logging.info("distance metric: "+distance)
 logging.info("desired efficieny: "+str(eff))
 
@@ -141,7 +143,8 @@ train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_label
 val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics, norm_kin=True)
 
 full_sig = torch.cat((train_sig, val_sig), dim=0)
-full_bkg = torch.cat((train_bkg, val_bkg), dim=0)[:30000]
+#full_bkg = torch.cat((train_bkg, val_bkg), dim=0)[:30000]
+full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 
 raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
 raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
@@ -193,7 +196,7 @@ if len(hidden_sizes_gcn) > 0:
     bkgsig_ind[:,0]+=len(full_sig)
     bkgbkg_ind += len(full_sig)
     logging.info("Generating sparse adjacency matrix ...")
-    sparse_adj_mat, edge_ind, crow_ind, col_ind, values = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+30000)
+    sparse_adj_mat, edge_ind, crow_ind, col_ind, values = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+len(full_bkg))
 
     t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
     r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
@@ -277,7 +280,7 @@ for epoch in range(epochs):
 #    a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
 #    f = r-a  # free inside reserved
 #    print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
-#    torch.cuda.empty_cache()
+    torch.cuda.empty_cache()
 
 #    full_outputs = model(full_x, sparse_adj_mat).cuda()
     with torch.cuda.amp.autocast():
@@ -296,6 +299,7 @@ for epoch in range(epochs):
 #    train_loss.append(loss.item())
 #    optimiser.step()
     scaler.scale(loss).backward()
+    loss.detach()
     train_loss.append(loss.item())
     scaler.step(optimiser)
 
