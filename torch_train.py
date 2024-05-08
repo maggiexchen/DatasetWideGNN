@@ -14,6 +14,7 @@ from scipy.spatial.distance import pdist, squareform
 import matplotlib.pyplot as plt
 import mplhep as hep
 import argparse
+import gc
 
 import utils.normalisation as norm
 import utils.torch_distances as dis
@@ -39,6 +40,8 @@ from sklearn.utils import shuffle
 import shap
 import logging
 logging.getLogger().setLevel(logging.INFO)
+
+torch.cuda.empty_cache()
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -74,7 +77,8 @@ else:
     # path = "/home/srutherford/GNN_shared/hhhgraph/data/" # sebs path
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
-device = torch.device("cuda")
+CUDA_LAUNCH_BLOCKING=1
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 print(torch.cuda.mem_get_info())
 t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
 r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
@@ -121,7 +125,7 @@ logging.info("variable set: "+variable)
 logging.info("input/output path: "+path)
 
 model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates)
-model.cuda()
+model.to(device)
 logging.info("distance metric: "+distance)
 logging.info("desired efficieny: "+str(eff))
 
@@ -146,7 +150,7 @@ raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 # full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0).cuda()
 # train_truth_labels = torch.cat((train_truth_sig_labels, train_truth_bkg_labels))
 # full_x = torch.cat((full_sig, full_bkg), dim=0)[:(len(full_sig)+30000)].cuda()
-full_x = torch.cat((full_sig, full_bkg), dim=0).cuda()
+full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
 #full_x = torch.cat((full_sig, full_bkg), dim=0)
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)#.cuda()
 # full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)[:(len(full_sig)+30000)].cuda()
@@ -197,14 +201,14 @@ if len(hidden_sizes_gcn) > 0:
     f = r-a  # free inside reserved
     print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
 
-    pdb.set_trace()
+#    pdb.set_trace()
     # print("Shape of sparse adj mat", sparse_adj_mat.shape)
 
     # saving adjacency matrix
     # Save the sparse tensor to a .pt file
     logging.info("Saving sparse adjacency matrix ...")
-    model_path = path+"models/"+model_label+"/"
-#    model_path = "/home/pacey/GNN/hhgraph_sparse/hhhgraph/models"+model_label+"/"
+#    model_path = path+"models/"+model_label+"/"
+    model_path = "/home/pacey/GNN/hhgraph_sparse/hhhgraph/models"+model_label+"/"
     misc.create_dirs(model_path)
     #torch.save(sparse_adj_mat, model_path+'sparse_adjacency_matrix.pt')
     torch.save(edge_ind, model_path+'coo_row.pt')
@@ -218,9 +222,9 @@ if len(hidden_sizes_gcn) > 0:
     a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
     f = r-a  # free inside reserved
     print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
-    del crow_ind, col_ind, values
-    torch.cuda.empty_cache() 
-    pdb.set_trace()
+#    del crow_ind, col_ind, values
+ #   torch.cuda.empty_cache() 
+#    pdb.set_trace()
 #    edge_wgts = full_wgts[edge_ind]#.cuda()
 #    edge_wgts = full_wgts[edge_ind]
  #   print("edge weights", edge_wgts)
@@ -252,41 +256,51 @@ logging.info("Training ...")
 # Define loss function for binary classification and ADAM optimiser
 loss_function = nn.BCELoss()
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
+scaler = torch.cuda.amp.GradScaler()
 
 print("full x", len(full_x))
 print("train truth labels", len(train_truth_labels))
 print("val truth labels", len(val_truth_labels))
 
+gc.collect()
+torch.cuda.empty_cache()
+torch.cuda.reset_max_memory_allocated()
+torch.cuda.synchronize()
+
 for epoch in range(epochs):
+    print(epoch)
     model.train()
     optimiser.zero_grad()
 
-    t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
-    r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
-    a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
-    f = r-a  # free inside reserved
-    print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
-    torch.cuda.empty_cache()
+#    t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
+#    r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
+#    a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
+#    f = r-a  # free inside reserved
+#    print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
+#    torch.cuda.empty_cache()
 
-    full_outputs = model(full_x, sparse_adj_mat).cuda()
-#    full_outputs = model(full_x, sparse_adj_mat)
+#    full_outputs = model(full_x, sparse_adj_mat).cuda()
+    with torch.cuda.amp.autocast():
+        full_outputs = model(full_x, sparse_adj_mat).to("cpu")
+        # splitting outputs into training/validation set
+        # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
+        train_outputs = torch.cat((full_outputs[:len(train_sig)], full_outputs[(len(train_sig)+len(val_sig)):(len(train_sig)+len(val_sig)+len(train_bkg))]), dim=0)#.to(device)
+        # train_outputs = full_outputs[:20000]
+        # print("train outputs", len(train_outputs))
+        val_outputs = torch.cat((full_outputs[(len(train_sig)):(len(train_sig)+len(val_sig))], full_outputs[-len(val_bkg):]), dim=0)#.cuda()
+        # val_outputs = full_outputs[20000:33532]
+        # print("val outputs", len(val_outputs))
+        loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze().cuda())#.cuda()
 
-    
-    # splitting outputs into training/validation set
-    # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
-    train_outputs = torch.cat((full_outputs[:len(train_sig)], full_outputs[(len(train_sig)+len(val_sig)):(len(train_sig)+len(val_sig)+len(train_bkg))]), dim=0).cuda()
-    # train_outputs = full_outputs[:20000]
-    # print("train outputs", len(train_outputs))
-    val_outputs = torch.cat((full_outputs[(len(train_sig)):(len(train_sig)+len(val_sig))], full_outputs[-len(val_bkg):]), dim=0).cuda()
-    # val_outputs = full_outputs[20000:33532]
-    # print("val outputs", len(val_outputs))
-    loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze().cuda()).cuda()
-    loss.backward()
+#    loss.backward()
+#    train_loss.append(loss.item())
+#    optimiser.step()
+    scaler.scale(loss).backward()
     train_loss.append(loss.item())
-    optimiser.step()
+    scaler.step(optimiser)
 
     model.eval()
-    validation_loss = loss_function(val_outputs.squeeze(), val_truth_labels.squeeze().cuda()).cuda()
+    validation_loss = loss_function(val_outputs.squeeze(), val_truth_labels.squeeze().cuda())#.cuda()
     val_loss.append(validation_loss.item())
 
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {loss.item()}, Validation Loss: {validation_loss.item()}')
