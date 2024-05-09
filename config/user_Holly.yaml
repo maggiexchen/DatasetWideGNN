@@ -1,0 +1,17 @@
+#######################
+# user config for Holly
+#######################
+
+# signal model hhh, LQ, stau
+signal: hhh
+
+# input paths
+ntuple_path: /data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/
+h5_path: /home/pacey/GNN/hhgraph_sparse/hhhgraph/data/hhh_split_files/ 
+ll_path: /home/pacey/GNN/hhgraph_sparse/hhhgraph/linking_lengths/ 
+dist_path: /data/atlas/users/pacey/GNN/distances/
+
+# output paths
+plot_path: /data/atlas/users/pacey/GNN/plots/ 
+adj_path: /data/atlas/users/pacey/GNN/graph/
+model_path: /data/atlas/users/pacey/GNN/models/ 

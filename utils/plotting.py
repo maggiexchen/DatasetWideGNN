@@ -81,7 +81,7 @@ def plot_kinematic_hists(df_sig, df_bkg, var, file_path, standardise=True):
     ax.set_xlabel("\n"+str(var) + " [GeV]", loc="right")
     ax.set_ylabel("No. Events", loc="top")
     # save
-    save_path = file_path+"/training_kinematics"
+    save_path = file_path+"/training_kinematics/"
     misc.create_dirs(save_path)
     exts = [".pdf"]
     for ext in exts:
@@ -206,7 +206,10 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
     ax.set_ylim((ymin, ymax*1.4))
     ax.set_xlabel("Centrality", loc="right")
     ax.set_ylabel("Normalised No. Events", loc="top")
-    fig.savefig(file_path+"/centrality/centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
+    # save
+    save_path = file_path+"/centrality/"
+    misc.create_dirs(save_path)
+    fig.savefig(save_path+"centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
 
     fig, ax = plt.subplots()
     ax.hist(degree_centrality[: len(sig)], bins=50, label="Signal", alpha=0.3, density=True, color="red")
@@ -222,7 +225,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
     ax.set_xlabel("Degree Centrality", loc="right")
     ax.set_ylabel("Normalised No. Events", loc="top")
     fig.tight_layout()
-    fig.savefig(file_path+"/centrality/degree_centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
+    fig.savefig(save_path+"degree_centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
 
     fig, ax = plt.subplots()
     ax.hist(norm_centrality[: len(sig)], bins=50, label="Signal", alpha=0.3, density=True, color="red")
@@ -239,7 +242,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
     ax.set_xlabel("Centrality", loc="right")
     ax.set_ylabel("Normalised No. Events", loc="top")
     fig.tight_layout()
-    fig.savefig(file_path+"/centrality/norm_centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
+    fig.savefig(save_path+"norm_centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
 
     fig, ax = plt.subplots()
     ax.hist(norm_degree_centrality[: len(sig)], bins=50, label="Signal", alpha=0.3, density=True, color="red")
@@ -256,7 +259,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
     ax.set_xlabel("Degree Centrality", loc="right")
     ax.set_ylabel("Normalised No. Events", loc="top")
     fig.tight_layout()
-    fig.savefig(file_path+"/centrality/norm_degree_centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
+    fig.savefig(save_path+"norm_degree_centrality_sigsig_eff_"+str(eff)+".pdf", transparent=True)
 
 
 

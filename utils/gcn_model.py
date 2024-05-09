@@ -17,6 +17,7 @@ class GCNClassifier(nn.Module):
         self.layers_gcn = nn.ModuleList()
         self.batch_norms_gcn = nn.ModuleList()
         self.dropout_gcn = nn.ModuleList()
+        i = 0
         for i in range(len(hidden_sizes_gcn)):
             # self.layers.append(GCNLayer(input_size, hidden_sizes[i]))
             self.layers_gcn.append(GCNConv(input_size, hidden_sizes_gcn[i]))

@@ -50,7 +50,7 @@ def GetParser():
         description="Reading Ntuples command line options."
     )
     parser.add_argument(
-        "--config",
+        "--MLconfig",
         "-c",
         type=str,
         required=True,
@@ -58,11 +58,11 @@ def GetParser():
     )
 
     parser.add_argument(
-        "--path",
-        "-p",
+        "--userconfig",
+        "-u",
         type=str,
-        required=False,
-        help="Specify the path to store all the input/output data and results",
+        required=True,
+        help="Specify the config for the user e.g. paths to store all the input/output data and results, signal model to look at",
     )
 
     return parser
@@ -70,38 +70,41 @@ def GetParser():
 parser = GetParser()
 args = parser.parse_args()
 
-if args.path:
-    path = args.path
-    if path[-1]!="/": path += "/"
-else:
-    path = "/data/atlas/atlasdata3/maggiechen/gnn_project/" #maggies path
-    # path = "/home/srutherford/GNN_shared/hhhgraph/data/" # sebs path
-
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 CUDA_LAUNCH_BLOCKING=1
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 print(torch.cuda.mem_get_info())
-t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
-r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
-a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
-f = r-a  # free inside reserved
-print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
 
-config_path = args.config
-train_config = misc.load_config(config_path)
+def printMemInfo():
+    GB = 1024**3
+    t = torch.cuda.get_device_properties(0).total_memory/GB
+    r = torch.cuda.memory_reserved(0)/GB
+    a = torch.cuda.memory_allocated(0)/GB
+    f = r-a  # free inside reserved
+    print("total [Gb]: ", t, "reserved [Gb]: ", r, "allocated [Gb]:", a, "free [Gb]: ", f)
+
+train_config_path = args.MLconfig
+train_config = misc.load_config(train_config_path)
+
+user_config_path = args.userconfig
+user_config = misc.load_config(user_config_path)
+print(user_config)
+h5_path = user_config["h5_path"]
+plot_path = user_config["plot_path"]
+ll_path = user_config["ll_path"]
+adj_path = user_config["adj_path"]
+dist_path = user_config["dist_path"]
+model_path = user_config["model_path"]
+
+# TODO: assert. This should be "hhh" "LQ" or "stau"
+signal = user_config["signal"]
+
 training_name = train_config["name"]
 hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
 hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
 dropout_rates = train_config["dropout_rates"]
 epochs = train_config["epochs"]
-
-if len(hidden_sizes_gcn) == 0:
-    model_label = "DNN"
-    plot_path = "plots/DNN/"
-else:
-    model_label = "GCN"
-    plot_path = "plots/GCN/"
 
 variable = train_config["variable"]
 if variable is None:
@@ -115,15 +118,42 @@ if eff is None:
 elif eff not in [0.6, 0.7, 0.8, 0.9]:
     raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
 
+model_label = signal\
+          + "_GCN" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
+          + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
+          + "_lr" + str(LR).replace(".", "p")\
+          + "_LLEff" + str(eff).replace(".", "p")\
+          + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
+          + "_e" + str(epochs)
+
+#if len(hidden_sizes_gcn) == 0:
+#    model_label = "DNN"
+#    plot_path = "plots/DNN/"
+#else:
+#    model_label = "GCN"
+#    plot_path = "plots/GCN/"
+
+#plot_path_label = "DNN" if len(hidden_sizes_gcn) == 0 else "GCN"
+#plot_path += plot_path_label 
+plot_path = plot_path + model_label + "/"
+misc.create_dirs(plot_path)
+
+
 kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
 
 train_loss = []
 val_loss = []
 
+logging.info("signal: "+signal)
 logging.info("chosen model: "+model_label)
 logging.info("variable set: "+variable)
-logging.info("input/output path: "+path)
+logging.info("input data path: "+h5_path)
+logging.info("input ll json path: "+ll_path)
+logging.info("input distances path: "+dist_path)
+logging.info("output plot path: "+plot_path)
+logging.info("adj matrix storage path: "+adj_path)
+logging.info("model storage path: "+model_path)
 
 model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates)
 model.to(device)
@@ -135,12 +165,12 @@ logging.info("desired efficieny: "+str(eff))
 logging.info('Importing signal and background files...')
 
 # un-normalised signal and background kinematics (for checking and plotting)
-raw_train_sig, raw_train_bkg, _, _, _, _ = adj.data_loader("data", "train", kinematics, norm_kin=False)
-raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader("data", "val", kinematics, norm_kin=False)
+raw_train_sig, raw_train_bkg, _, _, _, _ = adj.data_loader(h5_path, plot_path, "train", kinematics, norm_kin=False)
+raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=False)
 
 # normalised signal and background kinematics
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels  = adj.data_loader("data", "train", kinematics, norm_kin=True)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader("data", "val", kinematics, norm_kin=True)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels  = adj.data_loader(h5_path, plot_path, "train", kinematics, norm_kin=True)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=True)
 
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 #full_bkg = torch.cat((train_bkg, val_bkg), dim=0)[:30000]
@@ -149,159 +179,60 @@ full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
 raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
-# full_x = torch.cat((full_sig, full_bkg), dim=0).cuda()
-# full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0).cuda()
-# train_truth_labels = torch.cat((train_truth_sig_labels, train_truth_bkg_labels))
-# full_x = torch.cat((full_sig, full_bkg), dim=0)[:(len(full_sig)+30000)].cuda()
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
-#full_x = torch.cat((full_sig, full_bkg), dim=0)
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)#.cuda()
-# full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)[:(len(full_sig)+30000)].cuda()
-# train_truth_labels = train_truth_labels[:20000]
-# val_truth_labels = train_truth_labels[:(len(full_x)-20000)]
 
-if len(hidden_sizes_gcn) > 0:
-    # read in linking length calculated from sampled training data
-    sigsig_eff = eff
-    ll_path = path+"linking_lengths/"+str(variable)+"_"+str(distance)+"_linking_length.json"
-    misc.create_dirs(ll_path)
-    print(ll_path)
-    with open(ll_path, 'r') as lfile:
-        length_dict = json.load(lfile)
-        lengths = length_dict["length"]
-        linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
-        logging.info("linking length ="+str(linking_length))
-    linking_length = 0.5
-    
-    # TODO: batch load in event distances to apply linking length to
-    # If the distances were to be calculated and stored in advance, then loaded here, the ordering of the events need to be the same!
-    logging.info("Batch applying the linking length and getting non-zero indices ...")
-    logging.info("For sigsig ...")
-    sigsig_ind = adj.generate_batched_nonzero_ind(path, variable, distance, "sigsig", linking_length, flip=True)
-    print(sigsig_ind.shape)
-    logging.info("For sigbkg ...")
-    sigbkg_ind = adj.generate_batched_nonzero_ind(path, variable, distance, "sigbkg", linking_length, flip=True)
-    print(sigbkg_ind.shape)
-    logging.info("For bkgsig ...")
-    bkgsig_ind = torch.clone(sigbkg_ind)
-    bkgsig_ind = bkgsig_ind[:, [1, 0]]
-    print(bkgsig_ind.shape)
-    logging.info("For bkgbkg ...")
-    bkgbkg_ind = adj.generate_batched_nonzero_ind(path, variable, distance, "bkgbkg", linking_length, flip=True)
-    print(bkgbkg_ind.shape)
+print(adj_path+'sparse_adjacency_matrix.pt') 
+sparse_adj_mat = torch.load(adj_path+'sparse_adjacency_matrix.pt').to(device)
+#row_ind = torch.load(adj_path+'coo_row.pt')
+#crow_ind = torch.load(adj_path+'csr_row.pt')
+#col_ind = torch.load(adj_path+'csr_col.pt')
+#values = torch.load(adj_path+'csr_values.pt')
 
-    # adding to the indices to form the full matrix indices
-    logging.info("Stitching together the non-zero indices ...")
-    sigbkg_ind[:,1]+=len(full_sig)
-    bkgsig_ind[:,0]+=len(full_sig)
-    bkgbkg_ind += len(full_sig)
-    logging.info("Generating sparse adjacency matrix ...")
-    sparse_adj_mat, edge_ind, crow_ind, col_ind, values = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+len(full_bkg))
-
-    t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
-    r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
-    a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
-    f = r-a  # free inside reserved
-    print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
-
-#    pdb.set_trace()
-    # print("Shape of sparse adj mat", sparse_adj_mat.shape)
-
-    # saving adjacency matrix
-    # Save the sparse tensor to a .pt file
-    logging.info("Saving sparse adjacency matrix ...")
-#    model_path = path+"models/"+model_label+"/"
-    model_path = "/home/pacey/GNN/hhgraph_sparse/hhhgraph/models"+model_label+"/"
-    misc.create_dirs(model_path)
-    #torch.save(sparse_adj_mat, model_path+'sparse_adjacency_matrix.pt')
-    torch.save(edge_ind, model_path+'coo_row.pt')
-    torch.save(crow_ind, model_path+'csr_row.pt')
-    torch.save(col_ind, model_path+'csr_col.pt')
-    torch.save(values, model_path+'csr_values.pt')
-    # # using the ROW indices of the sparse adj mat to read out the edge weights used for training
-
-    t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
-    r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
-    a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
-    f = r-a  # free inside reserved
-    print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
-#    del crow_ind, col_ind, values
- #   torch.cuda.empty_cache() 
-#    pdb.set_trace()
-#    edge_wgts = full_wgts[edge_ind]#.cuda()
-#    edge_wgts = full_wgts[edge_ind]
- #   print("edge weights", edge_wgts)
-
-    # Still keeping the manually computed adjacency matrix
-    # full_adj_mat = adj.generate_adj_mat(full_x, full_wgts, distance, linking_length).cuda()
-
-# TODO: Adding plotting functionalities back that work with sparse adjacency matrix
-#     # calculate centrality
-#     logging.info("Calculating and plotting centrality ...")
-#     deg_cent = torch.sum(full_adj_mat, dim=1).cuda()
-#     plotting.plot_centrality(deg_cent, full_sig, full_bkg, path+"plots", eff)
-
-#     adj_mat = full_adj_mat.to_sparse_csr() ### densor tensor to csr tensor
-#     norm_label = training_name ### pyg layer uses D_half_inv normalisation
-
-#     logging.info("Plotting convoluted kinematics ... ")
-#     plotting.plot_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
-#     plotting.plot_conv_conv_kinematics(adj_mat, deg_cent, raw_full_sig, raw_full_bkg, kinematics, eff, path+"/training_kinematics/"+norm_label, normalisation="D_half_inv", standardise=False)
-
-#     print("Normalised adjacency matrix\n", adj_mat)
-
-# else:
-#     adj_mat = None
-#     norm_label = ""
-
+printMemInfo()
 
 logging.info("Training ...")
 # Define loss function for binary classification and ADAM optimiser
 loss_function = nn.BCELoss()
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
-scaler = torch.cuda.amp.GradScaler()
+#scaler = torch.cuda.amp.GradScaler()
 
 print("full x", len(full_x))
 print("train truth labels", len(train_truth_labels))
 print("val truth labels", len(val_truth_labels))
+print("sparse adj mat: ", sparse_adj_mat)
 
 gc.collect()
 torch.cuda.empty_cache()
-torch.cuda.reset_max_memory_allocated()
-torch.cuda.synchronize()
+#torch.cuda.reset_max_memory_allocated()
+#torch.cuda.synchronize()
 
 for epoch in range(epochs):
     print(epoch)
     model.train()
     optimiser.zero_grad()
 
-#    t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
-#    r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
-#    a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
-#    f = r-a  # free inside reserved
-#    print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
+    printMemInfo()
     torch.cuda.empty_cache()
 
 #    full_outputs = model(full_x, sparse_adj_mat).cuda()
-    with torch.cuda.amp.autocast():
-        full_outputs = model(full_x, sparse_adj_mat).to("cpu")
+#    with torch.cuda.amp.autocast():
+    full_outputs = model(full_x, sparse_adj_mat)#.to("cpu")
         # splitting outputs into training/validation set
         # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
-        train_outputs = torch.cat((full_outputs[:len(train_sig)], full_outputs[(len(train_sig)+len(val_sig)):(len(train_sig)+len(val_sig)+len(train_bkg))]), dim=0)#.to(device)
-        # train_outputs = full_outputs[:20000]
+    train_outputs = torch.cat((full_outputs[:len(train_sig)], full_outputs[(len(train_sig)+len(val_sig)):(len(train_sig)+len(val_sig)+len(train_bkg))]), dim=0)#.to(device)
         # print("train outputs", len(train_outputs))
-        val_outputs = torch.cat((full_outputs[(len(train_sig)):(len(train_sig)+len(val_sig))], full_outputs[-len(val_bkg):]), dim=0)#.cuda()
-        # val_outputs = full_outputs[20000:33532]
+    val_outputs = torch.cat((full_outputs[(len(train_sig)):(len(train_sig)+len(val_sig))], full_outputs[-len(val_bkg):]), dim=0)#.cuda()
         # print("val outputs", len(val_outputs))
-        loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze().cuda())#.cuda()
+    loss = loss_function(train_outputs.squeeze(), train_truth_labels.squeeze().cuda())#.cuda()
 
-#    loss.backward()
-#    train_loss.append(loss.item())
-#    optimiser.step()
-    scaler.scale(loss).backward()
-    loss.detach()
+    loss.backward()
     train_loss.append(loss.item())
-    scaler.step(optimiser)
+    optimiser.step()
+#    scaler.scale(loss).backward()
+#    loss.detach()
+#    train_loss.append(loss.item())
+#    scaler.step(optimiser)
 
     model.eval()
     validation_loss = loss_function(val_outputs.squeeze(), val_truth_labels.squeeze().cuda())#.cuda()
@@ -312,6 +243,8 @@ for epoch in range(epochs):
 # save trained model
 logging.info("Saving trained model and performance...")
 model_file_name = "model.pth"
+model_path = model_path+model_label+"/"
+misc.create_dirs(model_path)
 torch.save({
     'model_state': model.state_dict(),
     'optimiser_state': optimiser.state_dict(),
@@ -349,9 +282,8 @@ ax.legend(loc='upper right', fontsize=9)
 ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.set_xlabel("Epoch", loc="right")
 ax.set_ylabel("Loss", loc="top")
-fig_path = path + plot_path
-misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
+misc.create_dirs(plot_path)
+fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
 
 logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
@@ -369,9 +301,7 @@ ax.set_xlabel("Output score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
 ymin, ymax = ax.get_ylim()
 ax.set_ylim((ymin, ymax*1.2))
-fig_path = path + plot_path
-misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+model_label+"_training_validation_pred.pdf", transparent=True)
+fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_pred.pdf", transparent=True)
 
 logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
@@ -381,6 +311,4 @@ plt.legend(loc="upper left", fontsize=9)
 plt.xlim(0,1)
 plt.xlabel("Background Efficiency", loc="right")
 plt.ylabel("Signal Efficiency", loc="top")
-fig_path = path + plot_path
-misc.create_dirs(fig_path)
-fig.savefig(fig_path+variable+"_"+model_label+"_training_validation_ROC.pdf", transparent=True)
+fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_ROC.pdf", transparent=True)

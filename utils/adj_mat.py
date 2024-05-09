@@ -14,7 +14,7 @@ import re
 import pdb
 import glob
 
-def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True):
+def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True):
     """
     Function to load our sign and bkg data into pandas dataframes
 
@@ -28,8 +28,8 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True)
     Returns:
         (float) cityblock distance
     """
-    df_sig =  pd.read_hdf(path+"/hhh_split_files/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
-    df_bkg =  pd.read_hdf(path+"/hhh_split_files/bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
+    df_sig =  pd.read_hdf(h5_path+"/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
+    df_bkg =  pd.read_hdf(h5_path+"/bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
     df_sig_wgts = df_sig["eventWeight"]
     df_bkg_wgts = df_bkg["eventWeight"]
     df_sig = df_sig[kinematics]
@@ -44,7 +44,7 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True)
             df_all.loc[:, var] = norm.standardise(df_all.loc[:, var])
         df_sig = df_all.iloc[:len(df_sig)]
         df_bkg = df_all.iloc[len(df_sig):]
-        plot.plot_kinematic_hists(df_sig, df_bkg, var, path, standardise=norm_kin)
+        if plot_path != "": plot.plot_kinematic_hists(df_sig, df_bkg, var, plot_path, standardise=norm_kin)
     # convert pd dataframes to torch tensors
     torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)
     torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)
@@ -125,13 +125,13 @@ def generate_adj_mat_from_batch(distance, linking_length):
     return adj_mat
 
 
-def generate_batched_nonzero_ind(path, variable, distance, t, linking_length, flip=False):
+def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_length, flip=False):
     """
     Function that loads in the distances in batches, within each batch, apply the linking length,
     and returns non-zero indices within that batch
 
     Args:
-        path: path to the saved batched distance files
+        dist_path: path to the saved batched distance files
         variable: kinematic variable type in the file names
         distance: distance metric type in the file names
         t: type of distance (sigsig, sigbkg or bkgbkg)
@@ -142,14 +142,15 @@ def generate_batched_nonzero_ind(path, variable, distance, t, linking_length, fl
         indices of 
     """
     # Load in files in batches (sigsig, sigbkg, or bkgbkg) by the i and j indices
-    prefix = path+"/batched_"+variable +"_"+distance+"_distances/"
-    files = glob.glob(prefix+t+'*.pt')
+    dist_dir = dist_path+"/batched_"+variable +"_"+distance+"_distances/"
+    files = sorted(glob.glob(dist_dir + t + '*.pt'))
     print(len(files), " files found for "+t+" distances")
     # apply linking length within each batch, and pull out non-zero indices
     indices = torch.empty(0)
+    # glob saves in lexicographic order so the 0 0 should be first always
+    batch_size = torch.load(files[0])["distance"].size(0)
     for f in files:
         # get the i and j batch numbers
-#        print(re.findall(r'\d+', f))
         # use -1 and -2 here to count from back - to account for possible numbers earlier in the file path (e.g. atlas3)
         i_ind = int(re.findall(r'\d+', f)[-2])
         j_ind = int(re.findall(r'\d+', f)[-1])
@@ -166,8 +167,8 @@ def generate_batched_nonzero_ind(path, variable, distance, t, linking_length, fl
                 else:
                     ind = (distance >= linking_length).nonzero()
                 # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
-                ind[:,0] += i_ind*i_batch
-                ind[:,1] += j_ind*j_batch
+                ind[:,0] += i_ind*batch_size
+                ind[:,1] += j_ind*batch_size
                 indices = torch.cat((indices, ind))
                 if i_ind != j_ind:
                     ind_lowerleft = ind[:,torch.tensor([0, 1])][:, torch.tensor([1, 0])]
@@ -184,8 +185,8 @@ def generate_batched_nonzero_ind(path, variable, distance, t, linking_length, fl
             else:
                 ind = (distance >= linking_length).nonzero()
             # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
-            ind[:,0] += i_ind*i_batch
-            ind[:,1] += j_ind*j_batch
+            ind[:,0] += i_ind*batch_size
+            ind[:,1] += j_ind*batch_size
             indices = torch.cat((indices, ind))
     
     return indices
@@ -198,16 +199,38 @@ def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
     bkgbkg - indices of bkgbkg distances that have passed the linking length requirement
     N - the length of signal+background in the final full adjacency matrix (N x N)
     """
-    full_ind = torch.cat((sigsig, sigbkg, bkgsig, bkgbkg))
-    edge_ind = full_ind[:,0].round().to(torch.int)
-    csr_diff = torch.bincount(edge_ind)
-    csr_row = torch.cat([torch.tensor([0]), csr_diff.cumsum(dim=0)])
-    csr_col = full_ind[:,1]
-    sparse_adj_mat = torch.sparse_csr_tensor(csr_row, csr_col, torch.ones(full_ind.shape[0]), (N, N), dtype=torch.float32)
+    torch.set_printoptions(threshold = 10000)
+    full_ind_unsorted = torch.cat((sigsig, sigbkg, bkgsig, bkgbkg)).round().to(torch.int)
+#    print("OG: ",full_ind_unsorted, "size:",full_ind_unsorted.size(0),", ",full_ind_unsorted.size(1))
+    # order the rows/cols to be in ascending row order.
+
+    tmp = full_ind_unsorted[full_ind_unsorted[:,1].sort()[1]]
+    full_ind = tmp[tmp[:,0].sort()[1]]
+#    print("sorted: ",full_ind)
+    
+    row_ind = full_ind[:,0]
+    col_ind = full_ind[:,1].contiguous()
+#    print("row_ind",row_ind)
+#    print("col_ind",col_ind)
+
+    csr_count = row_ind.bincount(minlength=N)
+#    print("csr_count",csr_count,"size:",csr_count.size(0), "N: ",N)
+#    csr_diff = torch.cat([csr_count, torch.zeros([N - csr_count.size(0)], dtype=torch.int32)])
+#    print("csr_diff",csr_diff,"size:",csr_diff.size(0))
+    csr_row = torch.cat([torch.tensor([0], dtype=torch.int32), csr_count.cumsum(dim=0, dtype=torch.int32)])
+#    print("csr_row",csr_row)
+#    print(csr_row.shape, col_ind.shape, torch.ones(full_ind.shape[0]).shape, N)
+    sparse_adj_mat = torch.sparse_csr_tensor(csr_row, col_ind, torch.ones(full_ind.shape[0]), (N, N), dtype=torch.float32)
+#    print(sparse_adj_mat)
+
     crow_ind = sparse_adj_mat.crow_indices()
-    col_ind = sparse_adj_mat.col_indices()
+
+    for i,x in enumerate(crow_ind):
+      if x > x+1: print("ARGH: ",x," is larger than",x+1)
+    cols_ind = sparse_adj_mat.col_indices()
     values = sparse_adj_mat.values()
-    return sparse_adj_mat.cuda(), edge_ind, crow_ind, col_ind, values
+#    print(row_ind.dtype, csr_count.dtype, csr_row.dtype, crow_ind.dtype, col_ind.dtype, values.dtype)
+    return sparse_adj_mat, row_ind, crow_ind, cols_ind, values
 
 #    full_ind = torch.cat((sigsig, sigbkg, bkgsig, bkgbkg))
 #    edge_ind = full_ind[:,0]

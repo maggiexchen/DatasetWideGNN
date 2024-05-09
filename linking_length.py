@@ -48,15 +48,12 @@ def GetParser():
     )
 
     parser.add_argument(
-        "--path",
-        "-p",
+        "--userconfig",
+        "-u",
         type=str,
-        required=False,
-        help="Specify the path to store all the input/output data and results",
+        required=True,
+        help="Specify the config for the user e.g. paths to store all the input/output data and results, signal model to look at",
     )
-
-
-
 
     args = parser.parse_args()
     return args
@@ -66,22 +63,31 @@ args = GetParser()
 variable = str(args.variable)
 distance = str(args.distance)
 
-# path = "/data/atlas/atlasdata3/maggiechen/gnn_project/" #maggies path
-path = "/home/srutherford/GNN_shared/hhhgraph/data/" # sebs path
-if args.path:
-    path = args.path
-    if path[-1]!="/": path += "/"
+user_config_path = args.userconfig
+user_config = misc.load_config(user_config_path)
+h5_path = user_config["h5_path"]
+plot_path = user_config["plot_path"]
+dist_path = user_config["dist_path"]
+ll_path = user_config["ll_path"]
+
+# TODO: assert. This should be "hhh" "LQ" or "stau"
+signal = user_config["signal"]
 
 logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
-logging.info("input/output path: "+path)
+logging.info("signal: "+signal)
+logging.info("variable set: "+variable)
+logging.info("input data path: "+h5_path)
+logging.info("input distances path: "+dist_path)
+logging.info("output ll json path: "+ll_path)
+logging.info("output plot path: "+plot_path)
 
 logging.info("Loading sigsig distances in batches")
-sigsig_distance, sigsig_wgt = misc.get_batched_distances(path, variable, distance, "sigsig", sample=True)
+sigsig_distance, sigsig_wgt = misc.get_batched_distances(dist_path, variable, distance, "sigsig", sample=True)
 logging.info("Loading sigbkg distances in batches")
-sigbkg_distance, sigbkg_wgt = misc.get_batched_distances(path, variable, distance, "sigbkg", sample=True)
+sigbkg_distance, sigbkg_wgt = misc.get_batched_distances(dist_path, variable, distance, "sigbkg", sample=True)
 logging.info("Loading bkgbkg distances in batches")
-bkgbkg_distance, bkgbkg_wgt = misc.get_batched_distances(path, variable, distance, "bkgbkg", sample=True)
+bkgbkg_distance, bkgbkg_wgt = misc.get_batched_distances(dist_path, variable, distance, "bkgbkg", sample=True)
 
 # calculate ROC values for sigsig and bkgbkg
 # Between sigsig (0) and bkgbkg (1)
@@ -94,7 +100,7 @@ norm_sigsig = norm.minmax(sigsig_distance, 0, d_max)
 norm_sigbkg = norm.minmax(sigbkg_distance, 0, d_max)
 norm_bkgbkg = norm.minmax(bkgbkg_distance, 0, d_max)
 
-plot_path = path+"plots/standardised_weighted/"+variable+"/"
+plot_path = plot_path+"standardised_weighted/"+variable+"/"
 misc.create_dirs(plot_path)
 plotting.plot_distances(norm_sigsig, norm_sigbkg, norm_bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, variable, distance, plot_path, label="minmaxNormed")
 
@@ -115,9 +121,10 @@ roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(),
             "ss_sb_sig_cut": cut_ss_sb.tolist(),
             "tpr_sb_bb": tpr_ss_bb.tolist(),
             "fpr_sb_bb": fpr_ss_bb.tolist()}
-roc_path = path+"plots/standardised_weighted/ROC/"+variable+"_"+distance+"_ROC.json"
+roc_path = plot_path+"standardised_weighted/ROC/"
 misc.create_dirs(roc_path)
-with open(roc_path, "w") as outfile:
+roc_name = roc_path+variable+"_"+distance+"_ROC.json"
+with open(roc_name, "w") as outfile:
     json.dump(roc_dict, outfile)
 
 # pick sig-sig efficiencies at 0.6, 0.7, 0.8, 0.9
@@ -141,7 +148,7 @@ for eff in sigsig_eff:
 
 # saving linking lengths
 length_dict = {"sigsig_eff": sigsig_eff, "length": ss_thresholds}
-ll_path = path+"linking_lengths/"+variable+"_"+distance+"_linking_length.json"
+ll_path = ll_path+""+variable+"_"+distance+"_linking_length.json"
 misc.create_dirs(ll_path)
 with open(ll_path, "w") as lengthfile:
     json.dump(length_dict, lengthfile)
@@ -170,7 +177,7 @@ ax.set_ylim(y_min, y_max*1.2)
 ax.set_xlim(x_min, x_max*0.8)
 ax.set_xlabel(variable + " " + distance +" distance", loc="right")
 ax.set_ylabel("Normalised # event pairs / bin", loc="top")
-ssbb_path = path+"plots/standardised_weighted/linking_lengths/"
+ssbb_path = plot_path+"standardised_weighted/linking_lengths/"
 misc.create_dirs(ssbb_path)
 fig.savefig(ssbb_path+"/"+variable+"_"+distance+"_linking_lengths.pdf", transparent=True)
 
@@ -187,6 +194,6 @@ plt.ylim(0.,1.)
 plt.xlim(0.,1.)
 plt.xlabel("sig(bkg)-bkg Efficiency")
 plt.ylabel("sig-sig Efficiency")
-plot_name = path+"plots/standardised_weighted/ROC/"
-misc.create_dirs(plot_name)
-fig.savefig(plot_name+"/"+variable+"_"+distance+"_ROC.pdf", transparent=True)
+plot_dir = plot_path+"standardised_weighted/ROC/"
+misc.create_dirs(plot_dir)
+fig.savefig(plot_dir+"/"+variable+"_"+distance+"_ROC.pdf", transparent=True)
