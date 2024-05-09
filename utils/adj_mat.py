@@ -147,8 +147,8 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
     print(len(files), " files found for "+t+" distances")
     # apply linking length within each batch, and pull out non-zero indices
     indices = torch.empty(0)
-    # glob saves in lexicographic order so the 0 0 should be first always
-    batch_size = torch.load(files[0])["distance"].size(0)
+    batch_size = 30000 
+    print(batch_size)
     for f in files:
         # get the i and j batch numbers
         # use -1 and -2 here to count from back - to account for possible numbers earlier in the file path (e.g. atlas3)
@@ -159,8 +159,8 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
                 print("File ", i_ind, j_ind)
                 distance = torch.load(f)["distance"]
                 wgt = torch.load(f)["weight"]
-                i_batch = distance.size(0)
-                j_batch = distance.size(1)
+#                i_batch = distance.size(0)
+#                j_batch = distance.size(1)
                 # apply the linking length to the distances in that batch
                 if flip:
                     ind = (distance <= linking_length).nonzero()
@@ -177,8 +177,8 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
             print("File ", i_ind, j_ind)
             distance = torch.load(f)["distance"]
             wgt = torch.load(f)["weight"]
-            i_batch = distance.size(0)
-            j_batch = distance.size(1)
+#            i_batch = distance.size(0)
+#            j_batch = distance.size(1)
             # apply the linking length to the distances in that batch
             if flip:
                 ind = (distance <= linking_length).nonzero()
