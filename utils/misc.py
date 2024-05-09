@@ -5,6 +5,9 @@ import torch
 torch.manual_seed(42)
 
 def print_mem_info():
+    """
+    Function to calculate and print out the total memory available and used on CUDA.
+    """
     GB = 1024**3
     t = torch.cuda.get_device_properties(0).total_memory/GB
     r = torch.cuda.memory_reserved(0)/GB
@@ -124,6 +127,10 @@ def get_batched_distances(dist_path, variable, distance, t, sample=True):
 def load_config(file_path):
     """
     Function that loads in the training config file for a specific model
+    Args:
+        file_path (str): The path to find the config file
+    Returns:
+        (dict): the configuration dictionary
     """
     with open(file_path, "r") as yaml_file:
         config = yaml.safe_load(yaml_file)

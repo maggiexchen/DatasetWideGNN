@@ -19,14 +19,20 @@ def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, 
     Function to load our sign and bkg data into pandas dataframes
 
     Args:
-        path (str): base path for input file directory
+        h5_path (str): path for input file directory
+        plot_path (str): path for output plot directory
         f_type (str): input file extension
         kinematics (list(str)): list of kinematic variables to load as dataframe columns
-        n_sig (int): number of sig events to load
-        n_bkg (int): number of bkg events to load
-
+        n_sig (int): number of sig events to load # no longer used
+        n_bkg (int): number of bkg events to load # no longer used
+        norm_kin (bool): flag to standardise the kinematics in the input file
     Returns:
-        (float) cityblock distance
+        (torch.tensor(float32)): signal events/kinematics tensor
+        (torch.tensor(float32)): background events/kinematics tensor
+        (torch.tensor(float32)): all events/kinematics tensor
+        (torch.tensor(float32)): signal event weight tensor
+        (torch.tensor(float32)): background event weight tensor
+        (torce.tensor(float32)): all event truth labels ie. 1 for sig, 0 for bkg
     """
     df_sig =  pd.read_hdf(h5_path+"/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
     df_bkg =  pd.read_hdf(h5_path+"/bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
@@ -62,16 +68,25 @@ def create_adj_mat(a, length):
     Function to filter a matrix of distances into a binary adjacency matrix
 
     Args:
-        a (pytorch.tensor): matrix to filter
+        a (pytorch.tensor(float32)): matrix to filter
         length (float): linking length
 
     Returns:
-        (float) cityblock distance
+        (float): cityblock distance
     """
     return (a <= length).float()
 
 
 def create_node_wgts(a, b):
+    """
+    Function to create ....
+
+    Args:
+        a (torch.tensor()): first tensor
+        b (torch.tensor()): second tensor
+    Returns:
+        (torch.tensor()): weight tensor
+    """
     a_col = a.view(-1,1)
     b_col = b.view(1,-1)
     outer = torch.matmul(a_col, b_col)
@@ -83,8 +98,8 @@ def generate_adj_mat(x, x_wgts, distance, linking_length):
     Function create a binary adjacency matrix
 
     Args:
-        x (pytorch.tensor): matrix of events and kinematics
-        x_wgts (pytorch.tensor): matrix of event weights
+        x (pytorch.tensor(float32)): matrix of events and kinematics
+        x_wgts (pytorch.tensor(float32)): matrix of event weights
         distance (str): distance metric to use
         linking_length (float): linking length
 
@@ -115,7 +130,7 @@ def generate_adj_mat_from_batch(distance, linking_length):
     Function create a binary adjacency matrix from pre-calculated distances
 
     Args:
-        distance (pytorch.tensor): pair-wise distances between events
+        distance (torch.tensor(float32)): pair-wise distances between events
         linking_length (float): linking length
 
     Returns:
@@ -131,15 +146,15 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
     and returns non-zero indices within that batch
 
     Args:
-        dist_path: path to the saved batched distance files
-        variable: kinematic variable type in the file names
-        distance: distance metric type in the file names
-        t: type of distance (sigsig, sigbkg or bkgbkg)
-        linking length: chosen linking length to apply
-        flip: True (default) if the sigisg distances are smaller than bkgbkg distances
+        dist_path (str): path to the saved batched distance files
+        variable (str): kinematic variable type in the file names
+        distance (str): distance metric type in the file names
+        t (str): type of distance (sigsig, sigbkg or bkgbkg)
+        linking length (float): chosen linking length to apply
+        flip (bool): if the sigisg distances are smaller than bkgbkg distances
     
     Returns:
-        indices of 
+        (torch.tensor())indices of non-empty elements in the adj matrix
     """
     # Load in files in batches (sigsig, sigbkg, or bkgbkg) by the i and j indices
     dist_dir = dist_path+"/batched_"+variable +"_"+distance+"_distances/"
@@ -193,11 +208,20 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
 
 def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
     """
-    sigsig - indices of sigsig distances that have passed the linking length requirement
-    sigbkg - indices of sigbkg distances that have passed the linking length requirement
-    bkgsig - indices of bkgsig distances that have passed the linking length requirement
-    bkgbkg - indices of bkgbkg distances that have passed the linking length requirement
-    N - the length of signal+background in the final full adjacency matrix (N x N)
+    Function to generator the adjacency matrix (and the correspondingly formatted indices) as a torch.sparse_csr_tensor, from the sets of non-zero rows/columns.
+
+    Args:
+        sigsig (torch.tensor()): indices of sigsig distances that have passed the linking length requirement
+        sigbkg (torch.tensor()): indices of sigbkg distances that have passed the linking length requirement
+        bkgsig (torch.tensor()): indices of bkgsig distances that have passed the linking length requirement
+        bkgbkg (torch.tensor()): indices of bkgbkg distances that have passed the linking length requirement
+        N (int): the length of signal+background in the final full adjacency matrix (N x N)
+    Returns:
+        (torch.sparse_csr_tensor(float32)): adjacency matrix
+        (torch.tensor(int32)): ordered list of non-empty row indices
+        (torch.tensor(int32)): compressed row format for non-empty row indices
+        (torch.tensor(int32)): ordered list of non-empty column indices        
+        (torch.tensor(float32)): ordered list of values for non-empty cells in the adj 
     """
     torch.set_printoptions(threshold = 10000)
     full_ind_unsorted = torch.cat((sigsig, sigbkg, bkgsig, bkgbkg)).round().to(torch.int)
