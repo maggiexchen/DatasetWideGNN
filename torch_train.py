@@ -177,7 +177,7 @@ optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 for epoch in range(epochs):
     model.train()
     optimiser.zero_grad()
-    full_outputs = model(full_x, adj_mat)
+    full_outputs = model(full_x, adj_mat, full_wgts)
     
     # splitting outputs into training/validation set
     # full x is concatenated as [train_sig : val_sig: train_bkg : val_bkg], so outputs need to be selected accordingly
