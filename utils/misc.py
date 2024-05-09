@@ -4,6 +4,14 @@ import glob
 import torch
 torch.manual_seed(42)
 
+def print_mem_info():
+    GB = 1024**3
+    t = torch.cuda.get_device_properties(0).total_memory/GB
+    r = torch.cuda.memory_reserved(0)/GB
+    a = torch.cuda.memory_allocated(0)/GB
+    f = r-a  # free inside reserved
+    print("total [Gb]: ", t, "reserved [Gb]: ", r, "allocated [Gb]:", a, "free [Gb]: ", f)
+
 def create_dirs(path):
     """
     Function to create any directories needed to store the output of a function.

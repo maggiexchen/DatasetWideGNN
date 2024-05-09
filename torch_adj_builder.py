@@ -69,17 +69,8 @@ parser = GetParser()
 args = parser.parse_args()
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
-CUDA_LAUNCH_BLOCKING=1
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 print(torch.cuda.mem_get_info())
-
-def printMemInfo():
-    GB = 1024**3
-    t = torch.cuda.get_device_properties(0).total_memory/GB
-    r = torch.cuda.memory_reserved(0)/GB
-    a = torch.cuda.memory_allocated(0)/GB
-    f = r-a  # free inside reserved
-    print("total [Gb]: ", t, "reserved [Gb]: ", r, "allocated [Gb]:", a, "free [Gb]: ", f)
 
 train_config_path = args.MLconfig
 train_config = misc.load_config(train_config_path)
@@ -183,7 +174,7 @@ logging.info("Generating sparse adjacency matrix ...")
 sparse_adj_mat, edge_ind, crow_ind, col_ind, values = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+len(full_bkg))
 
 print("sparse adj mat: ", sparse_adj_mat)
-printMemInfo()
+misc.print_mem_info()
 
 # saving adjacency matrix
 # Save the sparse tensor to a .pt file
