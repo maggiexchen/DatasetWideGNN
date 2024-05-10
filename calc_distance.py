@@ -79,8 +79,8 @@ kinematics = misc.get_kinematics(variable)
 # load in input files
 logging.info('Importing signal and background files...')
 SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels = adj.data_loader(h5_path, "", "train", kinematics)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader(h5_path, "", "val", kinematics)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels = adj.data_loader(h5_path, "", "train", kinematics, signal=signal)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader(h5_path, "", "val", kinematics, signal=signal)
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 sig_wgt = torch.cat((train_sig_wgts, val_sig_wgts), dim=0)

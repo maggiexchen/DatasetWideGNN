@@ -14,7 +14,7 @@ import re
 import pdb
 import glob
 
-def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True):
+def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True, signal="hhh"):
     """
     Function to load our sign and bkg data into pandas dataframes
 
@@ -26,6 +26,7 @@ def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, 
         n_sig (int): number of sig events to load # no longer used
         n_bkg (int): number of bkg events to load # no longer used
         norm_kin (bool): flag to standardise the kinematics in the input file
+        signal (str): type of signal, to determine the bkgs present
     Returns:
         (torch.tensor(float32)): signal events/kinematics tensor
         (torch.tensor(float32)): background events/kinematics tensor
@@ -34,8 +35,15 @@ def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, 
         (torch.tensor(float32)): background event weight tensor
         (torce.tensor(float32)): all event truth labels ie. 1 for sig, 0 for bkg
     """
+    bkg_typedict = {"hhh": ["bkg"], "LQ": ["singletop", "ttbar"], "staus": []}
+    bkg_types = bkg_typedict[signal]
+
     df_sig =  pd.read_hdf(h5_path+"/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
-    df_bkg =  pd.read_hdf(h5_path+"/bkg_"+str(f_type)+".h5", key="bkg_"+str(f_type))
+    df_bkg = pd.DataFrame()
+    for bkg in bkg_types:
+        tmp_df_bkg = pd.read_hdf(h5_path+"/"+bkg+"_"+str(f_type)+".h5", key=bkg+"_"+str(f_type))
+        df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
+
     df_sig_wgts = df_sig["eventWeight"]
     df_bkg_wgts = df_bkg["eventWeight"]
     df_sig = df_sig[kinematics]
@@ -82,10 +90,10 @@ def create_node_wgts(a, b):
     Function to create ....
 
     Args:
-        a (torch.tensor()): first tensor
-        b (torch.tensor()): second tensor
+        a (torch.tensor(*)): first tensor
+        b (torch.tensor(*)): second tensor
     Returns:
-        (torch.tensor()): weight tensor
+        (torch.tensor(*)): weight tensor
     """
     a_col = a.view(-1,1)
     b_col = b.view(1,-1)
