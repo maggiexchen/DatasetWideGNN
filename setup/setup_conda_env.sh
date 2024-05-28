@@ -1,3 +1,5 @@
+# If you need to setup Holly's conda : eval "$(/data/atlas/users/pacey/miniconda/bin/conda shell.bash hook)"
+
 conda create --name torch-gpu
 
 conda activate torch-gpu
