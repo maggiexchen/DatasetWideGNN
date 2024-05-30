@@ -148,8 +148,8 @@ for eff in sigsig_eff:
 
 # saving linking lengths
 length_dict = {"sigsig_eff": sigsig_eff, "length": ss_thresholds}
-ll_path = ll_path+""+variable+"_"+distance+"_linking_length.json"
 misc.create_dirs(ll_path)
+ll_path = ll_path+""+variable+"_"+distance+"_linking_length.json"
 with open(ll_path, "w") as lengthfile:
     json.dump(length_dict, lengthfile)
 
