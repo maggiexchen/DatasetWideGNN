@@ -28,8 +28,8 @@ import pdb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-from torchinfo import summary
+# from torch.utils.data import DataLoader, TensorDataset
+# from torchinfo import summary
 
 import time
 st = time.time()
@@ -119,18 +119,18 @@ logging.info("desired efficieny: "+str(eff))
 logging.info('Importing signal and background files...')
 
 # un-normalised signal and background kinematics (for checking and plotting)
-raw_train_sig, raw_train_bkg, _, _, _, _ = adj.data_loader(h5_path, plot_path, "train", kinematics, norm_kin=False, signal=signal)
-raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=False, signal=signal)
+# raw_train_sig, raw_train_bkg, _, _, _, _ = adj.data_loader(h5_path, plot_path, "train", kinematics, norm_kin=False, signal=signal)
+# raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=False, signal=signal)
 
 # normalised signal and background kinematics
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_labels  = adj.data_loader(h5_path, plot_path, "train", kinematics, norm_kin=True, signal=signal)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_labels = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=True, signal=signal)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, _, _  = adj.data_loader(h5_path, plot_path, "train", kinematics, norm_kin=True, signal=signal)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, _, _ = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=True, signal=signal)
 
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 
-raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
-raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
+# raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
+# raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)#.cuda()
@@ -138,15 +138,15 @@ full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.c
 print("numevents: ",full_x.size(0))
 
 # read in linking length calculated from sampled training data
-sigsig_eff = eff
-ll_path = ll_path+str(variable)+"_"+str(distance)+"_linking_length.json"
-print(ll_path)
-with open(ll_path, 'r') as lfile:
-    length_dict = json.load(lfile)
-    lengths = length_dict["length"]
-    linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
-    logging.info("linking length ="+str(linking_length))
-linking_length = 0.5
+# sigsig_eff = eff
+# ll_path = ll_path+str(variable)+"_"+str(distance)+"_linking_length.json"
+# print(ll_path)
+# with open(ll_path, 'r') as lfile:
+#     length_dict = json.load(lfile)
+#     lengths = length_dict["length"]
+#     linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
+#     logging.info("linking length ="+str(linking_length))
+linking_length = 0.1
 
 # TODO: batch load in event distances to apply linking length to
 # If the distances were to be calculated and stored in advance, then loaded here, the ordering of the events need to be the same!
@@ -159,6 +159,7 @@ sigbkg_ind = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "si
 print("sigbg: ", sigbkg_ind.shape, sigbkg_ind)
 logging.info("For bkgsig ...")
 bkgsig_ind = torch.clone(sigbkg_ind)
+# pdb.set_trace()
 bkgsig_ind = bkgsig_ind[:, [1, 0]]
 print("bgsig: ", bkgsig_ind.shape, bkgsig_ind)
 logging.info("For bkgbkg ...")
