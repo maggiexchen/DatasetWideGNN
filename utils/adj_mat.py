@@ -217,7 +217,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
     
     return indices
 
-def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, path):
+def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
     """
     Function to generator the adjacency matrix (and the correspondingly formatted indices) as a torch.sparse_csr_tensor, from the sets of non-zero rows/columns.
 
