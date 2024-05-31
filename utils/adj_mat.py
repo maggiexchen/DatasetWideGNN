@@ -13,6 +13,9 @@ import utils.plotting as plot
 import re
 import pdb
 import glob
+import logging
+logging.getLogger().setLevel(logging.INFO)
+
 
 def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True):
     """
@@ -54,7 +57,7 @@ def data_loader(path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True)
     torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
     truth_labels = torch.tensor(numpy.concatenate((sig_label, bkg_label)), dtype=torch.float32)
 
-    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, truth_labels
+    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label), torch.tensor(bkg_label) #truth_labels
 
 
 def create_adj_mat(a, length):
@@ -149,26 +152,48 @@ def generate_batched_nonzero_ind(path, variable, distance, t, linking_length, fl
     indices = torch.empty(0)
     for f in files:
         # get the i and j batch numbers
-        i_ind = int(re.findall(r'\d+', f)[0])
-        j_ind = int(re.findall(r'\d+', f)[1])
-        print("File ", i_ind, j_ind)
-        distance = torch.load(f)["distance"]
-        wgt = torch.load(f)["weight"]
-        i_batch = distance.size(0)
-        j_batch = distance.size(1)
-        # apply the linking length to the distances in that batch
-        if flip:
-            ind = (distance <= linking_length).nonzero()
+#        print(re.findall(r'\d+', f))
+        # use -1 and -2 here to count from back - to account for possible numbers earlier in the file path (e.g. atlas3)
+        i_ind = int(re.findall(r'\d+', f)[-2])
+        j_ind = int(re.findall(r'\d+', f)[-1])
+        if t=="sigsig" or t=="bkgbkg":
+            if i_ind >= j_ind: 
+                print("File ", i_ind, j_ind)
+                distance = torch.load(f)["distance"]
+                wgt = torch.load(f)["weight"]
+                i_batch = 30000 #distance.size(0)
+                j_batch = 30000 #distance.size(1)
+                # apply the linking length to the distances in that batch
+                if flip:
+                    ind = (distance <= linking_length).nonzero()
+                else:
+                    ind = (distance >= linking_length).nonzero()
+                # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
+                ind[:,0] += i_ind*i_batch
+                ind[:,1] += j_ind*j_batch
+                indices = torch.cat((indices, ind))
+                if i_ind != j_ind:
+                    ind_lowerleft = ind[:,torch.tensor([0, 1])][:, torch.tensor([1, 0])]
+                    indices = torch.cat((indices, ind_lowerleft))
         else:
-            ind = (distance >= linking_length).nonzero()
-        # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
-        ind[:,0] += i_ind*i_batch
-        ind[:,1] += j_ind*j_batch
-        indices = torch.cat((indices, ind))
+            print("File ", i_ind, j_ind)
+            distance = torch.load(f)["distance"]
+            wgt = torch.load(f)["weight"]
+            i_batch = distance.size(0)
+            j_batch = distance.size(1)
+            # apply the linking length to the distances in that batch
+            if flip:
+                ind = (distance <= linking_length).nonzero()
+            else:
+                ind = (distance >= linking_length).nonzero()
+            # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
+            ind[:,0] += i_ind*i_batch
+            ind[:,1] += j_ind*j_batch
+            indices = torch.cat((indices, ind))
     
     return indices
 
-def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
+def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, path):
     """
     sigsig - indices of sigsig distances that have passed the linking length requirement
     sigbkg - indices of sigbkg distances that have passed the linking length requirement
@@ -177,10 +202,54 @@ def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
     N - the length of signal+background in the final full adjacency matrix (N x N)
     """
     full_ind = torch.cat((sigsig, sigbkg, bkgsig, bkgbkg))
-    edge_ind = full_ind[:,0]
-    # sparse_adj_mat = torch.sparse_csr_tensor(full_ind[:,0], full_ind[:,1], torch.ones(full_ind.size(1)), (N, N), dtype=torch.float32)
-    sparse_adj_mat = torch.sparse_coo_tensor(full_ind.t(), torch.ones(full_ind.shape[0]), [N, N], dtype=torch.float32)
-    edge_frac = sparse_adj_mat._nnz() / sparse_adj_mat.numel()
-    print("Fraction of edges: ", edge_frac)
+    row_ind = full_ind[:,0].round().to(torch.int)
+    col_ind = full_ind[:,1].round().to(torch.int)
+    # pdb.set_trace()
+    logging.info("Saving sparse adjacency matrix ...")
+    torch.save(row_ind, f"{path}/row_ind.pt")
+    torch.save(col_ind, f"{path}/col_ind.pt")
+    # csr_diff = torch.bincount(edge_ind)
+    # csr_row = torch.cat([torch.tensor([0]), csr_diff.cumsum(dim=0)])
+    # csr_col = full_ind[:,1]
+    torch.set_printoptions(threshold=1000)
+    print("row:")
+    print(full_ind[:,0].round().to(torch.int))
+    
+    return row_ind, col_ind
+#    print("crow:")
+#    print(csr_row)
+#    print("col:")
+#    print(csr_col)
+#    print("values:")
+#    print(torch.ones(full_ind.shape[0]))
+    # sparse_adj_mat = torch.sparse_csr_tensor(csr_row, csr_col, torch.ones(full_ind.shape[0]), (N, N), dtype=torch.float32)
+#    print("sparse_adj_mat:")
+#    print(sparse_adj_mat)
+    # sparse_adj_mat_coo = torch.sparse_coo_tensor(full_ind.t(), torch.ones(full_ind.shape[0]), [N, N], dtype=torch.float32)
+#    pdb.set_trace()
+    # edge_frac = sparse_adj_mat._nnz() / sparse_adj_mat.numel()
+    # print("Fraction of edges: ", edge_frac)
     # return sparse_adj_mat.coalesce().indices()
-    return sparse_adj_mat.to_sparse_csr(), edge_ind
+    # crow_ind = sparse_adj_mat.crow_indices()
+    # col_ind = sparse_adj_mat.col_indices()
+    # values = sparse_adj_mat.values()
+#    return sparse_adj_mat.cuda(), edge_ind.cuda(), crow_ind.cuda(), col_ind.cuda(), values.cuda()
+    # return sparse_adj_mat.cuda(), edge_ind, crow_ind, col_ind, values
+
+#    full_ind = torch.cat((sigsig, sigbkg, bkgsig, bkgbkg))
+#    edge_ind = full_ind[:,0]
+#    print("rows")
+#    print(full_ind[:,0])
+#    print("cols")
+#    print(full_ind[:,1])
+#    print("vals")
+#    print(torch.ones(full_ind.size(1)))
+#    print(torch.ones(full_ind.shape[0]))
+#    sparse_adj_mat = torch.sparse_csr_tensor(full_ind[:,0], full_ind[:,1], torch.ones(full_ind.shape[0]), (N, N), dtype=torch.float32)
+#    print(sparse_adj_mat)
+#    #sparse_adj_mat = torch.sparse_coo_tensor(full_ind.t(), torch.ones(full_ind.shape[0]), [N, N], dtype=torch.float32)
+#    edge_frac = sparse_adj_mat._nnz() / sparse_adj_mat.numel()
+#    print("Fraction of edges: ", edge_frac)
+#    # return sparse_adj_mat.coalesce().indices()
+##    return sparse_adj_mat.to_sparse_csr(), edge_ind
+#    return sparse_adj_mat.cuda(), edge_ind.cuda()
