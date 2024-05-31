@@ -17,3 +17,4 @@ MADnormed_distances/
 standardised_distances/
 models/
 batched_distances/
+data/batched_mass_euclidean_distances/
