@@ -1,0 +1,17 @@
+#######################
+# user config for Seb
+#######################
+
+# signal model hhh, LQ, stau
+signal: hhh
+
+# input paths
+ntuple_path: /data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/ # clearly wrong
+h5_path: /home/srutherford/GNN_shared/hhhgraph/data/hhh_split_files/ 
+ll_path: /home/srutherford/GNN_shared/hhhgraph/data/linking_lengths/ 
+dist_path: /home/srutherford/GNN_shared/hhhgraph/data/distances/
+
+# output paths
+plot_path: /home/srutherford/GNN_shared/hhhgraph/data/plots/ 
+adj_path:  /home/srutherford/GNN_shared/hhhgraph/data/graph/
+model_path: /home/srutherford/GNN_shared/hhhgraph/data/models/ 

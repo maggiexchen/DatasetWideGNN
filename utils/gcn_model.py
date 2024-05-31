@@ -9,9 +9,11 @@ import pdb
 class GCNClassifier(nn.Module):
     def __init__(self, input_size, hidden_sizes_gcn, hidden_sizes_mlp, output_size, dropout_rates):
         """
-        input_sizes: dimension of input node features
-        hidden_sizes: number of nodes in hidden graph layers as a list
-        output_sizes: dimension of output features (for binary classification is 1)
+        input_size (int): dimension of input node features
+        hidden_sizes_gcn (list(int)): list of number of hidden nodes in each GCN layer.
+        hidden_sizes_mlp (list(int)): list of number of hidden nodes in each MLP layer.
+        output_size (int): dimension of output features (for binary classification this is 1).
+        dropout_rates (list(float)): list of the dropout rate in each GCN, then MLP, layer.
         """
         super(GCNClassifier, self).__init__()
 
@@ -19,6 +21,7 @@ class GCNClassifier(nn.Module):
         self.layers_gcn = nn.ModuleList()
         self.batch_norms_gcn = nn.ModuleList()
         self.dropout_gcn = nn.ModuleList()
+        i = 0
         for i in range(len(hidden_sizes_gcn)):
             # self.layers.append(GCNLayer(input_size, hidden_sizes[i]))
             # self.layers_gcn.append(GCNConv(input_size, hidden_sizes_gcn[i]))
@@ -42,10 +45,21 @@ class GCNClassifier(nn.Module):
         # self.output_layer = GCNConv(input_size, output_size)
         self.output_layer = nn.Linear(input_size, output_size)
             
-    def forward(self, x, edge_index, edge_weights):
+    def forward(self, x, edge_index):
+        """
+        Function for forward propogation of the network layer
+        Args:
+            x (torch.tensor(float32)): Matrix of input features for each event
+            edge_index ():  ...
+        Returns:
+            (torch.tensor) 
+        """
         for layer, batch_norm, dropout in zip(self.layers_gcn, self.batch_norms_gcn, self.dropout_gcn):
-            x = F.relu(dropout(batch_norm(layer(x, edge_index, edge_weight=edge_weights)))) # for GATConv, use edge_attr instead of edge_weight
-            # x = F.relu(dropout(batch_norm(layer(x, edge_index))))
+            # when using sparse tensor object, edge_weight is not used
+            # Weights are the edge values in the sparse tensor object
+            # for GATConv, use edge_attr instead of edge_weight
+            # x = F.relu(dropout(batch_norm(layer(x, edge_index, edge_weight=edge_weights)))) 
+            x = F.relu(dropout(batch_norm(layer(x, edge_index))))
         for layer, batch_norm, dropout in zip(self.layers_mlp, self.batch_norms_mlp, self.dropout_mlp):
             x = F.relu(dropout(batch_norm(layer(x))))
         
