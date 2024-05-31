@@ -7,7 +7,7 @@ signal: hhh
 
 # input paths
 ntuple_path: /data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/ # clearly wrong
-h5_path: /home/srutherford/GNN_shared/hhhgraph/data/hhh_split_files/ 
+h5_path: /home/srutherford/GNN_shared/hhhgraph/data/hhh_split_files_debug/ 
 ll_path: /home/srutherford/GNN_shared/hhhgraph/data/linking_lengths/ 
 dist_path: /home/srutherford/GNN_shared/hhhgraph/data/distances/
 
