@@ -138,15 +138,15 @@ full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.c
 print("numevents: ",full_x.size(0))
 
 # read in linking length calculated from sampled training data
-# sigsig_eff = eff
-# ll_path = ll_path+str(variable)+"_"+str(distance)+"_linking_length.json"
-# print(ll_path)
-# with open(ll_path, 'r') as lfile:
-#     length_dict = json.load(lfile)
-#     lengths = length_dict["length"]
-#     linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
-#     logging.info("linking length ="+str(linking_length))
-linking_length = 0.1
+sigsig_eff = eff
+ll_path = ll_path+str(variable)+"_"+str(distance)+"_linking_length.json"
+print(ll_path)
+with open(ll_path, 'r') as lfile:
+    length_dict = json.load(lfile)
+    lengths = length_dict["length"]
+    linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
+    logging.info("linking length ="+str(linking_length))
+# linking_length = 0.1
 
 # TODO: batch load in event distances to apply linking length to
 # If the distances were to be calculated and stored in advance, then loaded here, the ordering of the events need to be the same!
@@ -175,6 +175,10 @@ logging.info("Generating sparse adjacency matrix ...")
 sparse_adj_mat, edge_ind, crow_ind, col_ind, values = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+len(full_bkg))
 
 print("sparse adj mat: ", sparse_adj_mat)
+total_edges = sigsig_ind.shape[0]+sigbkg_ind.shape[0]+bkgbkg_ind.shape[0]
+total_pairs = (len(full_sig)+len(full_bkg))**2
+print("The fraction of edges in graph is ", total_edges / total_pairs)
+
 misc.print_mem_info()
 
 # saving adjacency matrix
