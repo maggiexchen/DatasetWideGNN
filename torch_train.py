@@ -31,7 +31,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
-from torchinfo import summary
+# from torchinfo import summary
 
 from torch_geometric.data import Data
 from torch_geometric.loader import NeighborLoader
@@ -153,7 +153,7 @@ logging.info("model storage path: "+model_path)
 
 model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates)
 model.to(device)
-summary(model)
+# summary(model)
 logging.info("distance metric: "+distance)
 logging.info("desired efficieny: "+str(eff))
 
@@ -183,6 +183,7 @@ full_y = full_y.float()
 #full_x = torch.cat((full_sig, full_bkg), dim=0)
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)#.cuda()
 
+sparse_adj_mat = None
 if len(hidden_sizes_gcn) > 0:
 
     # logging.info("Loading sparse adjacency matrix ...")
@@ -198,12 +199,17 @@ if len(hidden_sizes_gcn) > 0:
     # f = r-a  # free inside reserved
     # print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
 
-    print(adj_path+'sparse_adjacency_matrix.pt') 
-    sparse_adj_mat = torch.load(adj_path+'sparse_adjacency_matrix.pt').to(device)
-#row_ind = torch.load(adj_path+'coo_row.pt')
-#crow_ind = torch.load(adj_path+'csr_row.pt')
-#col_ind = torch.load(adj_path+'csr_col.pt')
-#values = torch.load(adj_path+'csr_values.pt')
+    # print(adj_path+'sparse_adjacency_matrix.pt') 
+    # sparse_adj_mat = torch.load(adj_path+'sparse_adjacency_matrix.pt').to(device)
+    #row_ind = torch.load(adj_path+'coo_row.pt')
+    print("constructing sparse adjacency matrix ...")
+    row_ind = torch.load(adj_path+'coo_row.pt')
+    crow_ind = torch.load(adj_path+'csr_row.pt')
+    col_ind = torch.load(adj_path+'csr_col.pt')
+    values = torch.load(adj_path+'csr_values.pt')
+    edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64).to(device)
+    edge_wgts = full_wgts[row_ind]
+    # sparse_adj_mat = torch.sparse_csr_tensor(crow_ind, col_ind, values).to(device)
 
 misc.print_mem_info()
 
@@ -225,18 +231,20 @@ torch.cuda.empty_cache()
 #torch.cuda.reset_max_memory_allocated()
 #torch.cuda.synchronize()
 
-data = Data(x = full_x, y = full_y, edge_index = sparse_adj_mat) #edge_ind, edge_weight = edge_wgts)
+# data = Data(x = full_x, y = full_y, adj_t = sparse_adj_mat) # edge_index = sparse_adj_mat) #edge_ind, edge_weight = edge_wgts)
+data = Data(x = full_x, y = full_y, edge_index = edge_ind)#, edge_weight = edge_wgts)
+
 
 train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)+len(val_sig), len(train_sig)+len(val_sig)+len(train_bkg))), dim=0).tolist()
 val_idx = torch.cat((torch.arange(len(train_sig), len(train_sig)+len(val_sig)), torch.arange(len(full_x)-len(val_bkg), len(full_x))), dim=0).tolist()
 # pdb.set_trace()
 print("train idx", len(train_idx))
 print("val idx", len(val_idx))
-
+# pdb.set_trace()
 train_loader = NeighborLoader(
     data,
     input_nodes = train_idx,
-    num_neighbors = [0], #[20]*4,
+    num_neighbors = [20]*4,
     shuffle = True,
     batch_size = 2048, 
     # num_workers = 6, 
@@ -246,7 +254,7 @@ train_loader = NeighborLoader(
 val_loader = NeighborLoader(
     data,
     input_nodes = val_idx,
-    num_neighbors = [0], #20]*4,
+    num_neighbors = [20]*4,
     shuffle = True,
     batch_size = 2048,
     # num_workers = 6,
@@ -306,7 +314,7 @@ for epoch in range(epochs):
         
         batch = batch.to(device)
         batch_size = batch.batch_size
-        outputs = model(batch.x, batch.edge_index, batch.edge_weight)
+        outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
 
         ### NOTE only consider predictions and labels of seed nodes
         y = batch.y[:batch_size]
@@ -329,7 +337,7 @@ val_truth_labels = full_y[val_idx]
 print("train truth labels", len(train_truth_labels))
 print("val truth labels", len(val_truth_labels))
 
-model_path = path + "models/" + model_label + "/"
+# model_path = path + "models/" + model_label + "/"
 # save trained model
 logging.info("Saving trained model and performance...")
 model_file_name = "model.pth"
