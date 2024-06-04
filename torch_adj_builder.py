@@ -153,18 +153,18 @@ with open(ll_path, 'r') as lfile:
 logging.info("Batch applying the linking length and getting non-zero indices ...")
 logging.info("For sigsig ...")
 sigsig_ind = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "sigsig", linking_length, flip=True)
-print("sigsig: ",sigsig_ind.shape, sigsig_ind)
+print("sigsig: ",sigsig_ind.shape)
 logging.info("For sigbkg ...")
 sigbkg_ind = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "sigbkg", linking_length, flip=True)
-print("sigbg: ", sigbkg_ind.shape, sigbkg_ind)
+print("sigbg: ", sigbkg_ind.shape)
 logging.info("For bkgsig ...")
 bkgsig_ind = torch.clone(sigbkg_ind)
 # pdb.set_trace()
 bkgsig_ind = bkgsig_ind[:, [1, 0]]
-print("bgsig: ", bkgsig_ind.shape, bkgsig_ind)
+print("bgsig: ", bkgsig_ind.shape)
 logging.info("For bkgbkg ...")
 bkgbkg_ind = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "bkgbkg", linking_length, flip=True)
-print("bgbg: ", bkgbkg_ind.shape, bkgbkg_ind)
+print("bgbg: ", bkgbkg_ind.shape)
 
 # adding to the indices to form the full matrix indices
 logging.info("Stitching together the non-zero indices ...")
@@ -174,7 +174,7 @@ bkgbkg_ind += len(full_sig)
 logging.info("Generating sparse adjacency matrix ...")
 sparse_adj_mat, edge_ind, crow_ind, col_ind, values = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+len(full_bkg))
 
-print("sparse adj mat: ", sparse_adj_mat)
+print("sparse adj mat: ", sparse_adj_mat.shape)
 total_edges = sigsig_ind.shape[0]+sigbkg_ind.shape[0]+bkgbkg_ind.shape[0]
 total_pairs = (len(full_sig)+len(full_bkg))**2
 print("The fraction of edges in graph is ", total_edges / total_pairs)
@@ -190,4 +190,3 @@ torch.save(edge_ind, adj_path+'coo_row.pt')
 torch.save(crow_ind, adj_path+'csr_row.pt')
 torch.save(col_ind, adj_path+'csr_col.pt')
 torch.save(values, adj_path+'csr_values.pt')
-
