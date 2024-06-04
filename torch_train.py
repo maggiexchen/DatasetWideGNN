@@ -244,9 +244,9 @@ print("val idx", len(val_idx))
 train_loader = NeighborLoader(
     data,
     input_nodes = train_idx,
-    num_neighbors = [20]*4,
-    shuffle = True,
-    batch_size = 2048, 
+    num_neighbors = [1000]*4,
+    shuffle = False,
+    batch_size = 1024, 
     # num_workers = 6, 
     # persistent_workers = True
 )
@@ -254,13 +254,12 @@ train_loader = NeighborLoader(
 val_loader = NeighborLoader(
     data,
     input_nodes = val_idx,
-    num_neighbors = [20]*4,
-    shuffle = True,
-    batch_size = 2048,
+    num_neighbors = [1000]*4,
+    shuffle = False,
+    batch_size = 1024,
     # num_workers = 6,
     # persistent_workers = True
 )
-
 
 
 for epoch in range(epochs):
@@ -294,7 +293,7 @@ for epoch in range(epochs):
         optimiser.step() 
         # scaler.scale(loss).backward()
         # scaler.step(optimiser)
-        misc.print_mem_info()
+        #misc.print_mem_info()
         torch.cuda.empty_cache()
 
         total_examples += batch_size
