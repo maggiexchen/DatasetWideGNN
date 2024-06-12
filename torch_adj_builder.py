@@ -146,7 +146,7 @@ with open(ll_path, 'r') as lfile:
     lengths = length_dict["length"]
     linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
     logging.info("linking length ="+str(linking_length))
-# linking_length = 0.1
+linking_length = 0.1
 
 # TODO: batch load in event distances to apply linking length to
 # If the distances were to be calculated and stored in advance, then loaded here, the ordering of the events need to be the same!
@@ -154,14 +154,16 @@ logging.info("Batch applying the linking length and getting non-zero indices ...
 logging.info("For sigsig ...")
 sigsig_ind = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "sigsig", linking_length, flip=True)
 print("sigsig: ",sigsig_ind.shape)
+
 logging.info("For sigbkg ...")
 sigbkg_ind = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "sigbkg", linking_length, flip=True)
 print("sigbg: ", sigbkg_ind.shape)
+
 logging.info("For bkgsig ...")
 bkgsig_ind = torch.clone(sigbkg_ind)
-# pdb.set_trace()
 bkgsig_ind = bkgsig_ind[:, [1, 0]]
 print("bgsig: ", bkgsig_ind.shape)
+
 logging.info("For bkgbkg ...")
 bkgbkg_ind = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "bkgbkg", linking_length, flip=True)
 print("bgbg: ", bkgbkg_ind.shape)
