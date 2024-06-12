@@ -13,10 +13,10 @@ def cosine(a, b):
     Returns:
         (float) cosine distance
     """
-    numerator = torch.matmul(a, torch.transpose(b, 0, 1))
-    denominator = torch.sqrt(torch.tensordot(torch.sum(torch.square(a),dim=1), torch.sum(torch.square(b),dim=1)))
+    numerator = torch.matmul(a, torch.transpose(b, 0, 1)).to(torch.float16)
+    denominator = torch.sqrt(torch.tensordot(torch.sum(torch.square(a),dim=1), torch.sum(torch.square(b),dim=1))).to(torch.float16)
 
-    return 1 - numerator / denominator
+    return (1 - numerator / denominator).to(torch.float16)
 
 def euclidean(a, b):
     """
@@ -29,10 +29,10 @@ def euclidean(a, b):
     Returns:
         (float) euclidean distance
     """
-    a_expanded = torch.unsqueeze(a, dim=1)
-    b_expanded = torch.unsqueeze(b, dim=0)
+    a_expanded = torch.unsqueeze(a, dim=1).to(torch.float16)
+    b_expanded = torch.unsqueeze(b, dim=0).to(torch.float16)
 
-    return torch.sqrt(torch.sum(torch.square(a_expanded-b_expanded),dim=-1))
+    return torch.sqrt(torch.sum(torch.square(a_expanded-b_expanded),dim=-1)).to(torch.float16)
 
 def cityblock(a, b):
     """
@@ -45,7 +45,7 @@ def cityblock(a, b):
     Returns:
         (float) cityblock distance
     """
-    a_expanded = torch.unsqueeze(a, dim=1)
-    b_expanded = torch.unsqueeze(b, dim=0)
+    a_expanded = torch.unsqueeze(a, dim=1).to(torch.float16)
+    b_expanded = torch.unsqueeze(b, dim=0).to(torch.float16)
 
-    return torch.sum(torch.abs(a_expanded-b_expanded),dim=-1)
+    return torch.sum(torch.abs(a_expanded-b_expanded),dim=-1).to(torch.float16)

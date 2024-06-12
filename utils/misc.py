@@ -2,6 +2,7 @@ import os
 import yaml
 import glob
 import torch
+import math
 torch.manual_seed(42)
 
 def print_mem_info():
@@ -111,19 +112,34 @@ def get_batched_distances(dist_path, variable, distance, t, sample=True):
     """
     dist_dir = dist_path+"/batched_"+variable +"_"+distance+"_distances/"
     files = glob.glob(dist_dir + t + '*.pt')
-    distance = []
-    wgt = []
-    for f in files:
-        print(t+" distance", torch.load(f)["distance"].shape)
-        distance.append(torch.flatten(torch.load(f)["distance"]))
-        wgt.append(torch.flatten(torch.load(f)["weight"]))
-    distance = torch.cat(distance, dim=0)
-    wgt = torch.cat(wgt, dim=0)
+    distance = torch.empty(0, dtype=torch.float16)
+    wgt = torch.empty(0, dtype=torch.float16)
     if sample:
-        num_sample = 5000
-        ind = torch.randperm(len(distance))[:num_sample]
-        distance = distance[ind]
-        wgt = wgt[ind]
+        num_sample = 10000
+        batch_sample = math.ceil(num_sample / len(files))
+        sample_count = 0
+        while sample_count < num_sample:
+            for f in files:
+                distance_tmp = torch.flatten(torch.load(f)["distance"])
+                wgt_tmp = torch.flatten(torch.load(f)["weight"])
+                batch_ind = torch.randperm(len(distance_tmp))[:batch_sample]
+                print(t+" distance", torch.load(f)["distance"].shape)
+                distance = torch.cat((distance, distance_tmp[batch_ind]))
+                wgt = torch.cat((wgt, wgt_tmp[batch_ind]))
+                del distance_tmp
+                del wgt_tmp
+                sample_count += batch_sample
+    else:
+        for f in files:
+            distance_tmp = torch.flatten(torch.load(f)["distance"])
+            wgt_tmp = torch.flatten(torch.load(f)["weight"])
+            print(t+" distance", torch.load(f)["distance"].shape)
+            distance = torch.cat((distance, distance_tmp))
+            wgt = torch.cat((wgt, wgt_tmp))
+            del distance_tmp
+            del wgt_tmp
+            sample_count += batch_sample
+
     return distance, wgt
 
 def load_config(file_path):

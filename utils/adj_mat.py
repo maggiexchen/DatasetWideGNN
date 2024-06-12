@@ -16,6 +16,9 @@ import glob
 import logging
 logging.getLogger().setLevel(logging.INFO)
 
+import psutil
+process = psutil.Process()
+
 
 def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True, signal="hhh"):
     """
@@ -172,49 +175,59 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
     files = sorted(glob.glob(dist_dir + t + '*.pt'))
     print(len(files), " files found for "+t+" distances")
     # apply linking length within each batch, and pull out non-zero indices
-    indices = torch.empty(0)
+    indices = torch.empty(0, dtype=torch.int32)#.to("cuda")
     batch_size = 30000 
-    print(batch_size)
+    print("Loading batch size ", batch_size)
     for f in files:
         # get the i and j batch numbers
         # use -1 and -2 here to count from back - to account for possible numbers earlier in the file path (e.g. atlas3)
         i_ind = int(re.findall(r'\d+', f)[-2])
         j_ind = int(re.findall(r'\d+', f)[-1])
         if t=="sigsig" or t=="bkgbkg":
-            if i_ind >= j_ind: 
+            if i_ind >= j_ind:
                 print("File ", i_ind, j_ind)
-                distance = torch.load(f)["distance"]
-                wgt = torch.load(f)["weight"]
+                distance = torch.load(f)["distance"]# .to("cuda")
 #                i_batch = distance.size(0)
 #                j_batch = distance.size(1)
                 # apply the linking length to the distances in that batch
                 if flip:
-                    ind = (distance <= linking_length).nonzero()
+                    ind = (distance <= linking_length).nonzero().to(torch.int32)
                 else:
-                    ind = (distance >= linking_length).nonzero()
+                    ind = (distance >= linking_length).nonzero().to(torch.int32)
+                # print("CUDA allocated before ", torch.cuda.memory_allocated()/(1024 ** 3), "GB")
+                print(f"CPU allocated before {process.memory_info().rss/(1024 ** 3):.2f}, GB")
+                del distance
                 # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
                 ind[:,0] += i_ind*batch_size
                 ind[:,1] += j_ind*batch_size
+
                 indices = torch.cat((indices, ind))
                 if i_ind != j_ind:
                     ind_lowerleft = ind[:,torch.tensor([0, 1])][:, torch.tensor([1, 0])]
                     indices = torch.cat((indices, ind_lowerleft))
+                del ind
+                # print("CUDA allocated after ", torch.cuda.memory_allocated()/(1024 ** 3), "GB")
+                print(f"CPU allocated after {process.memory_info().rss/(1024 ** 3):.2f}, GB")
         else:
             print("File ", i_ind, j_ind)
-            distance = torch.load(f)["distance"]
-            wgt = torch.load(f)["weight"]
+            distance = torch.load(f)["distance"]# .to("cuda")
 #            i_batch = distance.size(0)
 #            j_batch = distance.size(1)
             # apply the linking length to the distances in that batch
             if flip:
-                ind = (distance <= linking_length).nonzero()
+                ind = (distance <= linking_length).nonzero().to(torch.int32)
             else:
-                ind = (distance >= linking_length).nonzero()
+                ind = (distance >= linking_length).nonzero().to(torch.int32)
+            # print("CUDA allocated before ", torch.cuda.memory_allocated()/(1024 ** 3), "GB")
+            print(print(f"CPU allocated before {process.memory_info().rss/(1024 ** 3):.2f}, GB"))
+            del distance
             # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
             ind[:,0] += i_ind*batch_size
             ind[:,1] += j_ind*batch_size
             indices = torch.cat((indices, ind))
-    
+            del ind
+            # print("CUDA allocated after ", torch.cuda.memory_allocated()/(1024 ** 3), "GB")
+            print(print(f"CPU allocated after {process.memory_info().rss/(1024 ** 3):.2f}, GB"))
     return indices
 
 def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
@@ -241,19 +254,25 @@ def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
     # return row_ind, col_ind
 
     torch.set_printoptions(threshold = 10000)
-    full_ind_unsorted = torch.cat((sigsig, sigbkg, bkgsig, bkgbkg)).round().to(torch.int)
+    full_ind_unsorted = torch.cat((sigsig, sigbkg, bkgsig, bkgbkg)).round().to(torch.int32)
 #    print("OG: ",full_ind_unsorted, "size:",full_ind_unsorted.size(0),", ",full_ind_unsorted.size(1))
     # order the rows/cols to be in ascending row order.
 
+    logging.info("Sorting indices ...")
     tmp = full_ind_unsorted[full_ind_unsorted[:,1].sort()[1]]
     full_ind = tmp[tmp[:,0].sort()[1]]
+    full_ind_shape = full_ind.shape[0]
+    del tmp
 #    print("sorted: ",full_ind)
     
+    logging.info("Getting rows and columns ...")
     row_ind = full_ind[:,0]
     col_ind = full_ind[:,1].contiguous()
+    del full_ind
 #    print("row_ind",row_ind)
 #    print("col_ind",col_ind)
-
+    
+    logging.info("writing sparse adj mat, row and column indices")
     csr_count = row_ind.bincount(minlength=N)
 #    print("csr_count",csr_count,"size:",csr_count.size(0), "N: ",N)
 #    csr_diff = torch.cat([csr_count, torch.zeros([N - csr_count.size(0)], dtype=torch.int32)])
@@ -261,7 +280,7 @@ def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
     csr_row = torch.cat([torch.tensor([0], dtype=torch.int32), csr_count.cumsum(dim=0, dtype=torch.int32)])
 #    print("csr_row",csr_row)
 #    print(csr_row.shape, col_ind.shape, torch.ones(full_ind.shape[0]).shape, N)
-    sparse_adj_mat = torch.sparse_csr_tensor(csr_row, col_ind, torch.ones(full_ind.shape[0]), (N, N), dtype=torch.float32)
+    sparse_adj_mat = torch.sparse_csr_tensor(csr_row, col_ind, torch.ones(full_ind_shape), (N, N), dtype=torch.float16)
 #    print(sparse_adj_mat)
 
     crow_ind = sparse_adj_mat.crow_indices()

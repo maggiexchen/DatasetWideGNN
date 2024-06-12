@@ -75,8 +75,9 @@ args = parser.parse_args()
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 CUDA_LAUNCH_BLOCKING=1
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-print(torch.cuda.mem_get_info())
+# device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+# print(torch.cuda.mem_get_info())
+device = torch.device('cpu')
 
 
 train_config_path = args.MLconfig
@@ -84,7 +85,7 @@ train_config = misc.load_config(train_config_path)
 
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
-print(user_config)
+print("Using config ",user_config)
 h5_path = user_config["h5_path"]
 plot_path = user_config["plot_path"]
 ll_path = user_config["ll_path"]
@@ -184,6 +185,8 @@ full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels))
 # raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
+del full_sig
+del full_bkg
 full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
 full_y = full_y.float()
 #full_x = torch.cat((full_sig, full_bkg), dim=0)
@@ -215,6 +218,9 @@ if len(hidden_sizes_gcn) > 0:
     values = torch.load(adj_path+'csr_values.pt')
     edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64).to(device)
     edge_wgts = full_wgts[row_ind]
+    del row_ind
+    del crow_ind
+    del col_ind
     # sparse_adj_mat = torch.sparse_csr_tensor(crow_ind, col_ind, values).to(device)
 
 misc.print_mem_info()
@@ -251,10 +257,10 @@ torch.cuda.empty_cache()
 
 # data = Data(x = full_x, y = full_y, adj_t = sparse_adj_mat) # edge_index = sparse_adj_mat) #edge_ind, edge_weight = edge_wgts)
 data = Data(x = full_x, y = full_y, edge_index = edge_ind)#, edge_weight = edge_wgts)
+del edge_ind
 
 train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)+len(val_sig), len(train_sig)+len(val_sig)+len(train_bkg))), dim=0).tolist()
 val_idx = torch.cat((torch.arange(len(train_sig), len(train_sig)+len(val_sig)), torch.arange(len(full_x)-len(val_bkg), len(full_x))), dim=0).tolist()
-# pdb.set_trace()
 print("train idx", len(train_idx))
 print("val idx", len(val_idx))
 # pdb.set_trace()
@@ -263,6 +269,7 @@ all_labels = data.y[train_idx].cpu().numpy()
 class_weights = compute_class_weights(all_labels).to(device)
 print("class weights", class_weights)
 
+logging.info("Graph sub-sampling for training ...")
 train_loader = NeighborLoader(
     data,
     input_nodes = train_idx,
@@ -273,6 +280,7 @@ train_loader = NeighborLoader(
     # persistent_workers = True
 )
 
+logging.info("Graph sub-sampling for validation ...")
 val_loader = NeighborLoader(
     data,
     input_nodes = val_idx,
@@ -283,11 +291,9 @@ val_loader = NeighborLoader(
     # persistent_workers = True
 )
 
-
-
+logging.info("Starting training ...")
 for epoch in range(epochs):
     print(epoch)
-    
     ### start training loop in the epoch
     model.train()
     total_examples = total_loss = 0
@@ -317,12 +323,12 @@ for epoch in range(epochs):
         optimiser.step() 
         # scaler.scale(loss).backward()
         # scaler.step(optimiser)
-        misc.print_mem_info()
+        #misc.print_mem_info()
         torch.cuda.empty_cache()
 
         total_examples += batch_size
         total_loss += float(loss) * batch_size
-        train_outputs = torch.cat((train_outputs, outputs.detach().cpu()))
+        train_outputs = torch.cat((train_outputs, outputs.detach()))
         
         # scaler.update()
 
@@ -348,7 +354,7 @@ for epoch in range(epochs):
 
         total_examples += batch_size
         total_loss += float(loss) * batch_size
-        val_outputs = torch.cat((val_outputs, outputs.detach().cpu()))
+        val_outputs = torch.cat((val_outputs, outputs.detach()))
 
     avg_vl_loss = total_loss / total_examples
     val_loss.append(avg_vl_loss)
