@@ -193,6 +193,7 @@ full_y = full_y.float()
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)#.cuda()
 
 sparse_adj_mat = None
+edge_ind = None
 if len(hidden_sizes_gcn) > 0:
 
     # logging.info("Loading sparse adjacency matrix ...")
@@ -273,7 +274,7 @@ logging.info("Graph sub-sampling for training ...")
 train_loader = NeighborLoader(
     data,
     input_nodes = train_idx,
-    num_neighbors = [0], #[20]*4,
+    num_neighbors = [20]*4,
     shuffle = True,
     batch_size = 2048, 
     # num_workers = 6, 
@@ -284,8 +285,8 @@ logging.info("Graph sub-sampling for validation ...")
 val_loader = NeighborLoader(
     data,
     input_nodes = val_idx,
-    num_neighbors = [0], #[20]*4,
-    shuffle = False,
+    num_neighbors = [20]*4,
+    # shuffle = False,
     batch_size = 2048,
     # num_workers = 6,
     # persistent_workers = True
@@ -298,6 +299,7 @@ for epoch in range(epochs):
     model.train()
     total_examples = total_loss = 0
     train_outputs = torch.tensor([])
+    train_truth_labels = torch.tensor([])
     i = 0
     for batch in train_loader:
         i += 1
@@ -329,6 +331,7 @@ for epoch in range(epochs):
         total_examples += batch_size
         total_loss += float(loss) * batch_size
         train_outputs = torch.cat((train_outputs, outputs.detach()))
+        train_truth_labels = torch.cat((train_truth_labels, y.detach()))
         
         # scaler.update()
 
@@ -339,6 +342,7 @@ for epoch in range(epochs):
     model.eval()
     total_examples = total_loss = 0
     val_outputs = torch.tensor([])
+    val_truth_labels = torch.tensor([])
     for batch in val_loader:
         
         batch = batch.to(device)
@@ -355,6 +359,7 @@ for epoch in range(epochs):
         total_examples += batch_size
         total_loss += float(loss) * batch_size
         val_outputs = torch.cat((val_outputs, outputs.detach()))
+        val_truth_labels = torch.cat((val_truth_labels, y.detach()))
 
     avg_vl_loss = total_loss / total_examples
     val_loss.append(avg_vl_loss)
@@ -362,8 +367,8 @@ for epoch in range(epochs):
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
 
 
-train_truth_labels = full_y[train_idx]
-val_truth_labels = full_y[val_idx]
+# train_truth_labels = full_y[train_idx]
+# val_truth_labels = full_y[val_idx]
 print("train truth labels", len(train_truth_labels))
 print("val truth labels", len(val_truth_labels))
 
