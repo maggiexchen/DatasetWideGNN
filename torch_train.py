@@ -168,6 +168,12 @@ logging.info('Importing signal and background files...')
 train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels = adj.data_loader(h5_path, plot_path, "train", kinematics, norm_kin=True, signal=signal)
 val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=True, signal=signal)
 
+print("train sig", len(train_sig))
+print("train bkg", len(train_bkg))
+print("val sig", len(val_sig))
+print("val bkg", len(val_bkg))
+
+
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 full_sig_labels = torch.cat((train_sig_labels, val_sig_labels))
 #full_bkg = torch.cat((train_bkg, val_bkg), dim=0)[:30000]
@@ -213,9 +219,21 @@ if len(hidden_sizes_gcn) > 0:
 
 misc.print_mem_info()
 
+def compute_class_weights(labels):
+    labels = labels.astype(int)  # Ensure labels are integers
+    class_counts = np.bincount(labels)
+    class_weights = 1.0 / class_counts
+    class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
+    return torch.tensor(class_weights, dtype=torch.float)
+
 logging.info("Training ...")
 # Define loss function for binary classification and ADAM optimiser
-loss_function = nn.BCELoss()
+# loss_function = nn.BCELoss()
+
+def weighted_bce_loss(output, target, weights):
+    loss = weights[1] * target * torch.log(output) + weights[0] * (1 - target) * torch.log(1 - output)
+    return -loss.mean()
+
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 # scaler = torch.cuda.amp.GradScaler()
 
@@ -234,17 +252,21 @@ torch.cuda.empty_cache()
 # data = Data(x = full_x, y = full_y, adj_t = sparse_adj_mat) # edge_index = sparse_adj_mat) #edge_ind, edge_weight = edge_wgts)
 data = Data(x = full_x, y = full_y, edge_index = edge_ind)#, edge_weight = edge_wgts)
 
-
 train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)+len(val_sig), len(train_sig)+len(val_sig)+len(train_bkg))), dim=0).tolist()
 val_idx = torch.cat((torch.arange(len(train_sig), len(train_sig)+len(val_sig)), torch.arange(len(full_x)-len(val_bkg), len(full_x))), dim=0).tolist()
 # pdb.set_trace()
 print("train idx", len(train_idx))
 print("val idx", len(val_idx))
 # pdb.set_trace()
+
+all_labels = data.y[train_idx].cpu().numpy()
+class_weights = compute_class_weights(all_labels).to(device)
+print("class weights", class_weights)
+
 train_loader = NeighborLoader(
     data,
     input_nodes = train_idx,
-    num_neighbors = [20]*4,
+    num_neighbors = [0], #[20]*4,
     shuffle = True,
     batch_size = 2048, 
     # num_workers = 6, 
@@ -254,8 +276,8 @@ train_loader = NeighborLoader(
 val_loader = NeighborLoader(
     data,
     input_nodes = val_idx,
-    num_neighbors = [20]*4,
-    shuffle = True,
+    num_neighbors = [0], #[20]*4,
+    shuffle = False,
     batch_size = 2048,
     # num_workers = 6,
     # persistent_workers = True
@@ -287,7 +309,8 @@ for epoch in range(epochs):
         outputs = outputs[:batch_size]
         
         # pdb.set_trace()
-        loss = loss_function(outputs.squeeze(), y.squeeze().cuda())#.cuda()
+        # loss = loss_function(outputs.squeeze(), y.squeeze().cuda())#.cuda()
+        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights)
 
         loss.backward()
 #    train_loss.append(loss.item())
@@ -320,7 +343,8 @@ for epoch in range(epochs):
         y = batch.y[:batch_size]
         outputs = outputs[:batch_size]
 
-        loss = loss_function(outputs.squeeze(), y.squeeze().cuda())#.cuda()
+        # loss = loss_function(outputs.squeeze(), y.squeeze().cuda())#.cuda()
+        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights)
 
         total_examples += batch_size
         total_loss += float(loss) * batch_size
