@@ -7,7 +7,7 @@ from torch_geometric.nn import GCNConv, GATConv, GraphConv
 import pdb
 
 class GCNClassifier(nn.Module):
-    def __init__(self, input_size, hidden_sizes_gcn, hidden_sizes_mlp, output_size, dropout_rates):
+    def __init__(self, input_size, hidden_sizes_gcn, hidden_sizes_mlp, output_size, dropout_rates, gnn_type = "GCN"):
         """
         input_size (int): dimension of input node features
         hidden_sizes_gcn (list(int)): list of number of hidden nodes in each GCN layer.
@@ -24,9 +24,14 @@ class GCNClassifier(nn.Module):
         i = 0
         for i in range(len(hidden_sizes_gcn)):
             # self.layers.append(GCNLayer(input_size, hidden_sizes[i]))
-            # self.layers_gcn.append(GCNConv(input_size, hidden_sizes_gcn[i]))
-            # self.layers_gcn.append(GATConv(input_size, hidden_sizes_gcn[i], edge_dim = 1))
-            self.layers_gcn.append(GraphConv(input_size, hidden_sizes_gcn[i]))
+            if gnn_type == "GCN":
+                self.layers_gcn.append(GCNConv(input_size, hidden_sizes_gcn[i]))
+            elif gnn_type == "GAT":
+                self.layers_gcn.append(GATConv(input_size, hidden_sizes_gcn[i]))#, edge_dim = 1))
+            elif gnn_type == "GraphConv":
+                self.layers_gcn.append(GraphConv(input_size, hidden_sizes_gcn[i]))
+            else:
+                raise ValueError("Invalid GNN type, please choose from 'GCN', 'GAT', 'GraphConv'")
             self.batch_norms_gcn.append(nn.BatchNorm1d(hidden_sizes_gcn[i]))
             self.dropout_gcn.append(nn.Dropout(p=dropout_rates[i]))
             input_size = hidden_sizes_gcn[i]

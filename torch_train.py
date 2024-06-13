@@ -104,6 +104,7 @@ dropout_rates = train_config["dropout_rates"]
 epochs = train_config["epochs"]
 num_nb_list = train_config["num_nb_list"]
 batch_size = train_config["batch_size"]
+gnn_type = train_config["gnn_type"]
 
 variable = train_config["variable"]
 if variable is None:
@@ -126,7 +127,7 @@ if len(hidden_sizes_gcn) == 0:
           + "_e" + str(epochs)
 else:
     model_label = signal\
-            + "_GCN" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
+            + f"_{gnn_type}" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
             + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
             + "_nb" + "-".join(map(str, num_nb_list))\
             + "_lr" + str(LR).replace(".", "p")\
@@ -164,7 +165,7 @@ logging.info("output plot path: "+plot_path)
 logging.info("adj matrix storage path: "+adj_path)
 logging.info("model storage path: "+model_path)
 
-model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates)
+model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
 model.to(device)
 # summary(model)
 logging.info("distance metric: "+distance)
