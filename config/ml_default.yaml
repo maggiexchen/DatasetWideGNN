@@ -9,4 +9,4 @@ dropout_rates: [0.0, 0.0, 0.0, 0.0, 0.0]
 epochs: 20
 num_nb_list: [20, 20, 20, 20]
 batch_size: 2048
-gnn_type: "GraphConv"
+gnn_type: "Graph"

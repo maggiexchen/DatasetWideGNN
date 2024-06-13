@@ -28,7 +28,7 @@ class GCNClassifier(nn.Module):
                 self.layers_gcn.append(GCNConv(input_size, hidden_sizes_gcn[i]))
             elif gnn_type == "GAT":
                 self.layers_gcn.append(GATConv(input_size, hidden_sizes_gcn[i]))#, edge_dim = 1))
-            elif gnn_type == "GraphConv":
+            elif gnn_type == "Graph":
                 self.layers_gcn.append(GraphConv(input_size, hidden_sizes_gcn[i]))
             else:
                 raise ValueError("Invalid GNN type, please choose from 'GCN', 'GAT', 'GraphConv'")

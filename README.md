@@ -41,7 +41,7 @@ python torch_adj_builder.py -c config/ml_<config file>.yaml -u config/user_<name
 ```
 
 The linking length used here is the same if generated from comparing sig-sig with bkg-bkg distances or from sig-sig with sig-bkg distances by specifying, just using the sig-sig efficiency.
-The linking length that gives 0.6, 0.7, 0.8, or 0.9 sig-sig efficiencies can be chosen.
+The linking length that gives 0.6, 0.7, 0.8, or 0.9 sig-sig efficiencies can be chosen. **New**: Alternatively, the linking length can be manually set in the `ml_<config>.yaml` file. This overwrites the linking length from the chosen efficiency.
 
 ## Training
 Training can be run for your choice of ML alg, by running: 
@@ -49,8 +49,13 @@ Training can be run for your choice of ML alg, by running:
 python torch_train.py -c config/ml_<config file>.yaml -u config/user_<name>.yaml
 ```
 This will retrieve the kinematics from the input h5 events, and the adj matrix, and use these for training.
-The config file should contain the name of the training, the type of kinematic variables, the type of distance metric, sig-sig efficiencies, and training hyperparameters.
+The config file should contain the type of GNN layer, the type of kinematic variables, the type of distance metric, sig-sig efficiencies (or linking length directly), and training hyperparameters.
 For an out-of-the-box test use `ml_default.yaml`
-The sig-sig efficiencies that are supported so far are `0.6`, `0.7`,` 0.8` and `0.9`. 
+The sig-sig efficiencies that are supported so far are `0.6`, `0.7`,` 0.8` and `0.9`. **New**: The linking length can be manually set in the `ml_<config>.yaml` file, so long as the adj matrix was already constructed with this linking length using `torch_adj_builder.py`.
 The model can be specified in the config file, including number of gcn and regular mlp layers and their sizes. Note: if there are no hidden gcn layers, model is equivalent to a regular dnn. 
-The adjacency matrix is normalised by default in the GCNConv layer using the $`D^{-1/2} A D^{-1/2}`$ scheme used in the "Semi-supervised Classification with Graph Convolutional Networks" paper (https://arxiv.org/pdf/1609.02907.pdf).
+
+**New**: There are currently three supported GNN layer types:
+- `GCN`: The GCNConv layer applies the normalisation scheme $`D^{-1/2} A D^{-1/2}`$ used in the "Semi-supervised Classification with Graph Convolutional Networks" paper (https://arxiv.org/pdf/1609.02907.pdf).
+- `GAT`: The GATConv layer applies the graph attention operator used in the "Graph Attention Networks" paper (https://arxiv.org/abs/1710.10903).
+- `Graph`: The GraphConv  layer applies the graph neural network operator from the “Weisfeiler and Leman Go Neural: Higher-order Graph Neural Networks” paper (https://arxiv.org/abs/1810.02244).
+
