@@ -87,7 +87,7 @@ dist_path = user_config["dist_path"]
 # TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
 
-training_name = train_config["name"]
+# training_name = train_config["name"]
 
 variable = train_config["variable"]
 if variable is None:
@@ -100,6 +100,7 @@ if eff is None:
     print("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
 elif eff not in [0.6, 0.7, 0.8, 0.9]:
     raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
+linking_length = train_config["linking_length"]
 
 kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
@@ -137,16 +138,19 @@ full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.c
 
 print("numevents: ",full_x.size(0))
 
-# read in linking length calculated from sampled training data
-sigsig_eff = eff
-ll_path = ll_path+str(variable)+"_"+str(distance)+"_linking_length.json"
-print(ll_path)
-with open(ll_path, 'r') as lfile:
-    length_dict = json.load(lfile)
-    lengths = length_dict["length"]
-    linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
-    logging.info("linking length ="+str(linking_length))
-linking_length = 0.1
+# read in linking length calculated from sampled training data, if not given in config
+sigsig_eff = None
+if linking_length is None:
+    sigsig_eff = eff
+    ll_path = ll_path+str(variable)+"_"+str(distance)+"_linking_length.json"
+    print(ll_path)
+    with open(ll_path, 'r') as lfile:
+        length_dict = json.load(lfile)
+        lengths = length_dict["length"]
+        linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
+        logging.info("linking length ="+str(linking_length))
+else:
+    print("linking length is given in config, IGNORING the sigsig_eff in the config!")
 
 # TODO: batch load in event distances to apply linking length to
 # If the distances were to be calculated and stored in advance, then loaded here, the ordering of the events need to be the same!
@@ -186,6 +190,13 @@ misc.print_mem_info()
 # saving adjacency matrix
 # Save the sparse tensor to a .pt file
 logging.info("Saving sparse adjacency matrix ...")
+
+if sigsig_eff is None:
+    adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
+else:
+    adj_path = adj_path + "/" + f"sigsig_eff_{sigsig_eff}/"
+
+
 misc.create_dirs(adj_path)
 torch.save(sparse_adj_mat, adj_path+'sparse_adjacency_matrix.pt')
 torch.save(edge_ind, adj_path+'coo_row.pt')

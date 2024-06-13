@@ -96,7 +96,7 @@ model_path = user_config["model_path"]
 # TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
 
-training_name = train_config["name"]
+# training_name = train_config["name"]
 hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
 hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
@@ -105,6 +105,7 @@ epochs = train_config["epochs"]
 num_nb_list = train_config["num_nb_list"]
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
+linking_length = train_config["linking_length"]
 
 variable = train_config["variable"]
 if variable is None:
@@ -113,10 +114,20 @@ distance = train_config["distance"]
 if distance is None:
     print("Need to specify a type of distance metric for the adjacency matrix in the config")
 eff = train_config["sigsig_eff"]
-if eff is None:
-    print("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
-elif eff not in [0.6, 0.7, 0.8, 0.9]:
-    raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
+
+if linking_length is None:
+    if eff is None:
+        raise Exception("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
+    elif eff not in [0.6, 0.7, 0.8, 0.9]:
+        raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
+    else:
+        ll_str = "_LLEff" + str(eff).replace(".", "p")
+        adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
+else:
+    eff = None
+    print("linking length is given in config, IGNORING the sigsig_eff in the config!")
+    ll_str = "_LL" + str(linking_length).replace(".", "p")
+    adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
 
 if len(hidden_sizes_gcn) == 0:
     model_label = signal\
@@ -131,10 +142,11 @@ else:
             + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
             + "_nb" + "-".join(map(str, num_nb_list))\
             + "_lr" + str(LR).replace(".", "p")\
-            + "_LLEff" + str(eff).replace(".", "p")\
+            + ll_str\
             + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
             + "_bs" + str(batch_size)\
             + "_e" + str(epochs)
+
 
 #if len(hidden_sizes_gcn) == 0:
 #    model_label = "DNN"
@@ -169,7 +181,10 @@ model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, 
 model.to(device)
 # summary(model)
 logging.info("distance metric: "+distance)
-logging.info("desired efficieny: "+str(eff))
+if eff is not None:
+    logging.info("desired efficieny: "+str(eff))
+elif linking_length is not None:
+    logging.info("linking length: "+str(linking_length))
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
@@ -205,37 +220,18 @@ full_y = full_y.float()
 #full_x = torch.cat((full_sig, full_bkg), dim=0)
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)#.cuda()
 
-sparse_adj_mat = None
 edge_ind = None
 if len(hidden_sizes_gcn) > 0:
-
-    # logging.info("Loading sparse adjacency matrix ...")
-    # row_ind = torch.load(adj_path+"/models/GCN_Adj/row_ind.pt")
-    # col_ind = torch.load(adj_path+"/models/GCN_Adj/col_ind.pt")
-
-    # edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64).to(device)
-    # edge_wgts = full_wgts[row_ind]
-
-    # t = torch.cuda.get_device_properties(0).total_memory/(1024*1024*1024)
-    # r = torch.cuda.memory_reserved(0)/(1024*1024*1024)
-    # a = torch.cuda.memory_allocated(0)/(1024*1024*1024)
-    # f = r-a  # free inside reserved
-    # print("total: ", t, "reserved: ", r, "allocated:", a, "free: ", f)
-
-    # print(adj_path+'sparse_adjacency_matrix.pt') 
-    # sparse_adj_mat = torch.load(adj_path+'sparse_adjacency_matrix.pt').to(device)
-    #row_ind = torch.load(adj_path+'coo_row.pt')
     print("constructing sparse adjacency matrix ...")
     row_ind = torch.load(adj_path+'coo_row.pt')
-    crow_ind = torch.load(adj_path+'csr_row.pt')
     col_ind = torch.load(adj_path+'csr_col.pt')
-    values = torch.load(adj_path+'csr_values.pt')
+    # crow_ind = torch.load(adj_path+'csr_row.pt')
+    # values = torch.load(adj_path+'csr_values.pt')
     edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64).to(device)
     edge_wgts = full_wgts[row_ind]
     del row_ind
-    del crow_ind
     del col_ind
-    # sparse_adj_mat = torch.sparse_csr_tensor(crow_ind, col_ind, values).to(device)
+    # del crow_ind
 
 misc.print_mem_info()
 
@@ -259,17 +255,13 @@ optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 
 print("full x", len(full_x))
 print("full y", len(full_y))
-# print("train truth labels", len(train_truth_labels))
-# print("val truth labels", len(val_truth_labels))
-
-print("sparse adj mat: ", sparse_adj_mat)
+print("edge ind", len(edge_ind))
 
 gc.collect()
 torch.cuda.empty_cache()
 #torch.cuda.reset_max_memory_allocated()
 #torch.cuda.synchronize()
 
-# data = Data(x = full_x, y = full_y, adj_t = sparse_adj_mat) # edge_index = sparse_adj_mat) #edge_ind, edge_weight = edge_wgts)
 data = Data(x = full_x, y = full_y, edge_index = edge_ind)#, edge_weight = edge_wgts)
 del edge_ind
 
@@ -440,7 +432,10 @@ ax.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (trai
 ax.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue")
 ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange")
 ax.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue")
-text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length at sig-sig efficiency "+str(eff)]
+if eff is not None:
+    text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length at sig-sig efficiency "+str(eff)]
+elif linking_length is not None:
+    text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length "+str(linking_length)]
 plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
 #ax.text(0.02, 0.95, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
 #ax.text(0.02, 0.91, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
