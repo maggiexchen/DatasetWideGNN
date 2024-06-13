@@ -102,6 +102,8 @@ hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
 dropout_rates = train_config["dropout_rates"]
 epochs = train_config["epochs"]
+num_nb_list = train_config["num_nb_list"]
+batch_size = train_config["batch_size"]
 
 variable = train_config["variable"]
 if variable is None:
@@ -115,13 +117,23 @@ if eff is None:
 elif eff not in [0.6, 0.7, 0.8, 0.9]:
     raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
 
-model_label = signal\
-          + "_GCN" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
+if len(hidden_sizes_gcn) == 0:
+    model_label = signal\
           + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
           + "_lr" + str(LR).replace(".", "p")\
-          + "_LLEff" + str(eff).replace(".", "p")\
           + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
+          + "_bs" + str(batch_size)\
           + "_e" + str(epochs)
+else:
+    model_label = signal\
+            + "_GCN" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
+            + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
+            + "_nb" + "-".join(map(str, num_nb_list))\
+            + "_lr" + str(LR).replace(".", "p")\
+            + "_LLEff" + str(eff).replace(".", "p")\
+            + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
+            + "_bs" + str(batch_size)\
+            + "_e" + str(epochs)
 
 #if len(hidden_sizes_gcn) == 0:
 #    model_label = "DNN"
@@ -274,9 +286,9 @@ logging.info("Graph sub-sampling for training ...")
 train_loader = NeighborLoader(
     data,
     input_nodes = train_idx,
-    num_neighbors = [20]*4,
+    num_neighbors = num_nb_list,
     shuffle = True,
-    batch_size = 2048, 
+    batch_size = batch_size, 
     # num_workers = 6, 
     # persistent_workers = True
 )
@@ -285,9 +297,9 @@ logging.info("Graph sub-sampling for validation ...")
 val_loader = NeighborLoader(
     data,
     input_nodes = val_idx,
-    num_neighbors = [20]*4,
+    num_neighbors = num_nb_list,
     # shuffle = False,
-    batch_size = 2048,
+    batch_size = batch_size,
     # num_workers = 6,
     # persistent_workers = True
 )

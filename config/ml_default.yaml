@@ -5,5 +5,7 @@ sigsig_eff: 0.6
 hidden_sizes_gcn: [16, 16]
 hidden_sizes_mlp: [16, 16, 16]
 LR: 0.01
-dropout_rates: [0.0, 0.0, 0.0, 0.0, 0.0]
-epochs: 10
+dropout_rates: [0.3, 0.2, 0.1, 0.0, 0.0]
+epochs: 15
+num_nb_list: [20, 20, 20, 20]
+batch_size: 2048
