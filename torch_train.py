@@ -1,11 +1,6 @@
 import pandas as pd
-# import uproot
 import numpy
-# import h5py
 import json
-# import math
-# import random
-# import yaml
 import glob
 import re
 import os
@@ -75,46 +70,47 @@ args = parser.parse_args()
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 CUDA_LAUNCH_BLOCKING=1
-# device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-# print(torch.cuda.mem_get_info())
-device = torch.device('cpu')
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+print(torch.cuda.mem_get_info())
+# device = torch.device('cpu')
 
-
-train_config_path = args.MLconfig
-train_config = misc.load_config(train_config_path)
-
+### load user config
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
-print("Using config ",user_config)
+print("Using user config ",user_config)
 h5_path = user_config["h5_path"]
 plot_path = user_config["plot_path"]
 ll_path = user_config["ll_path"]
 adj_path = user_config["adj_path"]
 dist_path = user_config["dist_path"]
 model_path = user_config["model_path"]
-
 # TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
+# assert signal in ["hhh", "LQ", "stau"], "signal should be 'hhh', 'LQ' or 'stau'"
 
-# training_name = train_config["name"]
+### load training config 
+train_config_path = args.MLconfig
+train_config = misc.load_config(train_config_path)
+print("Using training config ",train_config)
 hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
 hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
 dropout_rates = train_config["dropout_rates"]
 epochs = train_config["epochs"]
-num_nb_list = train_config["num_nb_list"]
+num_nb_list = train_config["num_nb_list"] 
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
-linking_length = train_config["linking_length"]
 
 variable = train_config["variable"]
 if variable is None:
     print("Need to specify a type of kinematic variable in the config")
+
 distance = train_config["distance"]
 if distance is None:
     print("Need to specify a type of distance metric for the adjacency matrix in the config")
-eff = train_config["sigsig_eff"]
 
+linking_length = train_config["linking_length"]
+eff = train_config["sigsig_eff"]
 if linking_length is None:
     if eff is None:
         raise Exception("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
@@ -129,6 +125,7 @@ else:
     ll_str = "_LL" + str(linking_length).replace(".", "p")
     adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
 
+### create model label and result plot path
 if len(hidden_sizes_gcn) == 0:
     model_label = signal\
           + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
@@ -145,21 +142,9 @@ else:
             + ll_str\
             + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
             + "_bs" + str(batch_size)\
-            + "_e" + str(epochs)
-
-
-#if len(hidden_sizes_gcn) == 0:
-#    model_label = "DNN"
-#    plot_path = "plots/DNN/"
-#else:
-#    model_label = "GCN"
-#    plot_path = "plots/GCN/"
-
-#plot_path_label = "DNN" if len(hidden_sizes_gcn) == 0 else "GCN"
-#plot_path += plot_path_label 
+            + "_e" + str(epochs)    
 plot_path = plot_path + model_label + "/"
 misc.create_dirs(plot_path)
-
 
 kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
@@ -179,7 +164,7 @@ logging.info("model storage path: "+model_path)
 
 model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
 model.to(device)
-# summary(model)
+
 logging.info("distance metric: "+distance)
 if eff is not None:
     logging.info("desired efficieny: "+str(eff))
@@ -205,7 +190,7 @@ print("val bkg", len(val_bkg))
 
 full_sig = torch.cat((train_sig, val_sig), dim=0)
 full_sig_labels = torch.cat((train_sig_labels, val_sig_labels))
-#full_bkg = torch.cat((train_bkg, val_bkg), dim=0)[:30000]
+
 full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
 full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels))
 
@@ -215,53 +200,55 @@ full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels))
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
 del full_sig
 del full_bkg
+
 full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
 full_y = full_y.float()
-#full_x = torch.cat((full_sig, full_bkg), dim=0)
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)#.cuda()
 
+### load edge indices if gnn layers are used
 edge_ind = None
 if len(hidden_sizes_gcn) > 0:
     print("constructing sparse adjacency matrix ...")
-    row_ind = torch.load(adj_path+'coo_row.pt')
-    col_ind = torch.load(adj_path+'csr_col.pt')
-    # crow_ind = torch.load(adj_path+'csr_row.pt')
-    # values = torch.load(adj_path+'csr_values.pt')
+    print("loading row indices ...")
+    row_ind = torch.load(adj_path+'row_ind.pt')
+    print("loading col indices ...")
+    col_ind = torch.load(adj_path+'col_ind.pt')
+    print("stacking row and col indices ...")
     edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64).to(device)
-    edge_wgts = full_wgts[row_ind]
+    print("deleting row and col indices ...")
     del row_ind
     del col_ind
-    # del crow_ind
+    # print("loading edge weights ...")
+    # edge_wgts = full_wgts[row_ind]
 
 misc.print_mem_info()
 
 def compute_class_weights(labels):
+    '''
+    Compute class weights for binary classification
+    '''
     labels = labels.astype(int)  # Ensure labels are integers
     class_counts = np.bincount(labels)
     class_weights = 1.0 / class_counts
     class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
     return torch.tensor(class_weights, dtype=torch.float)
 
-logging.info("Training ...")
-# Define loss function for binary classification and ADAM optimiser
-# loss_function = nn.BCELoss()
-
+### define loss function and optimiser
 def weighted_bce_loss(output, target, weights):
     loss = weights[1] * target * torch.log(output) + weights[0] * (1 - target) * torch.log(1 - output)
     return -loss.mean()
 
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
-# scaler = torch.cuda.amp.GradScaler()
 
+logging.info("Training ...")
 print("full x", len(full_x))
 print("full y", len(full_y))
 print("edge ind", len(edge_ind))
 
 gc.collect()
 torch.cuda.empty_cache()
-#torch.cuda.reset_max_memory_allocated()
-#torch.cuda.synchronize()
 
+### create data object, train and val loaders
 data = Data(x = full_x, y = full_y, edge_index = edge_ind)#, edge_weight = edge_wgts)
 del edge_ind
 
@@ -269,7 +256,6 @@ train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)
 val_idx = torch.cat((torch.arange(len(train_sig), len(train_sig)+len(val_sig)), torch.arange(len(full_x)-len(val_bkg), len(full_x))), dim=0).tolist()
 print("train idx", len(train_idx))
 print("val idx", len(val_idx))
-# pdb.set_trace()
 
 all_labels = data.y[train_idx].cpu().numpy()
 class_weights = compute_class_weights(all_labels).to(device)
@@ -299,38 +285,27 @@ val_loader = NeighborLoader(
 
 logging.info("Starting training ...")
 for epoch in range(epochs):
-    print(epoch)
+
     ### start training loop in the epoch
     model.train()
     total_examples = total_loss = 0
     train_outputs = torch.tensor([])
     train_truth_labels = torch.tensor([])
-    i = 0
     for batch in train_loader:
-        i += 1
-        # print("batch: ", i)
+        
         optimiser.zero_grad()
         batch = batch.to(device)
         batch_size = batch.batch_size
-        # print("==>batch size: ", batch_size)
-        # with torch.cuda.amp.autocast():
-        # pdb.set_trace()
         outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
         
         ### NOTE only consider predictions and labels of seed nodes
         y = batch.y[:batch_size]
         outputs = outputs[:batch_size]
-        
-        # pdb.set_trace()
-        # loss = loss_function(outputs.squeeze(), y.squeeze().cuda())#.cuda()
-        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights)
 
+        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights)
         loss.backward()
-#    train_loss.append(loss.item())
         optimiser.step() 
-        # scaler.scale(loss).backward()
-        # scaler.step(optimiser)
-        #misc.print_mem_info()
+
         torch.cuda.empty_cache()
 
         total_examples += batch_size
@@ -338,8 +313,6 @@ for epoch in range(epochs):
         train_outputs = torch.cat((train_outputs, outputs.detach()))
         train_truth_labels = torch.cat((train_truth_labels, y.detach()))
         
-        # scaler.update()
-
     avg_tr_loss = total_loss / total_examples
     train_loss.append(avg_tr_loss)
         
@@ -358,7 +331,6 @@ for epoch in range(epochs):
         y = batch.y[:batch_size]
         outputs = outputs[:batch_size]
 
-        # loss = loss_function(outputs.squeeze(), y.squeeze().cuda())#.cuda()
         loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights)
 
         total_examples += batch_size
@@ -371,14 +343,10 @@ for epoch in range(epochs):
         
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
 
-
-# train_truth_labels = full_y[train_idx]
-# val_truth_labels = full_y[val_idx]
+logging.info("Training complete.")
 print("train truth labels", len(train_truth_labels))
 print("val truth labels", len(val_truth_labels))
 
-# model_path = path + "models/" + model_label + "/"
-# save trained model
 logging.info("Saving trained model and performance...")
 model_file_name = "model.pth"
 model_path = model_path+model_label+"/"
@@ -388,7 +356,7 @@ torch.save({
     'optimiser_state': optimiser.state_dict(),
 }, model_path+model_file_name)
 
-# pdb.set_trace()
+### compute ROC curve and AUC
 train_outputs = train_outputs.view(-1).to(device)
 train_label_bool = train_truth_labels.bool()
 train_sig_pred = train_outputs[train_label_bool]
@@ -402,7 +370,6 @@ val_outputs = val_outputs.view(-1).to(device)
 val_label_bool = val_truth_labels.bool()
 val_sig_pred = val_outputs[val_label_bool]
 val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
-fig, ax = plt.subplots()
 
 val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy())
 val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy())
@@ -437,10 +404,6 @@ if eff is not None:
 elif linking_length is not None:
     text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length "+str(linking_length)]
 plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
-#ax.text(0.02, 0.95, "Training AUC = {:.3f}".format(train_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
-#ax.text(0.02, 0.91, "Validation AUC = {:.3f}".format(val_auc), verticalalignment="bottom", size=9, transform=ax.transAxes)
-#ax.text(0.02, 0.87, "6b Resonant TRSM signal, 5b Data", verticalalignment="bottom", size=9, transform=ax.transAxes)
-#ax.text(0.02, 0.83, "Linking length at sig-sig efficiency "+str(eff), verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.legend(loc='upper right', fontsize=9)
 ax.set_xlabel("Output score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")

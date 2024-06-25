@@ -1,9 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-# from utils.gcn_layer import GCNLayer
 from torch_geometric.nn import GCNConv, GATConv, GraphConv
-# from torch_geometric.nn import GATConv
 import pdb
 
 class GCNClassifier(nn.Module):
