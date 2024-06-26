@@ -70,9 +70,9 @@ args = parser.parse_args()
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 CUDA_LAUNCH_BLOCKING=1
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+# device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 print(torch.cuda.mem_get_info())
-# device = torch.device('cpu')
+device = torch.device('cpu')
 
 ### load user config
 user_config_path = args.userconfig
@@ -394,7 +394,19 @@ fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_loss.pdf", 
 
 logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
-binning = numpy.linspace(0,1,50)
+binning = np.linspace(0,1,51)
+
+# ### save histograms values
+# train_sig_pred_hist, bin_edges = np.histogram(train_sig_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
+# train_bkg_pred_hist, _ = np.histogram(train_bkg_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
+# val_sig_pred_hist, _ = np.histogram(val_sig_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
+# val_bkg_pred_hist, _ = np.histogram(val_bkg_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
+# np.save(plot_path+"bin_edges.npy", bin_edges)
+# np.save(plot_path+"train_sig_pred_hist.npy", train_sig_pred_hist)
+# np.save(plot_path+"train_bkg_pred_hist.npy", train_bkg_pred_hist)
+# np.save(plot_path+"val_sig_pred_hist.npy", val_sig_pred_hist)
+# np.save(plot_path+"val_bkg_pred_hist.npy", val_bkg_pred_hist)
+
 ax.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange")
 ax.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue")
 ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange")
