@@ -180,17 +180,17 @@ bkgbkg_ind += len(full_sig)
 
 logging.info("Concatenating the indices ...")
 full_ind = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind)).round().to(torch.int32)
-del sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind
 
 #### generate the adjacency matrix as a sparse tensor object (currently not needed, using edge index instead)
 # logging.info("Rounding the indices to int32 ...")
-# full_ind = full_ind.torch.to(torch.int32)
+# full_ind = full_ind.to(torch.int32)
 # logging.info("Generating sparse adjacency matrix ...")
 # sparse_adj_mat, edge_ind, crow_ind, col_ind, values = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+len(full_bkg))
 # print("sparse adj mat: ", sparse_adj_mat.shape)
 # total_edges = sigsig_ind.shape[0]+sigbkg_ind.shape[0]+bkgbkg_ind.shape[0]
 # total_pairs = (len(full_sig)+len(full_bkg))**2
 # print("The fraction of edges in graph is ", total_edges / total_pairs)
+del sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind
 
 misc.print_mem_info()
 logging.info("Saving sparse adjacency matrix ...")

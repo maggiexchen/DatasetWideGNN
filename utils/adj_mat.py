@@ -171,7 +171,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
         (torch.tensor())indices of non-empty elements in the adj matrix
     """
     # Load in files in batches (sigsig, sigbkg, or bkgbkg) by the i and j indices
-    dist_dir = dist_path+"/batched_"+variable +"_"+distance+"_distances_reduced/"
+    dist_dir = dist_path+"/batched_"+variable +"_"+distance+"_distances/"
     files = sorted(glob.glob(dist_dir + t + '*.pt'))
     print(len(files), " files found for "+t+" distances")
     # apply linking length within each batch, and pull out non-zero indices
