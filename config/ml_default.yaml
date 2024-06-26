@@ -1,12 +1,12 @@
 variable: "mass"
 distance: "euclidean"
 sigsig_eff: 0.6
-linking_length: 
+linking_length: 0.1
 hidden_sizes_gcn: [16, 16]
 hidden_sizes_mlp: [16, 16, 16]
 LR: 0.01
 dropout_rates: [0.0, 0.0, 0.0, 0.0, 0.0]
-epochs: 20
+epochs: 10
 num_nb_list: [20, 20, 20, 20]
 batch_size: 2048
 gnn_type: "Graph"
