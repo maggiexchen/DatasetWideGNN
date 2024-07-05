@@ -3,11 +3,11 @@
 #######################
 
 # signal model hhh, LQ, stau
-signal: hhh
+signal: stau
 
 # input paths
 ntuple_path: /data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/ # clearly wrong
-h5_path: /home/srutherford/GNN_shared/hhhgraph/data/hhh_split_files/ 
+h5_path: /home/srutherford/GNN_shared/hhhgraph/data/stau_split_files/ 
 ll_path: /home/srutherford/GNN_shared/hhhgraph/linking_lengths/ 
 dist_path: /home/srutherford/GNN_shared/hhhgraph/data/distances/
 
@@ -15,3 +15,4 @@ dist_path: /home/srutherford/GNN_shared/hhhgraph/data/distances/
 plot_path: /home/srutherford/GNN_shared/hhhgraph/data/plots/ 
 adj_path:  /home/srutherford/GNN_shared/hhhgraph/data/graph/
 model_path: /home/srutherford/GNN_shared/hhhgraph/data/models/ 
+score_path: /home/srutherford/GNN_shared/hhhgraph/data/dnn_scores/
