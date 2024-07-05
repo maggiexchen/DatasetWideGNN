@@ -71,7 +71,7 @@ args = parser.parse_args()
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 CUDA_LAUNCH_BLOCKING=1
 # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-print(torch.cuda.mem_get_info())
+# print(torch.cuda.mem_get_info())
 device = torch.device('cpu')
 
 ### load user config
@@ -84,6 +84,7 @@ ll_path = user_config["ll_path"]
 adj_path = user_config["adj_path"]
 dist_path = user_config["dist_path"]
 model_path = user_config["model_path"]
+score_path = user_config["score_path"]
 # TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
 # assert signal in ["hhh", "LQ", "stau"], "signal should be 'hhh', 'LQ' or 'stau'"
@@ -146,7 +147,10 @@ else:
 plot_path = plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
-kinematics = misc.get_kinematics(variable)
+if signal == "stau":
+    kinematics = misc.get_kinematics_staus(variable)
+else:
+    kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
 
 train_loss = []
@@ -223,19 +227,46 @@ if len(hidden_sizes_gcn) > 0:
 
 misc.print_mem_info()
 
-def compute_class_weights(labels):
+# def compute_class_weights(labels):
+#     '''
+#     Compute class weights for binary classification
+#     '''
+#     labels = labels.astype(int)  # Ensure labels are integers
+#     class_counts = np.bincount(labels)
+#     class_weights = 1.0 / class_counts
+#     class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
+#     return torch.tensor(class_weights, dtype=torch.float)
+
+def compute_class_weights(labels, event_weights):
     '''
-    Compute class weights for binary classification
+    Compute weighted class weights for binary classification with event weights
+    
+    Args:
+        labels (np.ndarray): Array of labels.
+        event_weights (np.ndarray): Array of event weights corresponding to each label.
+    
+    Returns:
+        torch.Tensor: Tensor of class weights.
     '''
     labels = labels.astype(int)  # Ensure labels are integers
-    class_counts = np.bincount(labels)
-    class_weights = 1.0 / class_counts
+    unique_labels = np.unique(labels)
+
+    # Initialize an array to hold the weighted count for each class
+    weighted_counts = np.zeros(len(unique_labels), dtype=float)
+
+    # Accumulate the weighted counts for each class
+    for label in unique_labels:
+        weighted_counts[label] = np.sum(event_weights[labels == label])
+    
+    # Compute the class weights as the inverse of the weighted counts
+    class_weights = 1.0 / weighted_counts
     class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
+    
     return torch.tensor(class_weights, dtype=torch.float)
 
 ### define loss function and optimiser
-def weighted_bce_loss(output, target, weights):
-    loss = weights[1] * target * torch.log(output) + weights[0] * (1 - target) * torch.log(1 - output)
+def weighted_bce_loss(output, target, class_weights, event_weights):
+    loss = event_weights * (class_weights[1] * target * torch.log(output) + class_weights[0] * (1 - target) * torch.log(1 - output))
     return -loss.mean()
 
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
@@ -243,13 +274,14 @@ optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 logging.info("Training ...")
 print("full x", len(full_x))
 print("full y", len(full_y))
-print("edge ind", len(edge_ind))
+if len(hidden_sizes_gcn) > 0:
+    print("edge ind", len(edge_ind))
 
 gc.collect()
 torch.cuda.empty_cache()
 
 ### create data object, train and val loaders
-data = Data(x = full_x, y = full_y, edge_index = edge_ind)#, edge_weight = edge_wgts)
+data = Data(x = full_x, y = full_y, edge_index = edge_ind, wgts = full_wgts)#, edge_weight = edge_wgts)
 del edge_ind
 
 train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)+len(val_sig), len(train_sig)+len(val_sig)+len(train_bkg))), dim=0).tolist()
@@ -258,7 +290,8 @@ print("train idx", len(train_idx))
 print("val idx", len(val_idx))
 
 all_labels = data.y[train_idx].cpu().numpy()
-class_weights = compute_class_weights(all_labels).to(device)
+all_wgts = data.wgts[train_idx].cpu().numpy()
+class_weights = compute_class_weights(all_labels, all_wgts).to(device)
 print("class weights", class_weights)
 
 logging.info("Graph sub-sampling for training ...")
@@ -291,8 +324,9 @@ for epoch in range(epochs):
     total_examples = total_loss = 0
     train_outputs = torch.tensor([])
     train_truth_labels = torch.tensor([])
+    train_wgts = torch.tensor([])
     for batch in train_loader:
-        
+
         optimiser.zero_grad()
         batch = batch.to(device)
         batch_size = batch.batch_size
@@ -301,17 +335,20 @@ for epoch in range(epochs):
         ### NOTE only consider predictions and labels of seed nodes
         y = batch.y[:batch_size]
         outputs = outputs[:batch_size]
+        event_wgts = batch.wgts[:batch_size]
 
-        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights)
+        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts) 
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
         optimiser.step() 
 
         torch.cuda.empty_cache()
-
         total_examples += batch_size
         total_loss += float(loss) * batch_size
         train_outputs = torch.cat((train_outputs, outputs.detach()))
         train_truth_labels = torch.cat((train_truth_labels, y.detach()))
+        train_wgts = torch.cat((train_wgts, event_wgts.detach()))
         
     avg_tr_loss = total_loss / total_examples
     train_loss.append(avg_tr_loss)
@@ -321,6 +358,7 @@ for epoch in range(epochs):
     total_examples = total_loss = 0
     val_outputs = torch.tensor([])
     val_truth_labels = torch.tensor([])
+    val_wgts = torch.tensor([])
     for batch in val_loader:
         
         batch = batch.to(device)
@@ -330,13 +368,15 @@ for epoch in range(epochs):
         ### NOTE only consider predictions and labels of seed nodes
         y = batch.y[:batch_size]
         outputs = outputs[:batch_size]
+        event_wgts = batch.wgts[:batch_size]
 
-        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights)
+        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
 
         total_examples += batch_size
         total_loss += float(loss) * batch_size
         val_outputs = torch.cat((val_outputs, outputs.detach()))
         val_truth_labels = torch.cat((val_truth_labels, y.detach()))
+        val_wgts = torch.cat((val_wgts, event_wgts.detach()))
 
     avg_vl_loss = total_loss / total_examples
     val_loss.append(avg_vl_loss)
@@ -360,19 +400,23 @@ torch.save({
 train_outputs = train_outputs.view(-1).to(device)
 train_label_bool = train_truth_labels.bool()
 train_sig_pred = train_outputs[train_label_bool]
+train_sig_wgts = train_wgts[train_label_bool]
 train_bkg_pred = train_outputs[torch.logical_not(train_label_bool)]
+train_bkg_wgts = train_wgts[torch.logical_not(train_label_bool)]
 
-train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy())
-train_auc = roc_auc_score(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy())
+train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
+train_auc = roc_auc_score(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
 print("Training AUC", train_auc)
 
 val_outputs = val_outputs.view(-1).to(device)
 val_label_bool = val_truth_labels.bool()
 val_sig_pred = val_outputs[val_label_bool]
+val_sig_wgts = val_wgts[val_label_bool]
 val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
+val_bkg_wgts = val_wgts[torch.logical_not(val_label_bool)]
 
-val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy())
-val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy())
+val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
+val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
 print("Validation AUC", val_auc)
 
 # save performance to json
@@ -407,10 +451,26 @@ binning = np.linspace(0,1,51)
 # np.save(plot_path+"val_sig_pred_hist.npy", val_sig_pred_hist)
 # np.save(plot_path+"val_bkg_pred_hist.npy", val_bkg_pred_hist)
 
-ax.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange")
-ax.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue")
-ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange")
-ax.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue")
+ax.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange", weights=train_sig_wgts.detach().cpu().numpy())
+ax.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue", weights=train_bkg_wgts.detach().cpu().numpy())
+ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange", weights=val_sig_wgts.detach().cpu().numpy())
+ax.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue", weights=val_bkg_wgts.detach().cpu().numpy())
+
+score_path = score_path + model_label + "/"
+misc.create_dirs(score_path)
+
+np.save(score_path+"train_sig_pred.npy", train_sig_pred.detach().cpu().numpy())
+np.save(score_path+"train_sig_wgts.npy", train_sig_wgts.detach().cpu().numpy())
+
+np.save(score_path+"train_bkg_pred.npy", train_bkg_pred.detach().cpu().numpy())
+np.save(score_path+"train_bkg_wgts.npy", train_bkg_wgts.detach().cpu().numpy())
+
+np.save(score_path+"val_sig_pred.npy", val_sig_pred.detach().cpu().numpy())
+np.save(score_path+"val_sig_wgts.npy", val_sig_wgts.detach().cpu().numpy())
+
+np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().cpu().numpy())
+np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().cpu().numpy())
+
 if eff is not None:
     text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length at sig-sig efficiency "+str(eff)]
 elif linking_length is not None:
