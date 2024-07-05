@@ -41,17 +41,36 @@ def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, 
         (torch.tensor(float32)): background event weight tensor
         (torce.tensor(float32)): all event truth labels ie. 1 for sig, 0 for bkg
     """
-    bkg_typedict = {"hhh": ["bkg"], "LQ": ["singletop", "ttbar"], "staus": []}
+    bkg_typedict = {"hhh": ["bkg"], "LQ": ["singletop", "ttbar"], 
+                    "stau": ['Wjets','Zlljets','Zttjets','diboson0L','diboson1L', 
+                              'diboson2L','diboson3L','diboson4L', 'higgs',
+                                'singletop','topOther','triboson','ttV','ttbar_incl']}
     bkg_types = bkg_typedict[signal]
 
-    df_sig =  pd.read_hdf(h5_path+"/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
+    if signal == "stau":
+        df_sig = pd.read_hdf(h5_path+"/StauStau_"+str(f_type)+".h5")
+        df_sig = misc.sig_mass_point(df_sig, mass_points = ['100_50'])
+    else:
+        df_sig =  pd.read_hdf(h5_path+"/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
+    
     df_bkg = pd.DataFrame()
-    for bkg in bkg_types:
-        tmp_df_bkg = pd.read_hdf(h5_path+"/"+bkg+"_"+str(f_type)+".h5", key=bkg+"_"+str(f_type))
-        df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
+    if signal == "stau":
+        for bkg in bkg_types:
+            tmp_df_bkg = pd.read_hdf(h5_path+"/"+bkg+"_"+str(f_type)+".h5")
+            df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
+    else:
+        for bkg in bkg_types:
+            tmp_df_bkg = pd.read_hdf(h5_path+"/"+bkg+"_"+str(f_type)+".h5", key=bkg+"_"+str(f_type))
+            df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
 
-    df_sig_wgts = df_sig["eventWeight"]
-    df_bkg_wgts = df_bkg["eventWeight"]
+    ### get event weights
+    if signal == "stau":
+        df_sig_wgts = df_sig["scale_factor"]
+        df_bkg_wgts = df_bkg["scale_factor"]
+    else:
+        df_sig_wgts = df_sig["eventWeight"]
+        df_bkg_wgts = df_bkg["eventWeight"]
+    
     df_sig = df_sig[kinematics]
     df_bkg = df_bkg[kinematics]
     df_all = pd.concat([df_sig, df_bkg], axis=0)
@@ -60,8 +79,10 @@ def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, 
     bkg_label = [0]*len(df_bkg)
     # Standardising kinematics
     for var in kinematics:
+        print(f"-----> Standardising {var}:")
         if norm_kin:
-            df_all.loc[:, var] = norm.standardise(df_all.loc[:, var])
+            standardised_values = norm.standardise(df_all.loc[:, var])
+            df_all.loc[:, var] = standardised_values.astype('float32')  # convert to float32
         df_sig = df_all.iloc[:len(df_sig)]
         df_bkg = df_all.iloc[len(df_sig):]
         if plot_path != "": plot.plot_kinematic_hists(df_sig, df_bkg, var, plot_path, standardise=norm_kin)
@@ -72,7 +93,7 @@ def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, 
     torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
     # concatenating signal and background events / weights
     torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
-    truth_labels = torch.tensor(numpy.concatenate((sig_label, bkg_label)), dtype=torch.float32)
+    # truth_labels = torch.tensor(numpy.concatenate((sig_label, bkg_label)), dtype=torch.float32)
 
     return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label), torch.tensor(bkg_label) #truth_labels
 

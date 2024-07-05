@@ -3,6 +3,7 @@ import yaml
 import glob
 import torch
 import math
+import pandas as pd
 torch.manual_seed(42)
 
 def print_mem_info():
@@ -73,6 +74,150 @@ def get_kinematics(variable):
         raise Exception("bruh, pick a better variable set (mass, angular, shape, combined, mass_and_angular, mass_and_shape)")
 
     return kinematics
+
+def get_kinematics_staus(variable):
+    """
+    Function to obtain the list of names of kinematic variables to use for a given category.
+    Throws an exception for an unknown category
+
+    Args:
+        variable (str): the category of variables you want the list for
+
+    Returns:
+        list(str): the list of names of kinematic variables
+    """
+    if variable == "all":    
+        kin_var_0J = [
+            ### met
+            'met_Et', 'met_Signif', 'TST_Et',
+            ### tau
+            'tauPt', 'tauEta', 'tauNTracks', 
+            # 'tauM', #check this
+            ### lep
+            'lepPt', 'lepEta', 'lepD0', 'lepD0Sig', 'lepZ0',
+            'lepZ0SinTheta','lepFlavor', 'lepCharge',
+            ### dphi (losing parity info bc of abs? check this!)
+            'dPhi_met_tst', 'dPhi_met_lep', 'dPhi_met_tau', 
+            'dPhi_tst_lep', 'dPhi_tst_tau', 'dPhi_lep_tau', 
+            ### dEta and dR
+            'dEta_lep_tau', 'dR_lep_tau', 
+            ### angular
+            'sum_cos', 
+            'met_cen', 
+            'cPhi1', 'cPhi2', 
+            'cos_star',
+            ### balance
+            'tau_lep_bal', 'met_bal',
+            ### mass
+            'mT_tau_met', 'mT_lep_met', 
+            'mT_sum', 'mCT_tau_lep','m_inv_tau_lep', 
+            ### mt2
+            'mT2_0', 'mT2_10', 'mT2_20', 'mT2_30', 
+            'mT2_40', 'mT2_50', 'mT2_60',
+            ### meff
+            # 'myMeffInc20', 'myMeffInc20_tau',
+            # 'myMeffInc30', 'myMeffInc30_tau', 
+            'myMeffInc40', 'myMeffInc40_tau', 
+            # 'myMeffInc50', 'myMeffInc50_tau',
+            'nbjets_85WP'
+            ### also try absEta?
+        ]
+
+        kin_var_J =  [
+            'jetPt', 'jetEta', 'jetM',
+            'dPhi_met_jet', 'dPhi_tst_jet', 
+            'dPhi_lep_jet', 'dPhi_tau_jet',
+            'dEta_lep_jet', 'dEta_tau_jet',
+            'dR_lep_jet', 'dR_tau_jet',
+            'myHt40', 
+            'njets20', 'njets30', 'njets40', 'njets50',
+            ]
+
+        rtaus_var_0J = [#'rtau1_x', 'rtau1_y', 'rtau2_x', 'rtau2_y', 
+                'rtau1Pt', #'rtau1Phi',
+                'rtau2Pt', #'rtau2Phi', 
+                'dPhi_met_rtau1', 'dPhi_met_rtau2',
+                'dPhi_tst_rtau1', 'dPhi_tst_rtau2', 
+                'dPhi_rtau1_rtau2',
+                'dR_rtau1_rtau2',  
+                'm_inv_rtaus', 
+                'rtaus_bal', 
+                'mCT_rtaus',
+                'cos_star_rtaus', #'scale_factor'
+                ]
+
+        rtaus_var_J = [
+                'dPhi_rtau1_jet',  
+                'dPhi_rtau2_jet',
+                'dR_rtau1_jet',
+                'dR_rtau2_jet', 
+                ]
+
+        kin_var_0J = kin_var_0J + rtaus_var_0J
+        kin_var_J = kin_var_J + rtaus_var_J
+        kinematics = kin_var_0J + kin_var_J
+
+    elif variable == "distance":
+        # distance_var = kin_var
+        kinematics = [
+            'lep1D0Sig',
+            'lep1Pt',
+            'met_Et',
+            'met_Signif',
+            'm_inv_tau_lep',
+            'mT_lep_met',
+            'mT_sum',
+            'mT_tau_met',
+            'tauPt',
+        ]
+    else:
+        raise Exception("bruh, pick a better variable set for staus (all, distance)")
+    
+    return kinematics
+
+def sig_mass_point(df_sig, mass_points = ['100_50']):
+    """
+    Function to obtain signal for desired mass point(s)
+    Args:
+        df_sig (pd.DataFrame): the signal dataframe
+        mass_points (list(str)): the mass point(s) you want to extract
+    Returns:
+        (pd.DataFrame): the signal dataframe for the desired mass point(s)
+    """
+    mass_point_dsid = { "100_1": 537028,
+                "100_25": 537029,
+                "100_50": 537030,
+                "100_75": 537031,
+                "100_90": 537032,
+                "150_1": 537033,
+                "150_50": 537034,
+                "150_75": 537035,
+                "150_100": 537036,
+                "150_125": 537037,
+                "150_140": 537038,
+                "200_1": 537039,
+                "200_50": 537040,
+                "200_100": 537041,
+                "200_125": 537042,
+                "200_150": 537043,
+                "200_175": 537044,
+                "200_190": 537045,
+                "250_1": 537046,
+                "250_50": 537047,
+                "250_100": 537048,
+                "250_150": 537049,
+                "250_175": 537050,
+                "250_200": 537051,
+                "250_225": 537052,
+                "250_240": 537053,
+                }
+    
+    df_sig_new = pd.DataFrame()
+    for mp in mass_points:
+        df_sig_mp = df_sig[df_sig.DatasetNumber == mass_point_dsid[mp]]
+        df_sig_new = pd.concat([df_sig_new, df_sig_mp])
+    
+    return df_sig_new
 
 def get_h5_paths(path, variable, distance, label="sampled_train"):
     """
