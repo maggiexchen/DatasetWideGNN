@@ -471,10 +471,22 @@ np.save(score_path+"val_sig_wgts.npy", val_sig_wgts.detach().cpu().numpy())
 np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().cpu().numpy())
 np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().cpu().numpy())
 
-if eff is not None:
-    text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length at sig-sig efficiency "+str(eff)]
-elif linking_length is not None:
-    text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length "+str(linking_length)]
+if signal == "hhh":
+    if eff is not None:
+        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length at sig-sig efficiency "+str(eff)]
+    elif linking_length is not None:
+        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length "+str(linking_length)]
+elif signal == "stau":
+    if eff is not None:
+        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", "Linking length at sig-sig efficiency "+str(eff)]
+    elif linking_length is not None:
+        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", "Linking length "+str(linking_length)]
+elif signal == "LQ":
+    if eff is not None:
+        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", "Linking length at sig-sig efficiency "+str(eff)]
+    elif linking_length is not None:
+        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", "Linking length "+str(linking_length)]
+
 plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
 ax.legend(loc='upper right', fontsize=9)
 ax.set_xlabel("Output score", loc="right")
