@@ -204,6 +204,6 @@ np_sigsig_wgt = sigsig['weight'].numpy().flatten()
 np_sigbkg_wgt = sigbkg['weight'].numpy().flatten()
 np_bkgbkg_wgt = bkgbkg['weight'].numpy().flatten()
 
-plot_path =plot_path+"standardised_weighted/"+variable+"/"
+plot_path = plot_path+"/"+variable+"/"
 misc.create_dirs(plot_path)
 plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path)

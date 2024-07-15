@@ -23,9 +23,12 @@ def calc_ROC(sig, bkg, sig_wgt, bkg_wgt, flip=False):
         (float): overall AUC
 
     """
-
-    y_sig = [0]*len(sig)
-    y_bkg = [1]*len(bkg)
+    if flip:
+        y_sig = [0]*len(sig)
+        y_bkg = [1]*len(bkg)
+    else:
+        y_sig = [1]*len(sig)
+        y_bkg = [0]*len(bkg)
     x_combined = np.concatenate((sig, bkg))
     y_combined = np.concatenate((y_sig, y_bkg))
     wgt_combined = np.concatenate((sig_wgt, bkg_wgt))
