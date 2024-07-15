@@ -85,9 +85,10 @@ adj_path = user_config["adj_path"]
 dist_path = user_config["dist_path"]
 model_path = user_config["model_path"]
 score_path = user_config["score_path"]
-# TODO: assert. This should be "hhh" "LQ" or "stau"
+
 signal = user_config["signal"]
-# assert signal in ["hhh", "LQ", "stau"], "signal should be 'hhh', 'LQ' or 'stau'"
+assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
+signal_label, background_label = plotting.get_plot_labels(signal)
 
 ### load training config 
 train_config_path = args.MLconfig
@@ -115,8 +116,8 @@ eff = train_config["sigsig_eff"]
 if linking_length is None:
     if eff is None:
         raise Exception("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
-    elif eff not in [0.6, 0.7, 0.8, 0.9]:
-        raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
+    elif eff not in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+        raise Exception("not given a supported efficiency, (0.4, 0.5, 0.6, 0.7, 0.8, 0.9)")
     else:
         ll_str = "_LLEff" + str(eff).replace(".", "p")
         adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
@@ -183,20 +184,23 @@ logging.info('Importing signal and background files...')
 # raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=False, signal=signal)
 
 # normalised signal and background kinematics
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels = adj.data_loader(h5_path, plot_path, "train", kinematics, norm_kin=True, signal=signal)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=True, signal=signal)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels = adj.data_loader(h5_path, plot_path, "train", kinematics, plot=False, signal=signal)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels = adj.data_loader(h5_path, plot_path, "val", kinematics, plot=False, signal=signal)
+test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_sig_labels, test_bkg_labels = adj.data_loader(h5_path, plot_path, "test", kinematics, plot=False, signal=signal)
 
 print("train sig", len(train_sig))
 print("train bkg", len(train_bkg))
 print("val sig", len(val_sig))
 print("val bkg", len(val_bkg))
+print("test sig", len(test_sig))
+print("test bkg", len(test_bkg))
 
 
-full_sig = torch.cat((train_sig, val_sig), dim=0)
-full_sig_labels = torch.cat((train_sig_labels, val_sig_labels))
+full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
+full_sig_labels = torch.cat((train_sig_labels, val_sig_labels, test_sig_labels))
 
-full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
-full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels))
+full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
+full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels, test_bkg_labels))
 
 # raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
 # raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
@@ -207,7 +211,7 @@ del full_bkg
 
 full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
 full_y = full_y.float()
-full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)#.cuda()
+full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)), dim=0)#.cuda()
 
 ### load edge indices if gnn layers are used
 edge_ind = None

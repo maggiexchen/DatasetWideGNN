@@ -95,8 +95,8 @@ if distance is None:
 eff = train_config["sigsig_eff"]
 if eff is None:
     print("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
-elif eff not in [0.6, 0.7, 0.8, 0.9]:
-    raise Exception("not given a supported efficiency, (0.6, 0.7, 0.8, 0.9)")
+elif eff not in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+    raise Exception("not given a supported efficiency, (0.4, 0.5, 0.6, 0.7, 0.8, 0.9)")
 
 linking_length = train_config["linking_length"]
 # read in linking length calculated from sampled training data, if not given in config
@@ -139,17 +139,18 @@ logging.info('Importing signal and background files...')
 # raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=False, signal=signal)
 
 # normalised signal and background kinematics
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, _, _  = adj.data_loader(h5_path, plot_path, "train", kinematics, norm_kin=True, signal=signal)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, _, _ = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=True, signal=signal)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, _, _  = adj.data_loader(h5_path, plot_path, "train", kinematics, plot=True, signal=signal)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, _, _ = adj.data_loader(h5_path, plot_path, "val", kinematics, plot=False, signal=signal)
+test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, _, _ = adj.data_loader(h5_path, plot_path, "test", kinematics, plot=False, signal=signal)
 
-full_sig = torch.cat((train_sig, val_sig), dim=0)
-full_bkg = torch.cat((train_bkg, val_bkg), dim=0)
+full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
+full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
 
 # raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
 # raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
-full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts), dim=0)), dim=0)#.cuda()
+full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)), dim=0)#.cuda()
 
 print("numevents: ",full_x.size(0))
 
@@ -187,9 +188,11 @@ full_ind = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind)).round().t
 # logging.info("Generating sparse adjacency matrix ...")
 # sparse_adj_mat, edge_ind, crow_ind, col_ind, values = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+len(full_bkg))
 # print("sparse adj mat: ", sparse_adj_mat.shape)
-# total_edges = sigsig_ind.shape[0]+sigbkg_ind.shape[0]+bkgbkg_ind.shape[0]
-# total_pairs = (len(full_sig)+len(full_bkg))**2
-# print("The fraction of edges in graph is ", total_edges / total_pairs)
+
+
+total_edges = sigsig_ind.shape[0]+sigbkg_ind.shape[0]+bkgbkg_ind.shape[0]
+total_pairs = (len(full_sig)+len(full_bkg))**2
+print("The fraction of edges in graph is ", total_edges / total_pairs)
 del sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind
 
 misc.print_mem_info()
