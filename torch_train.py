@@ -26,6 +26,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+import torch.optim as optim
 # from torchinfo import summary
 
 from torch_geometric.data import Data
@@ -179,10 +180,6 @@ elif linking_length is not None:
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
 
-# un-normalised signal and background kinematics (for checking and plotting)
-# raw_train_sig, raw_train_bkg, _, _, _, _ = adj.data_loader(h5_path, plot_path, "train", kinematics, norm_kin=False, signal=signal)
-# raw_val_sig, raw_val_bkg, _, _, _, _ = adj.data_loader(h5_path, plot_path, "val", kinematics, norm_kin=False, signal=signal)
-
 # normalised signal and background kinematics
 train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels = adj.data_loader(h5_path, plot_path, "train", kinematics, plot=False, signal=signal)
 val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels = adj.data_loader(h5_path, plot_path, "val", kinematics, plot=False, signal=signal)
@@ -265,15 +262,27 @@ def compute_class_weights(labels, event_weights):
     # Compute the class weights as the inverse of the weighted counts
     class_weights = 1.0 / weighted_counts
     class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
-    
+
     return torch.tensor(class_weights, dtype=torch.float)
 
 ### define loss function and optimiser
 def weighted_bce_loss(output, target, class_weights, event_weights):
-    loss = event_weights * (class_weights[1] * target * torch.log(output) + class_weights[0] * (1 - target) * torch.log(1 - output))
+    sig_loss = event_weights * (class_weights[1] * target * torch.log(output+1e-10))
+    bkg_loss = class_weights[0] * (1-target) * torch.log(1-output+1e-10)
+    loss = sig_loss+bkg_loss
     return -loss.mean()
 
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, 'min')
+
+def binary_class_weights(labels, event_weights):
+    num_sig = np.sum(event_weights[labels == 1])
+    num_bkg = np.sum(event_weights[labels == 0])
+    # sig_weight = num_bkg/num_sig
+    # return torch.tensor(sig_weight, dtype=torch.float)
+    bkg_weight = num_sig/num_bkg
+    sig_weight = 1
+    return torch.tensor([bkg_weight, 1], dtype=torch.float)
 
 logging.info("Training ...")
 print("full x", len(full_x))
@@ -296,6 +305,7 @@ print("val idx", len(val_idx))
 all_labels = data.y[train_idx].cpu().numpy()
 all_wgts = data.wgts[train_idx].cpu().numpy()
 class_weights = compute_class_weights(all_labels, all_wgts).to(device)
+# class_weights = binary_class_weights(all_labels, all_wgts).to(device)
 print("class weights", class_weights)
 
 logging.info("Graph sub-sampling for training ...")
@@ -304,7 +314,7 @@ train_loader = NeighborLoader(
     input_nodes = train_idx,
     num_neighbors = num_nb_list,
     shuffle = True,
-    batch_size = batch_size, 
+    batch_size = batch_size,
     # num_workers = 6, 
     # persistent_workers = True
 )
@@ -314,11 +324,13 @@ val_loader = NeighborLoader(
     data,
     input_nodes = val_idx,
     num_neighbors = num_nb_list,
-    # shuffle = False,
+    shuffle = True,
     batch_size = batch_size,
     # num_workers = 6,
     # persistent_workers = True
 )
+
+# BCE_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([sig_class_weight]))
 
 logging.info("Starting training ...")
 for epoch in range(epochs):
@@ -344,8 +356,7 @@ for epoch in range(epochs):
         loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts) 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-
-        optimiser.step() 
+        optimiser.step()
 
         torch.cuda.empty_cache()
         total_examples += batch_size
@@ -375,6 +386,11 @@ for epoch in range(epochs):
         event_wgts = batch.wgts[:batch_size]
 
         loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
+        current_lr = optimiser.param_groups[0]['lr']
+        scheduler.step(loss)
+        new_lr = optimiser.param_groups[0]['lr']
+        if new_lr < current_lr:
+            print(f"Learning rate reduced to: {new_lr}")
 
         total_examples += batch_size
         total_loss += float(loss) * batch_size
