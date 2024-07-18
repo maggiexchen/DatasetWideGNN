@@ -27,6 +27,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 import torch.optim as optim
+from torch.utils.checkpoint import checkpoint
 # from torchinfo import summary
 
 from torch_geometric.data import Data
@@ -304,8 +305,8 @@ print("val idx", len(val_idx))
 
 all_labels = data.y[train_idx].cpu().numpy()
 all_wgts = data.wgts[train_idx].cpu().numpy()
-class_weights = compute_class_weights(all_labels, all_wgts).to(device)
-# class_weights = binary_class_weights(all_labels, all_wgts).to(device)
+# class_weights = compute_class_weights(all_labels, all_wgts).to(device)
+class_weights = binary_class_weights(all_labels, all_wgts).to(device)
 print("class weights", class_weights)
 
 logging.info("Graph sub-sampling for training ...")
