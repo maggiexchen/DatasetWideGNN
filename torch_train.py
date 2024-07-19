@@ -124,10 +124,14 @@ if linking_length is None:
         ll_str = "_LLEff" + str(eff).replace(".", "p")
         adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
 else:
-    eff = None
-    print("linking length is given in config, IGNORING the sigsig_eff in the config!")
-    ll_str = "_LL" + str(linking_length).replace(".", "p")
-    adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
+    if eff is not None:
+        # when both linking length and sigsig eff are specified, use the linking length at specified sigsig efficiency
+        ll_str = "_LLEff" + str(eff).replace(".", "p")
+        adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
+    else:
+        print("linking length is given in config, IGNORING the sigsig_eff in the config!")
+        ll_str = "_LL" + str(linking_length).replace(".", "p")
+        adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
 
 ### create model label and result plot path
 if len(hidden_sizes_gcn) == 0:
