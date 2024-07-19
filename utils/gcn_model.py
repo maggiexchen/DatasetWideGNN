@@ -41,7 +41,10 @@ class GCNClassifier(nn.Module):
         for j in range(len(hidden_sizes_mlp)):
             self.layers_mlp.append(nn.Linear(input_size, hidden_sizes_mlp[j]))
             self.batch_norms_mlp.append(nn.BatchNorm1d(hidden_sizes_mlp[j]))
-            self.dropout_mlp.append(nn.Dropout(p=dropout_rates[i+j]))
+            if len(hidden_sizes_gcn) > 0:
+                self.dropout_mlp.append(nn.Dropout(p=dropout_rates[i+j]))
+            else:
+                self.dropout_mlp.append(nn.Dropout(p=dropout_rates[j]))
             input_size = hidden_sizes_mlp[j]
         
         
