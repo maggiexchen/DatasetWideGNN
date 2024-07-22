@@ -1,0 +1,12 @@
+variable: "all"
+distance: "euclidean"
+sigsig_eff: 0.6
+linking_length: 0.1
+hidden_sizes_gcn: []
+hidden_sizes_mlp: [64, 48, 32, 16,16]
+LR: 0.001
+dropout_rates: [0.0, 0.0, 0.0, 0.0, 0.0]
+epochs: 10
+num_nb_list: [20, 20, 20, 20]
+batch_size: 2048
+gnn_type: "Graph"
