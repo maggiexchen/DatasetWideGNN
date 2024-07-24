@@ -1,0 +1,10 @@
+#######################
+# user config for Maggie
+#######################
+
+# signal model hhh, LQ, stau
+signal: LQ
+
+# input paths
+ntuple_path: /data/atlas/atlasdata3/maggiechen/LQ_ntuples/
+h5_path: /data/atlas/atlasdata3/maggiechen/LQ_test/
