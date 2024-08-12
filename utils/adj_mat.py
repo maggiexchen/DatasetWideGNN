@@ -112,7 +112,7 @@ def create_adj_mat(a, length):
     Returns:
         (float): cityblock distance
     """
-    return (a <= length).float()
+    return (a <= length).int()
 
 
 def create_node_wgts(a, b):
