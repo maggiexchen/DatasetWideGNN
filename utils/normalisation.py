@@ -1,4 +1,5 @@
 import numpy
+import torch
 
 def MAD_norm(dist1, dist2):
     """
@@ -67,4 +68,9 @@ def standardise(dist):
     """
     mean = numpy.mean(dist)
     std = numpy.std(dist)
+    return (dist-mean)/std
+
+def standardise_tensor(dist):
+    mean = torch.mean(dist)
+    std = torch.std(dist)
     return (dist-mean)/std
