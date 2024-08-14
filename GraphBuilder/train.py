@@ -65,21 +65,25 @@ signal = user_config["signal"]
 logging.info('Importing signal and background files...')
 train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_sig_labels, train_truth_bkg_labels = adj.data_loader(h5_path, "", "train", kinematics, signal=signal)
 val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_sig_labels, val_truth_bkg_labels = adj.data_loader(h5_path, "", "val", kinematics, signal=signal)
+test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels, test_truth_bkg_labels = adj.data_loader(h5_path, "", "test", kinematics, signal=signal)
 
 train_pairs= PairDataset(train_sig, train_bkg, 200, 200)
-# val_pairs = PairDataset(val_sig, val_bkg, 100, 100)
+val_pairs = PairDataset(val_sig, val_bkg, 100, 100)
 print("training pairs", len(train_pairs))
-# print("validation pairs", len(val_pairs))
+print("validation pairs", len(val_pairs))
 
 train_loader = DataLoader(train_pairs, batch_size=512, shuffle=True)
-# val_loader = DataLoader(val_pairs, batch_size=128, shuffle=True)
+val_loader = DataLoader(val_pairs, batch_size=128, shuffle=True)
 
 model = EmbeddingNet(input_dim=len(kinematics), embedding_dim=2)
-margin = 0.5
-contrastive_hinge_loss = ContrastiveHingeLoss(margin=margin, embedding_dim=2)
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-num_epochs = 30
+margin = user_config["margin"]
+LR = user_config["LR"]
+embedding_dim = user_config["embedding_dim"]
+num_epoch = user_config["epoch"]
+penalty = user_config["penalty"]
+contrastive_hinge_loss = ContrastiveHingeLoss(margin=margin, embedding_dim=embedding_dim, pen=penalty)
+optimizer = optim.Adam(model.parameters(), lr=LR)
+num_epochs = num_epoch
 
 train_output1 = torch.tensor([])
 train_output2 = torch.tensor([])
@@ -100,7 +104,6 @@ for epoch in range(num_epochs):
         labels = labels.float()
 
         optimizer.zero_grad()
-        # output1, output2 = model(signal_events, background_events)
         output1 = model(event1)
         output2 = model(event2)
         train_output1 = torch.cat((train_output1, output1))
@@ -112,18 +115,38 @@ for epoch in range(num_epochs):
         running_loss += loss.item() * batchsize
 
     epoch_loss = running_loss / len(train_loader.dataset)
-    print(f'Epoch {epoch+1}/{num_epochs}, Train Loss: {epoch_loss:.4f}')
     train_loss.append(epoch_loss)
 
-model.eval()
-val_running_loss = 0.0
-num_batches = 0
-with torch.no_grad():
+    model.eval()
+    running_val_loss = 0.0
+    with torch.no_grad():  # Disable gradient computation
+        for batch in val_loader:
+            event1, event2, labels = batch
+            batchsize = event1.size(0)
+            event1 = event1.float()
+            event2 = event2.float()
+            labels = labels.float()
 
-    val_data = torch.cat((val_sig, val_bkg), dim=0)
-    val_idx = torch.randperm(len(val_data))[:500]
-    val_embeddings = model(val_data[val_idx])
-val_labels = torch.cat((val_truth_sig_labels, val_truth_bkg_labels), dim=0)[val_idx]
+            # Forward pass
+            output1 = model(event1)
+            output2 = model(event2)
+
+            # Compute the loss
+            loss = contrastive_hinge_loss(output1, output2, labels)
+            running_val_loss += loss.item() * batchsize
+
+    # Compute average validation loss for the epoch
+    epoch_val_loss = running_val_loss / len(val_loader.dataset)
+    print(f'Epoch {epoch+1}/{num_epochs}, Train Loss: {epoch_loss:.4f}, Validation Loss: {epoch_val_loss:.4f}')
+    val_loss.append(epoch_val_loss)
+
+    model.train()
+
+with torch.no_grad():
+    test_data = torch.cat((test_sig, test_bkg), dim=0)
+    test_idx = torch.randperm(len(test_data))[:500]
+    test_embeddings = model(test_data[test_idx])
+test_labels = torch.cat((test_truth_sig_labels, test_truth_bkg_labels), dim=0)[test_idx]
 
 def embedded_euclidean_dist(embeddings, labels):
     sig_label = (labels == 1)
@@ -164,59 +187,64 @@ def make_graph(sigsig_dist, sigbkg_dist, bkgbkg_dist, radius):
     efficiency = (torch.sum(sigsig_graph) + torch.sum(bkgbkg_graph)) / same_class
 
     # calcualte graph purity
-    num = abs(torch.sum(sigsig_graph) + torch.sum(bkgbkg_graph) - torch.sum(sigbkg_graph))
-    den = abs(torch.sum(adj_mat) - torch.sum(sigbkg_graph))
-    purity = num/den
+    purity = (torch.sum(adj_mat) - torch.sum(sigbkg_graph))/torch.sum(adj_mat)
 
     # calculate fraction of edges
     total = adj_mat.shape[0]**2
     edges = torch.sum(adj_mat)
     edge_frac = edges/total
 
-    return efficiency.detach().numpy(), purity.detach().numpy(), edge_frac.detach().numpy()
+    # sigisg efficiency and purity
+    sigsig_eff = (torch.sum(sigsig_graph)) / sigsig_dist.shape[0]**2
+    sigsig_pur = torch.sum(sigsig_graph) / torch.sum(adj_mat)
 
-val_sigsig_dist, val_sigbkg_dist, val_bkgbkg_dist, val_avg_sigsig_dist, val_avg_sigbkg_dist, val_avg_bkgbkg_dist = embedded_euclidean_dist(val_embeddings, val_labels)
-print("Validation average sig-sig distance: ", val_avg_sigsig_dist)
-print("Validation average bkg-bkg distance: ", val_avg_bkgbkg_dist)
-print("Validation average sig-bkg distance: ", val_avg_sigbkg_dist)
+    # bkgbkg efficiency and purity
+    bkgbkg_eff = (torch.sum(bkgbkg_graph)) / bkgbkg_dist.shape[0]**2
+    bkgbkg_pur = torch.sum(bkgbkg_graph) / torch.sum(adj_mat)
 
-def plot_embeddings(embeddings, labels, epoch, margin, radius=1.0):
+    return efficiency.detach().numpy(), purity.detach().numpy(), edge_frac.detach().numpy(), sigsig_eff.detach().numpy(), sigsig_pur.detach().numpy(), bkgbkg_eff.detach().numpy(), bkgbkg_pur.detach().numpy()
+
+test_sigsig_dist, test_sigbkg_dist, test_bkgbkg_dist, test_avg_sigsig_dist, test_avg_sigbkg_dist, test_avg_bkgbkg_dist = embedded_euclidean_dist(test_embeddings, test_labels)
+print("Validation average sig-sig distance: ", test_avg_sigsig_dist)
+print("Validation average bkg-bkg distance: ", test_avg_bkgbkg_dist)
+print("Validation average sig-bkg distance: ", test_avg_sigbkg_dist)
+
+def plot_embeddings(embeddings, labels, epoch, margin, radius=1.0, pen=1.0):
     sigsig_dist, sigbkg_dist, bkgbkg_dist, avg_sigsig_dist, avg_sigbkg_dist, avg_bkgbkg_dist = embedded_euclidean_dist(embeddings, labels)
-    eff, purity, edge_frac = make_graph(sigsig_dist, sigbkg_dist, bkgbkg_dist, radius)
+    eff, purity, edge_frac, sigsig_eff, sigsig_pur, bkgbkg_eff, bkgbkg_pur = make_graph(sigsig_dist, sigbkg_dist, bkgbkg_dist, radius)
 
     fig = plt.figure(figsize=(12, 10))
     plt.rc('text', usetex=True)
     ax = fig.add_subplot()
     sig_label = (labels == 1)
     bkg_label = (labels == 0)
-    ax.scatter(norm.standardise_tensor(embeddings[:,0])[bkg_label], norm.standardise_tensor(embeddings[:,1])[bkg_label], c='b', label="Background")
-    ax.scatter(norm.standardise_tensor(embeddings[:,0])[sig_label], norm.standardise_tensor(embeddings[:,1])[sig_label], c='r', label="Signal")
+    ax.scatter(norm.standardise_tensor(embeddings[:,0])[bkg_label], norm.standardise_tensor(embeddings[:,1])[bkg_label], c='dodgerblue', label="Background")
+    ax.scatter(norm.standardise_tensor(embeddings[:,0])[sig_label], norm.standardise_tensor(embeddings[:,1])[sig_label], c='deeppink', label="Signal")
     ax.legend(loc="upper right", fontsize=16)
     ax.text(0.03, 0.95, r"\textbf{Signal} - Leptoquark, \textbf{Background} - $t\bar{t}$, Single top", size=16, transform=ax.transAxes)
     ax.text(0.03, 0.91, r"\textbf{Average distances:}", size=16, transform=ax.transAxes)
     ax.text(0.03, 0.88, f"sig-sig - {avg_sigsig_dist.item():.3f}, bkg-bkg - {avg_bkgbkg_dist.item():.3f}, sig-bkg - {avg_sigbkg_dist.item():.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.84, r"\textbf{Graph at radius = }" + str(radius) + ":", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.81, f"Efficiency - {eff:.3f}, purity - {purity:.3f}, edge fraction - {edge_frac:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.84, r"\textbf{Graph at radius }" + str(radius) + f", edge fraction - {edge_frac:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.81, f"Same class: efficiency - {eff:.3f}, purity - {purity:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.78, f"Sig-sig: efficiency - {sigsig_eff:.3f}, purity - {sigsig_pur:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.75, f"Bkg-bkg: efficiency - {bkgbkg_eff:.3f}, purity - {bkgbkg_pur:.3f}", size=16, transform=ax.transAxes)
 
     ax.set_xlabel('Embedded feature 1', loc="right", fontsize=16)
     ax.set_ylabel('Embedded feature 2', loc="top", fontsize=16)
-    ymin, ymax = ax.get_ylim()
-    ax.set_ylim((ymin, ymax*1.5))
-    fig.savefig("embedding_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+".pdf")
+    ax.set_xlim((-4, 4))
+    ax.set_ylim((-4, 4))
+    fig.savefig("embedding_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(pen)+".pdf")
 
-# for radius in np.arange(0.08, 0.19, 0.01):
-#     val_eff, val_pur, val_edge_frac = make_graph(val_sigsig_dist, val_sigbkg_dist, val_bkgbkg_dist, radius=radius)
-#     print("At radius ", radius)
-#     print("Same class edges efficiency - ", val_eff)
-#     print("Edge purity - ", val_pur)
-#     print("Edge fraciton - ", val_edge_frac)
 
-radius = 0.15
-plot_embeddings(val_embeddings, val_labels, num_epochs, margin, radius=radius)
+radius = 0.1
+plot_embeddings(test_embeddings, test_labels, num_epochs, margin, radius=radius, pen=penalty)
 
-# fig, ax = plt.subplots()
-# x_epoch = np.arange(1,num_epochs+1,1)
-# ax.plot(x_epoch, train_loss)
-# ax.set_xlabel("Epoch", loc="right")
-# ax.set_ylabel("Training loss", loc="top")
-# fig.savefig("training_loss.pdf", transparent=True)
+if num_epochs > 0:
+    fig, ax = plt.subplots()
+    x_epoch = np.arange(1,num_epochs+1,1)
+    ax.plot(x_epoch, train_loss, color="cornflowerblue", label="Training")
+    ax.plot(x_epoch, val_loss, color="darkorange", label="Validation")
+    ax.set_xlabel("Epoch", loc="right")
+    ax.set_ylabel("Loss", loc="top")
+    ax.legend(loc="upper right")
+    fig.savefig("loss_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(penalty)+".pdf", transparent=True)
