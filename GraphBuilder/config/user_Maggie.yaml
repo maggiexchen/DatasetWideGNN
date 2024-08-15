@@ -10,7 +10,7 @@ ntuple_path: /data/atlas/atlasdata3/maggiechen/LQ_ntuples/
 h5_path: /data/atlas/atlasdata3/maggiechen/LQ_test/
 
 # training parameters
-margin: 3
+margin: 3.0
 LR: 0.05
 embedding_dim: 2
 epoch: 30

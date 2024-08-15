@@ -143,10 +143,11 @@ for epoch in range(num_epochs):
     model.train()
 
 with torch.no_grad():
-    test_data = torch.cat((test_sig, test_bkg), dim=0)
-    test_idx = torch.randperm(len(test_data))[:500]
-    test_embeddings = model(test_data[test_idx])
-test_labels = torch.cat((test_truth_sig_labels, test_truth_bkg_labels), dim=0)[test_idx]
+    sig_sample_ind = torch.randperm(len(test_sig))[:250]
+    bkg_sample_ind = torch.randperm(len(test_bkg))[:250]
+    test_data = torch.cat((test_sig[sig_sample_ind], test_bkg[bkg_sample_ind]), dim=0)
+    test_labels = torch.cat((test_truth_sig_labels[sig_sample_ind], test_truth_bkg_labels[bkg_sample_ind]), dim=0)
+    test_embeddings = model(test_data)
 
 def embedded_euclidean_dist(embeddings, labels):
     sig_label = (labels == 1)
@@ -209,10 +210,10 @@ print("Validation average sig-sig distance: ", test_avg_sigsig_dist)
 print("Validation average bkg-bkg distance: ", test_avg_bkgbkg_dist)
 print("Validation average sig-bkg distance: ", test_avg_sigbkg_dist)
 
-def plot_embeddings(embeddings, labels, epoch, margin, radius=1.0, pen=1.0):
+def plot_embeddings(embeddings, labels, epoch, margin, feat, radius=1.0, pen=1.0):
     sigsig_dist, sigbkg_dist, bkgbkg_dist, avg_sigsig_dist, avg_sigbkg_dist, avg_bkgbkg_dist = embedded_euclidean_dist(embeddings, labels)
     eff, purity, edge_frac, sigsig_eff, sigsig_pur, bkgbkg_eff, bkgbkg_pur = make_graph(sigsig_dist, sigbkg_dist, bkgbkg_dist, radius)
-
+    if feat == 2:
     fig = plt.figure(figsize=(12, 10))
     plt.rc('text', usetex=True)
     ax = fig.add_subplot()
@@ -233,11 +234,15 @@ def plot_embeddings(embeddings, labels, epoch, margin, radius=1.0, pen=1.0):
     ax.set_ylabel('Embedded feature 2', loc="top", fontsize=16)
     ax.set_xlim((-4, 4))
     ax.set_ylim((-4, 4))
-    fig.savefig("embedding_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(pen)+".pdf")
+    plot_path = "plots/embedding_"+str(feat)+"feats/"
+    if num_epochs == 0:
+        fig.savefig(plot_path+"embedding_e0.pdf")
+    else:
+        fig.savefig(plot_path+"embedding_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(pen)+".pdf")
 
 
 radius = 0.1
-plot_embeddings(test_embeddings, test_labels, num_epochs, margin, radius=radius, pen=penalty)
+plot_embeddings(test_embeddings, test_labels, num_epochs, margin, feat=embedding_dim radius=radius, pen=penalty)
 
 if num_epochs > 0:
     fig, ax = plt.subplots()
@@ -247,4 +252,5 @@ if num_epochs > 0:
     ax.set_xlabel("Epoch", loc="right")
     ax.set_ylabel("Loss", loc="top")
     ax.legend(loc="upper right")
-    fig.savefig("loss_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(penalty)+".pdf", transparent=True)
+    plot_path = "plots/loss/"
+    fig.savefig(plot_path+"loss_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(penalty)+".pdf", transparent=True)
