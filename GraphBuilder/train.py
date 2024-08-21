@@ -25,6 +25,7 @@ import argparse
 import numpy as np
 
 from sklearn.manifold import TSNE
+tsne = TSNE(n_components=2, random_state=42)
 import matplotlib.pyplot as plt
 
 def GetParser():
@@ -60,6 +61,7 @@ user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
 h5_path = user_config["h5_path"]
 signal = user_config["signal"]
+embedding_dim = user_config["embedding_dim"]
 
 # load in input files
 logging.info('Importing signal and background files...')
@@ -75,7 +77,7 @@ print("validation pairs", len(val_pairs))
 train_loader = DataLoader(train_pairs, batch_size=512, shuffle=True)
 val_loader = DataLoader(val_pairs, batch_size=128, shuffle=True)
 
-model = EmbeddingNet(input_dim=len(kinematics), embedding_dim=2)
+model = EmbeddingNet(input_dim=len(kinematics), embedding_dim=embedding_dim)
 margin = user_config["margin"]
 LR = user_config["LR"]
 embedding_dim = user_config["embedding_dim"]
@@ -91,6 +93,10 @@ train_labels = torch.tensor([])
 
 train_loss = []
 val_loss = []
+print("Training ...")
+print("Margin: ", margin)
+print("Embedding dim: ", embedding_dim)
+print("LR: ", LR)
 
 for epoch in range(num_epochs):
     model.train()
@@ -213,36 +219,43 @@ print("Validation average sig-bkg distance: ", test_avg_sigbkg_dist)
 def plot_embeddings(embeddings, labels, epoch, margin, feat, radius=1.0, pen=1.0):
     sigsig_dist, sigbkg_dist, bkgbkg_dist, avg_sigsig_dist, avg_sigbkg_dist, avg_bkgbkg_dist = embedded_euclidean_dist(embeddings, labels)
     eff, purity, edge_frac, sigsig_eff, sigsig_pur, bkgbkg_eff, bkgbkg_pur = make_graph(sigsig_dist, sigbkg_dist, bkgbkg_dist, radius)
-    if feat == 2:
     fig = plt.figure(figsize=(12, 10))
     plt.rc('text', usetex=True)
     ax = fig.add_subplot()
     sig_label = (labels == 1)
     bkg_label = (labels == 0)
-    ax.scatter(norm.standardise_tensor(embeddings[:,0])[bkg_label], norm.standardise_tensor(embeddings[:,1])[bkg_label], c='dodgerblue', label="Background")
-    ax.scatter(norm.standardise_tensor(embeddings[:,0])[sig_label], norm.standardise_tensor(embeddings[:,1])[sig_label], c='deeppink', label="Signal")
+    if feat==2:
+        ax.scatter(embeddings[:,0][bkg_label], embeddings[:,1][bkg_label], c='dodgerblue', label="Background")
+        ax.scatter(embeddings[:,0][sig_label], embeddings[:,1][sig_label], c='deeppink', label="Signal")
+    else:
+        embeddings_2d = tsne.fit_transform(embeddings)
+        ax.scatter(embeddings_2d[:,0][bkg_label], embeddings_2d[:,1][bkg_label], c='dodgerblue', label="Background")
+        ax.scatter(embeddings_2d[:,0][sig_label], embeddings_2d[:,1][sig_label], c='deeppink', label="Signal")
+
     ax.legend(loc="upper right", fontsize=16)
     ax.text(0.03, 0.95, r"\textbf{Signal} - Leptoquark, \textbf{Background} - $t\bar{t}$, Single top", size=16, transform=ax.transAxes)
     ax.text(0.03, 0.91, r"\textbf{Average distances:}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.88, f"sig-sig - {avg_sigsig_dist.item():.3f}, bkg-bkg - {avg_bkgbkg_dist.item():.3f}, sig-bkg - {avg_sigbkg_dist.item():.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.84, r"\textbf{Graph at radius }" + str(radius) + f", edge fraction - {edge_frac:.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.81, f"Same class: efficiency - {eff:.3f}, purity - {purity:.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.78, f"Sig-sig: efficiency - {sigsig_eff:.3f}, purity - {sigsig_pur:.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.75, f"Bkg-bkg: efficiency - {bkgbkg_eff:.3f}, purity - {bkgbkg_pur:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.88, f"sig-sig {avg_sigsig_dist.item():.3f}, bkg-bkg {avg_bkgbkg_dist.item():.3f}, sig-bkg {avg_sigbkg_dist.item():.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.84, r"\textbf{Graph at radius }" + str(radius) + f", edge fraction {edge_frac:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.81, f"Same class: efficiency {eff:.3f}, purity {purity:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.78, f"Sig-sig: efficiency {sigsig_eff:.3f}, purity {sigsig_pur:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.75, f"Bkg-bkg: efficiency {bkgbkg_eff:.3f}, purity {bkgbkg_pur:.3f}", size=16, transform=ax.transAxes)
 
     ax.set_xlabel('Embedded feature 1', loc="right", fontsize=16)
     ax.set_ylabel('Embedded feature 2', loc="top", fontsize=16)
-    ax.set_xlim((-4, 4))
-    ax.set_ylim((-4, 4))
-    plot_path = "plots/embedding_"+str(feat)+"feats/"
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    ax.set_xlim((xmin*0.8, xmax*1.2))
+    ax.set_ylim((ymin*0.8, ymax*1.2))
+    plot_path = "scan_plots/embedding_"+str(feat)+"feats/"
+    os.makedirs(plot_path, exist_ok=True)
     if num_epochs == 0:
         fig.savefig(plot_path+"embedding_e0.pdf")
     else:
         fig.savefig(plot_path+"embedding_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(pen)+".pdf")
 
-
-radius = 0.1
-plot_embeddings(test_embeddings, test_labels, num_epochs, margin, feat=embedding_dim radius=radius, pen=penalty)
+radius = margin
+plot_embeddings(test_embeddings, test_labels, num_epochs, margin, feat=embedding_dim, radius=radius, pen=penalty)
 
 if num_epochs > 0:
     fig, ax = plt.subplots()
@@ -252,5 +265,6 @@ if num_epochs > 0:
     ax.set_xlabel("Epoch", loc="right")
     ax.set_ylabel("Loss", loc="top")
     ax.legend(loc="upper right")
-    plot_path = "plots/loss/"
+    plot_path = "scan_plots/embedding_"+str(embedding_dim)+"feats/loss/"
+    os.makedirs(plot_path, exist_ok=True)
     fig.savefig(plot_path+"loss_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(penalty)+".pdf", transparent=True)
