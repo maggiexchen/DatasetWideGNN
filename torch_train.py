@@ -379,35 +379,36 @@ for epoch in range(epochs):
     val_outputs = torch.tensor([])
     val_truth_labels = torch.tensor([])
     val_wgts = torch.tensor([])
-    for batch in val_loader:
-        
-        batch = batch.to(device)
-        batch_size = batch.batch_size
-        outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
+    with torch.no_grad():
+        for batch in val_loader:
+            
+            batch = batch.to(device)
+            batch_size = batch.batch_size
+            outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
 
-        ### NOTE only consider predictions and labels of seed nodes
-        y = batch.y[:batch_size]
-        outputs = outputs[:batch_size]
-        event_wgts = batch.wgts[:batch_size]
+            ### NOTE only consider predictions and labels of seed nodes
+            y = batch.y[:batch_size]
+            outputs = outputs[:batch_size]
+            event_wgts = batch.wgts[:batch_size]
 
-        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
-        current_lr = optimiser.param_groups[0]['lr']
-        scheduler.step(loss)
-        new_lr = optimiser.param_groups[0]['lr']
-        if new_lr < current_lr:
-            print(f"Learning rate reduced to: {new_lr}")
+            loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
+            current_lr = optimiser.param_groups[0]['lr']
+            scheduler.step(loss)
+            new_lr = optimiser.param_groups[0]['lr']
+            if new_lr < current_lr:
+                print(f"Learning rate reduced to: {new_lr}")
 
-        total_examples += batch_size
-        total_loss += float(loss) * batch_size
-        val_outputs = torch.cat((val_outputs, outputs.detach()))
-        val_truth_labels = torch.cat((val_truth_labels, y.detach()))
-        val_wgts = torch.cat((val_wgts, event_wgts.detach()))
+            total_examples += batch_size
+            total_loss += float(loss) * batch_size
+            val_outputs = torch.cat((val_outputs, outputs.detach()))
+            val_truth_labels = torch.cat((val_truth_labels, y.detach()))
+            val_wgts = torch.cat((val_wgts, event_wgts.detach()))
 
     avg_vl_loss = total_loss / total_examples
     val_loss.append(avg_vl_loss)
-        
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
-
+    scheduler.step(avg_vl_loss)
+    
 logging.info("Training complete.")
 print("train truth labels", len(train_truth_labels))
 print("val truth labels", len(val_truth_labels))
