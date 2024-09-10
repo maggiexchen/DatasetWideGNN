@@ -9,9 +9,12 @@ signal: LQ
 ntuple_path: /data/atlas/atlasdata3/maggiechen/LQ_ntuples/
 h5_path: /data/atlas/atlasdata3/maggiechen/LQ_test/
 
+# save paths
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/models/
+
 # training parameters
-margin: 2.0
+margin: 2
 LR: 0.01
-embedding_dim: 4
+embedding_dim: 24
 epoch: 30
-penalty: 1.0
+penalty: 4
