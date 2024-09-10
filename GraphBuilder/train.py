@@ -23,6 +23,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
 import numpy as np
+import json
 
 from sklearn.manifold import TSNE
 tsne = TSNE(n_components=2, random_state=42)
@@ -60,6 +61,7 @@ kinematics = misc.get_kinematics(variable)
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
 h5_path = user_config["h5_path"]
+model_save_path = user_config["model_path"]
 signal = user_config["signal"]
 embedding_dim = user_config["embedding_dim"]
 
@@ -83,8 +85,11 @@ LR = user_config["LR"]
 embedding_dim = user_config["embedding_dim"]
 num_epoch = user_config["epoch"]
 penalty = user_config["penalty"]
+radius = margin/2
+
 contrastive_hinge_loss = ContrastiveHingeLoss(margin=margin, embedding_dim=embedding_dim, pen=penalty)
-optimizer = optim.Adam(model.parameters(), lr=LR)
+optimiser = optim.Adam(model.parameters(), lr=LR)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, 'min')
 num_epochs = num_epoch
 
 train_output1 = torch.tensor([])
@@ -109,7 +114,7 @@ for epoch in range(num_epochs):
         event2 = event2.float()
         labels = labels.float()
 
-        optimizer.zero_grad()
+        optimiser.zero_grad()
         output1 = model(event1)
         output2 = model(event2)
         train_output1 = torch.cat((train_output1, output1))
@@ -117,7 +122,7 @@ for epoch in range(num_epochs):
         train_labels = torch.cat((train_labels, labels))
         loss = contrastive_hinge_loss(output1, output2, labels)
         loss.backward()
-        optimizer.step()
+        optimiser.step()
         running_loss += loss.item() * batchsize
 
     epoch_loss = running_loss / len(train_loader.dataset)
@@ -146,7 +151,17 @@ for epoch in range(num_epochs):
     print(f'Epoch {epoch+1}/{num_epochs}, Train Loss: {epoch_loss:.4f}, Validation Loss: {epoch_val_loss:.4f}')
     val_loss.append(epoch_val_loss)
 
+    scheduler.step(epoch_val_loss)
     model.train()
+
+logging.info("Saving trained model and performance...")
+model_file_name = "EmbeddingNet_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(penalty)+"_model.pth"
+model_path = modle_save_path + "embedding_"+str(embedding_dim)+"feats/"
+os.makedirs(model_path, exist_ok=True)
+torch.save({
+    'model_state': model.state_dict(),
+    'optimiser_state': optimiser.state_dict(),
+}, model_path+model_file_name)
 
 with torch.no_grad():
     sig_sample_ind = torch.randperm(len(test_sig))[:250]
@@ -234,19 +249,20 @@ def plot_embeddings(embeddings, labels, epoch, margin, feat, radius=1.0, pen=1.0
 
     ax.legend(loc="upper right", fontsize=16)
     ax.text(0.03, 0.95, r"\textbf{Signal} - Leptoquark, \textbf{Background} - $t\bar{t}$, Single top", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.91, r"\textbf{Average distances:}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.88, f"sig-sig {avg_sigsig_dist.item():.3f}, bkg-bkg {avg_bkgbkg_dist.item():.3f}, sig-bkg {avg_sigbkg_dist.item():.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.84, r"\textbf{Graph at radius }" + str(radius) + f", edge fraction {edge_frac:.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.81, f"Same class: efficiency {eff:.3f}, purity {purity:.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.78, f"Sig-sig: efficiency {sigsig_eff:.3f}, purity {sigsig_pur:.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.75, f"Bkg-bkg: efficiency {bkgbkg_eff:.3f}, purity {bkgbkg_pur:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.91, r"\textbf{Loss margin: }" + str(margin), size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.88, r"\textbf{Average distances:}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.84, f"sig-sig {avg_sigsig_dist.item():.3f}, bkg-bkg {avg_bkgbkg_dist.item():.3f}, sig-bkg {avg_sigbkg_dist.item():.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.79, r"\textbf{Graph at radius }" + str(radius) + f", edge fraction {edge_frac:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.76, f"Same class: efficiency {eff:.3f}, purity {purity:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.73, f"Sig-sig: efficiency {sigsig_eff:.3f}, purity {sigsig_pur:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.70, f"Bkg-bkg: efficiency {bkgbkg_eff:.3f}, purity {bkgbkg_pur:.3f}", size=16, transform=ax.transAxes)
 
     ax.set_xlabel('Embedded feature 1', loc="right", fontsize=16)
     ax.set_ylabel('Embedded feature 2', loc="top", fontsize=16)
     xmin, xmax = ax.get_xlim()
     ymin, ymax = ax.get_ylim()
-    ax.set_xlim((xmin*0.8, xmax*1.2))
-    ax.set_ylim((ymin*0.8, ymax*1.2))
+    ax.set_xlim((xmin*1.2, xmax*1.2))
+    ax.set_ylim((ymin*1.2, ymax*1.2))
     plot_path = "scan_plots/embedding_"+str(feat)+"feats/"
     os.makedirs(plot_path, exist_ok=True)
     if num_epochs == 0:
@@ -254,8 +270,32 @@ def plot_embeddings(embeddings, labels, epoch, margin, feat, radius=1.0, pen=1.0
     else:
         fig.savefig(plot_path+"embedding_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(pen)+".pdf")
 
-radius = margin
-plot_embeddings(test_embeddings, test_labels, num_epochs, margin, feat=embedding_dim, radius=radius, pen=penalty)
+    # graph info saved into a dictionary
+    graph_dict = {"loss_margin": margin,
+                  "loss_penalty": pen,
+                  "radius": radius,
+                  "embedding_dim": feat,
+                  "avg_sigsig_dist": avg_sigsig_dist,
+                  "avg_sigbkg_dist": avg_sigbkg_dist,
+                  "avg_bkgbkg_dist": avg_bkgbkg_dist,
+                  "edge_fraction": edge_frac,
+                  "same_class_eff": eff,
+                  "same_class_purity": purity,
+                  "sigsig_eff": sigsig_eff,
+                  "sigsig_purity": sigsig_pur,
+                  "bkgbkg_eff": bkgbkg_eff,
+                  "bkgbkg_purity": bkgbkg_pur}
+    graph_dict = {k: (v.tolist() if isinstance(v, np.ndarray) else float(v) if isinstance(v, (np.float32, np.float64)) else v) 
+                          for k, v in graph_dict.items()}
+
+    
+    return graph_dict
+
+graph_dict = plot_embeddings(test_embeddings, test_labels, num_epochs, margin, feat=embedding_dim, radius=radius, pen=penalty)
+
+graph_dict_path = model_path + "EmbeddingNet_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(penalty)+"_dict.json"
+with open(graph_dict_path, "w") as dictfile:
+    json.dump(graph_dict, dictfile)
 
 if num_epochs > 0:
     fig, ax = plt.subplots()
