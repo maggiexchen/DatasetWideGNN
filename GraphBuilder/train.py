@@ -36,14 +36,6 @@ def GetParser():
     )
 
     parser.add_argument(
-        "--variable",
-        "-v",
-        type=str,
-        required=True,
-        help="Specify the type of kinematic variables to calculate distance for",
-    )
-
-    parser.add_argument(
         "--userconfig",
         "-u",
         type=str,
@@ -55,11 +47,15 @@ def GetParser():
     return args
 
 args = GetParser()
-variable = str(args.variable)
-kinematics = misc.get_kinematics(variable)
-
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
+
+variable = user_config["variable"]
+kinematics = misc.get_kinematics(variable)
+signal = user_config["signal"]
+assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
+signal_label, background_label = plotting.get_plot_labels(signal)
+
 h5_path = user_config["h5_path"]
 model_save_path = user_config["model_path"]
 signal = user_config["signal"]

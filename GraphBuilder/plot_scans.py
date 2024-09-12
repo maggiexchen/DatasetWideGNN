@@ -2,7 +2,27 @@ import os
 import matplotlib.pyplot as plt
 import json
 import utils.misc as misc
+import argparse
 
+def GetParser():
+    """Argument parser for reading Ntuples script."""
+    parser = argparse.ArgumentParser(
+        description="Reading Ntuples command line options."
+    )
+
+    parser.add_argument(
+        "--userconfig",
+        "-u",
+        type=str,
+        required=True,
+        help="Specify the config for the user e.g. paths to store all the input/output data and results, signal model to look at",
+    )
+
+    args = parser.parse_args()
+    return args
+
+args = GetParser()
+user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
 model_path = user_config["model_path"]
 margins = [0.1, 0.5, 1.0, 1.5, 2]
@@ -13,7 +33,7 @@ linestyles = ["-", "--", "dotted"]
 
 eff_fig, eff_ax = plt.subplots(figsize=(11, 9))
 pur_fig, pur_ax = plt.subplots(figsize=(11, 9))
-plot_path = "scan_plots/"
+plot_path = user_config["plot_path"]
 
 for i, dim in enumerate(dims):
     same_class_eff = []
