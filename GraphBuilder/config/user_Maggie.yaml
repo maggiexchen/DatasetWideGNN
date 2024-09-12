@@ -4,13 +4,15 @@
 
 # signal model hhh, LQ, stau
 signal: LQ
+variable: LQ
 
 # input paths
 ntuple_path: /data/atlas/atlasdata3/maggiechen/LQ_ntuples/
 h5_path: /data/atlas/atlasdata3/maggiechen/LQ_test/
 
 # save paths
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/models/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/models/
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/scan_plots/
 
 # training parameters
 margin: 2
