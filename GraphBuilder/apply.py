@@ -18,9 +18,11 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
 import numpy as np
+import pandas as pd
 import json
 
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -47,6 +49,9 @@ user_config = misc.load_config(user_config_path)
 h5_path = user_config["h5_path"]
 model_save_path = user_config["model_path"]
 plot_path = user_config["plot_path"]
+embedding_path = user_config["embedding_path"]
+os.makedirs(embedding_path, exist_ok=True)
+
 variable = user_config["variable"]
 kinematics = misc.get_kinematics(variable)
 signal = user_config["signal"]
@@ -75,6 +80,9 @@ full_sig_labels = torch.cat((train_sig_labels, val_sig_labels, test_sig_labels))
 full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
 full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels, test_bkg_labels))
 
+sig_len = len(full_sig)
+bkg_len = len(full_bkg)
+
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
 del full_sig
 del full_bkg
@@ -94,8 +102,48 @@ with torch.no_grad():
         outputs.append(model(inputs))
 outputs = torch.cat(outputs, dim=0)
 
-print(outputs.shape)
+sig_outputs = outputs[:sig_len, :]
+bkg_outputs = outputs[sig_len:, :]
+
 # save the embedded features in h5 files
+print("Output shape ", outputs.shape)
+logging.info("Converting output tensor to numpy ...")
+sig_outputs_numpy = sig_outputs.numpy()
+bkg_outputs_numpy = bkg_outputs.numpy()
+
+
+logging.info("Train val test split ...")
+# train:validation:test = 5:3:2
+x_sig_train_val, x_sig_test, y_sig_train_val, y_sig_test = train_test_split(sig_outputs, full_sig_labels, test_size=0.2, shuffle=False)
+x_sig_train, x_sig_val, y_sig_train, y_sig_val = train_test_split(x_sig_train_val, y_sig_train_val, test_size=0.375, shuffle=False)
+
+x_bkg_train_val, x_bkg_test, y_bkg_train_val, y_bkg_test = train_test_split(bkg_outputs, full_bkg_labels, test_size=0.2, shuffle=False)
+x_bkg_train, x_bkg_val, y_bkg_train, y_bkg_val = train_test_split(x_bkg_train_val, y_bkg_train_val, test_size=0.375, shuffle=False)
+
+
+df_sig_train = pd.DataFrame({f'feat_{i+1:02d}': x_sig_train[:, i] for i in range(embedding_dim)})
+df_sig_val = pd.DataFrame({f'feat_{i+1:02d}': x_sig_val[:, i] for i in range(embedding_dim)})
+df_sig_test = pd.DataFrame({f'feat_{i+1:02d}': x_sig_test[:, i] for i in range(embedding_dim)})
+df_bkg_train = pd.DataFrame({f'feat_{i+1:02d}': x_bkg_train[:, i] for i in range(embedding_dim)})
+df_bkg_val = pd.DataFrame({f'feat_{i+1:02d}': x_bkg_val[:, i] for i in range(embedding_dim)})
+df_bkg_test = pd.DataFrame({f'feat_{i+1:02d}': x_bkg_test[:, i] for i in range(embedding_dim)})
+
+df_sig_train["target"] = y_sig_train
+df_sig_val["target"] = y_sig_val
+df_sig_test["target"] = y_sig_test
+df_bkg_train["target"] = y_bkg_train
+df_bkg_val["target"] = y_bkg_val
+df_bkg_test["target"] = y_bkg_test
+
+logging.info("Saving h5 files")
+df_sig_train.to_hdf(embedding_path + "sig_train.h5", key="sig_train", mode="w")
+df_sig_val.to_hdf(embedding_path + "sig_val.h5", key="sig_val", mode="w")
+df_sig_test.to_hdf(embedding_path + "sig_test.h5", key="sig_test", mode="w")
+df_bkg_train.to_hdf(embedding_path + "bkg_train.h5", key="bkg_train", mode="w")
+df_bkg_val.to_hdf(embedding_path + "bkg_val.h5", key="bkg_val", mode="w")
+df_bkg_test.to_hdf(embedding_path + "bkg_test.h5", key="bkg_test", mode="w")
+
+
 # change config file so that these files can be found
 # use calc_distance.py to batch calculate distances in the embedded space
 # use linking_length.py to define linking length in the embedded space
