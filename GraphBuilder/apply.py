@@ -53,7 +53,7 @@ embedding_path = user_config["embedding_path"]
 os.makedirs(embedding_path, exist_ok=True)
 
 variable = user_config["variable"]
-kinematics = misc.get_kinematics(variable)
+kinematics = misc.get_kinematics(variable, 1)
 signal = user_config["signal"]
 
 # parameters of chosen model
@@ -76,9 +76,11 @@ test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_sig_labels, test_
 
 full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
 full_sig_labels = torch.cat((train_sig_labels, val_sig_labels, test_sig_labels))
+full_sig_wgts = torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts))
 
 full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
 full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels, test_bkg_labels))
+full_bkg_wgts = torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts))
 
 sig_len = len(full_sig)
 bkg_len = len(full_bkg)
@@ -114,11 +116,11 @@ bkg_outputs_numpy = bkg_outputs.numpy()
 
 logging.info("Train val test split ...")
 # train:validation:test = 5:3:2
-x_sig_train_val, x_sig_test, y_sig_train_val, y_sig_test = train_test_split(sig_outputs, full_sig_labels, test_size=0.2, shuffle=False)
-x_sig_train, x_sig_val, y_sig_train, y_sig_val = train_test_split(x_sig_train_val, y_sig_train_val, test_size=0.375, shuffle=False)
+x_sig_train_val, x_sig_test, y_sig_train_val, y_sig_test, wgts_sig_train_val, wgts_sig_test = train_test_split(sig_outputs, full_sig_labels, full_sig_wgts, test_size=0.2, shuffle=False)
+x_sig_train, x_sig_val, y_sig_train, y_sig_val, wgts_sig_train, wgts_sig_val = train_test_split(x_sig_train_val, y_sig_train_val, wgts_sig_train_val, test_size=0.375, shuffle=False)
 
-x_bkg_train_val, x_bkg_test, y_bkg_train_val, y_bkg_test = train_test_split(bkg_outputs, full_bkg_labels, test_size=0.2, shuffle=False)
-x_bkg_train, x_bkg_val, y_bkg_train, y_bkg_val = train_test_split(x_bkg_train_val, y_bkg_train_val, test_size=0.375, shuffle=False)
+x_bkg_train_val, x_bkg_test, y_bkg_train_val, y_bkg_test, wgts_bkg_train_val, wgts_bkg_test = train_test_split(bkg_outputs, full_bkg_labels, full_bkg_wgts, test_size=0.2, shuffle=False)
+x_bkg_train, x_bkg_val, y_bkg_train, y_bkg_val, wgts_bkg_train, wgts_bkg_val = train_test_split(x_bkg_train_val, y_bkg_train_val, wgts_bkg_train_val, test_size=0.375, shuffle=False)
 
 
 df_sig_train = pd.DataFrame({f'feat_{i+1:02d}': x_sig_train[:, i] for i in range(embedding_dim)})
@@ -134,6 +136,16 @@ df_sig_test["target"] = y_sig_test
 df_bkg_train["target"] = y_bkg_train
 df_bkg_val["target"] = y_bkg_val
 df_bkg_test["target"] = y_bkg_test
+
+df_sig_train["eventWeight"] = wgts_sig_train
+df_sig_val["eventWeight"] = wgts_sig_val
+df_sig_test["eventWeight"] = wgts_sig_test
+df_bkg_train["eventWeight"] = wgts_bkg_train
+df_bkg_val["eventWeight"] = wgts_bkg_val
+df_bkg_test["eventWeight"] = wgts_bkg_test
+
+# saving eventWeights
+
 
 logging.info("Saving h5 files")
 df_sig_train.to_hdf(embedding_path + "sig_train.h5", key="sig_train", mode="w")
