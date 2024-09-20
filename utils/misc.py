@@ -41,7 +41,7 @@ def create_dirs(path):
 
     return 0
 
-def get_kinematics(variable):
+def get_kinematics(variable, dim):
     """
     Function to obtain the list of names of kinematic variables to use for a given category.
     Throws an exception for an unknown category
@@ -70,6 +70,9 @@ def get_kinematics(variable):
         kinematics = ["mH1","mH2","mH3","mHHH","sphere3dv2b","sphere3dv2btrans","aplan3dv2b","theta3dv2b"]
     elif variable == "LQ":
         kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
+    elif variable == "embedding":
+        embedding_dim = dim
+        kinematics = [f'feat_{i+1:02d}' for i in range(embedding_dim)]
     else:
         raise Exception("bruh, pick a better variable set (mass, angular, shape, combined, mass_and_angular, mass_and_shape)")
 

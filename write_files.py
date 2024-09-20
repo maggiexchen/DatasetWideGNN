@@ -38,8 +38,9 @@ user_config = misc.load_config(user_config_path)
 h5_path = user_config["h5_path"]
 ntuple_path = user_config["ntuple_path"]
 
-# TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
+feature_dim = user_config["feature_dim"]
+assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 
 logging.info("signal: "+signal)
 logging.info("input ntuple path: "+ntuple_path)
@@ -47,8 +48,6 @@ logging.info("output h5 data path: "+h5_path)
 
 # load in input files
 logging.info('Importing signal and background files...')
-#signal_file = uproot.open("/data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/6b_resonant_TRSM/out3_reco_6j_521176.root:tree")
-#background_file = uproot.open("/data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/data/out3_data_reco_5j.root:tree")
 signal_file = uproot.open(ntuple_path + "6b_resonant_TRSM/out3_reco_6j_521176.root:tree")
 background_file = uproot.open(ntuple_path + "data/out3_data_reco_5j.root:tree")
 features = signal_file.keys()

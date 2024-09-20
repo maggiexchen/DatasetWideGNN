@@ -62,9 +62,9 @@ h5_path = user_config["h5_path"]
 plot_path = user_config["plot_path"]
 dist_path = user_config["dist_path"]
 
-# TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
-### assert signal in ["hhh", "LQ", "stau"], "signal should be 'hhh', 'LQ' or 'stau'"
+feature_dim = user_config["feature_dim"]
+assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {signal}"
 
 logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
@@ -73,12 +73,11 @@ logging.info("variable set: "+variable)
 logging.info("input data path: "+h5_path)
 logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
-
-kinematics = misc.get_kinematics(variable)
+kinematics = misc.get_kinematics(variable, feature_dim)
 
 # load in input files
 logging.info('Importing signal and background files...')
-SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
+if signal == "hhh": SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
 train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_sig_labels, train_truth_bkg_labels = adj.data_loader(h5_path, "", "train", kinematics, signal=signal)
 val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_sig_labels, val_truth_bkg_labels = adj.data_loader(h5_path, "", "val", kinematics, signal=signal)
 test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels, test_truth_bkg_labels = adj.data_loader(h5_path, "", "test", kinematics, signal=signal)
@@ -86,9 +85,7 @@ test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels,
 full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
 full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
 sig_wgt = torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0)
-# train_truth_labels = torch.cat((train_truth_sig_labels, train_truth_bkg_labels), dim=0)
-# val_truth_labels = torch.cat((val_truth_sig_labels, val_truth_bkg_labels), dim=0)
-# test_truth_labels = torch.cat((test_truth_sig_labels, test_truth_bkg_labels), dim=0)
+
 global_bkg_wgt = 1.0
 if signal == "hhh": global_bkg_wgt = SF_4b5b
 bkg_wgt = torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)*global_bkg_wgt

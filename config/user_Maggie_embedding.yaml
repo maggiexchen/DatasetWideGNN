@@ -1,0 +1,19 @@
+#######################
+# user config for Maggie
+#######################
+
+# signal model hhh, LQ, stau
+signal: hhh
+feature_dim: 2
+
+# input paths
+ntuple_path: /data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/
+h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/linking_lengths/ 
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/output_scores/
+
+# output paths
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/plots/ 
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/models/ 

@@ -89,7 +89,7 @@ model_path = user_config["model_path"]
 score_path = user_config["score_path"]
 
 signal = user_config["signal"]
-assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
+assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {signal}"
 signal_label, background_label = plotting.get_plot_labels(signal)
 
 ### load training config 
@@ -155,9 +155,9 @@ plot_path = plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
 if signal == "stau":
-    kinematics = misc.get_kinematics_staus(variable)
+    kinematics = misc.get_kinematics_staus(variable, feature_dim)
 else:
-    kinematics = misc.get_kinematics(variable)
+    kinematics = misc.get_kinematics(variable, feature_dim)
 input_size = len(kinematics)
 
 train_loss = []

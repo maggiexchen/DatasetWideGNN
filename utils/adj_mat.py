@@ -69,7 +69,7 @@ def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"
     else:
         df_sig_wgts = df_sig["eventWeight"]
         df_bkg_wgts = df_bkg["eventWeight"]
-    
+
     df_sig = df_sig[kinematics]
     df_bkg = df_bkg[kinematics]
     df_all = pd.concat([df_sig, df_bkg], axis=0)
