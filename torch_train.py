@@ -80,7 +80,8 @@ device = torch.device('cpu')
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
 print("Using user config ",user_config)
-h5_path = user_config["h5_path"]
+distance_h5_path = user_config["distance_h5_path"]
+kinematic_h5_path = user_config["kinematic_h5_path"]
 plot_path = user_config["plot_path"]
 ll_path = user_config["ll_path"]
 adj_path = user_config["adj_path"]
@@ -89,6 +90,7 @@ model_path = user_config["model_path"]
 score_path = user_config["score_path"]
 
 signal = user_config["signal"]
+feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {signal}"
 signal_label, background_label = plotting.get_plot_labels(signal)
 
@@ -105,9 +107,13 @@ num_nb_list = train_config["num_nb_list"]
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
 
-variable = train_config["variable"]
-if variable is None:
+kinematic_variable = train_config["kinematic_variable"]
+embedding_variable = train_config["embedding_variable"]
+if kinematic_variable is None:
     print("Need to specify a type of kinematic variable in the config")
+
+if embedding_variable is None:
+    embedding_variable = kinematic_variable
 
 distance = train_config["distance"]
 if distance is None:
@@ -118,8 +124,8 @@ eff = train_config["sigsig_eff"]
 if linking_length is None:
     if eff is None:
         raise Exception("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
-    elif eff not in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
-        raise Exception("not given a supported efficiency, (0.4, 0.5, 0.6, 0.7, 0.8, 0.9)")
+    elif eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+        raise Exception("not given a supported efficiency, (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)")
     else:
         ll_str = "_LLEff" + str(eff).replace(".", "p")
         adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
@@ -155,9 +161,9 @@ plot_path = plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
 if signal == "stau":
-    kinematics = misc.get_kinematics_staus(variable, feature_dim)
+    kinematics = misc.get_kinematics_staus(kinematic_variable, feature_dim)
 else:
-    kinematics = misc.get_kinematics(variable, feature_dim)
+    kinematics = misc.get_kinematics(kinematic_variable, feature_dim)
 input_size = len(kinematics)
 
 train_loss = []
@@ -165,8 +171,9 @@ val_loss = []
 
 logging.info("signal: "+signal)
 logging.info("chosen model: "+model_label)
-logging.info("variable set: "+variable)
-logging.info("input data path: "+h5_path)
+logging.info("kinematic variable set: "+kinematic_variable)
+logging.info("embedding variable set: "+embedding_variable)
+logging.info("input data path: "+distance_h5_path)
 logging.info("input ll json path: "+ll_path)
 logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
@@ -186,9 +193,9 @@ elif linking_length is not None:
 logging.info('Importing signal and background files...')
 
 # normalised signal and background kinematics
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels = adj.data_loader(h5_path, plot_path, "train", kinematics, plot=False, signal=signal)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels = adj.data_loader(h5_path, plot_path, "val", kinematics, plot=False, signal=signal)
-test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_sig_labels, test_bkg_labels = adj.data_loader(h5_path, plot_path, "test", kinematics, plot=False, signal=signal)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, "train", kinematics, plot=False, signal=signal)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, "val", kinematics, plot=False, signal=signal)
+test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_sig_labels, test_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, "test", kinematics, plot=False, signal=signal)
 
 print("train sig", len(train_sig))
 print("train bkg", len(train_bkg))
@@ -208,12 +215,18 @@ full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels, test_bkg_labels))
 # raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
+# full_x = full_x.to(torch.float16)
 del full_sig
 del full_bkg
 
 full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
-full_y = full_y.float()
-full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)), dim=0)#.cuda()
+full_y = full_y.to(torch.float)
+full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)), dim=0)
+# full_wgts = full_wgts.to(torch.float16)
+
+# del train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels
+# del val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels
+# del test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_sig_labels, test_bkg_labels
 
 ### load edge indices if gnn layers are used
 edge_ind = None
@@ -281,13 +294,16 @@ optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, 'min')
 
 def binary_class_weights(labels, event_weights):
-    num_sig = np.sum(event_weights[labels == 1])
-    num_bkg = np.sum(event_weights[labels == 0])
+    # num_sig = np.sum(event_weights[labels == 1])
+    # num_bkg = np.sum(event_weights[labels == 0])
+    num_sig = len(labels[labels == 1])
+    num_bkg = len(labels[labels == 0])
+    print("num sig ", num_sig, "num bkg ", num_bkg)
     # sig_weight = num_bkg/num_sig
     # return torch.tensor(sig_weight, dtype=torch.float)
     bkg_weight = num_sig/num_bkg
     sig_weight = 1
-    return torch.tensor([bkg_weight, 1], dtype=torch.float)
+    return torch.tensor([bkg_weight, 1])
 
 logging.info("Training ...")
 print("full x", len(full_x))
@@ -309,6 +325,7 @@ print("val idx", len(val_idx))
 
 all_labels = data.y[train_idx].cpu().numpy()
 all_wgts = data.wgts[train_idx].cpu().numpy()
+print("LABEL 0 ", len(all_labels[all_labels==0]))
 # class_weights = compute_class_weights(all_labels, all_wgts).to(device)
 class_weights = binary_class_weights(all_labels, all_wgts).to(device)
 print("class weights", class_weights)
@@ -460,7 +477,7 @@ ax.set_xlabel("Epoch", loc="right")
 ax.set_ylabel("Loss", loc="top")
 misc.create_dirs(plot_path)
 logging.info("Saving plots to "+plot_path)
-fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
+fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
 
 logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
@@ -519,7 +536,7 @@ ax.set_xlabel("Output score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
 ymin, ymax = ax.get_ylim()
 ax.set_ylim((ymin, ymax*1.2))
-fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_pred.pdf", transparent=True)
+fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_pred.pdf", transparent=True)
 
 logging.info("Plotting ROC curves ...")
 fig, ax = plt.subplots()
@@ -529,4 +546,4 @@ plt.legend(loc="upper left", fontsize=9)
 plt.xlim(0,1)
 plt.xlabel("Background Efficiency", loc="right")
 plt.ylabel("Signal Efficiency", loc="top")
-fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_ROC.pdf", transparent=True)
+fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_ROC.pdf", transparent=True)

@@ -65,7 +65,7 @@ distance = str(args.distance)
 
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
-h5_path = user_config["h5_path"]
+distance_h5_path = user_config["distance_h5_path"]
 plot_path = user_config["plot_path"]
 dist_path = user_config["dist_path"]
 ll_path = user_config["ll_path"]
@@ -78,7 +78,7 @@ logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("signal: "+signal)
 logging.info("variable set: "+variable)
-logging.info("input data path: "+h5_path)
+logging.info("input data path: "+distance_h5_path)
 logging.info("input distances path: "+dist_path)
 logging.info("output ll json path: "+ll_path)
 logging.info("output plot path: "+plot_path)
@@ -130,8 +130,8 @@ with open(roc_name, "w") as outfile:
 
 # pick sig-sig efficiencies at 0.6, 0.7, 0.8, 0.9
 # TODO: finer granularity for linking length scan?
-sigsig_eff = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-eff_labels = ["40%", "50%","60%", "70%", "80%", "90%"]
+sigsig_eff = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+eff_labels = ["20%", "30%","40%", "50%","60%", "70%", "80%", "90%"]
 ss_sb_roc_cuts = []
 ss_sb_thresholds = []
 ss_bb_roc_cuts = []
