@@ -71,8 +71,11 @@ def get_kinematics(variable, dim):
     elif variable == "LQ":
         kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
     elif variable == "embedding":
-        embedding_dim = dim
-        kinematics = [f'feat_{i+1:02d}' for i in range(embedding_dim)]
+        if dim == None:
+            raise Exception("Please specify the number of emdedded features used")
+        else:
+            embedding_dim = dim
+            kinematics = [f'feat_{i+1:02d}' for i in range(embedding_dim)]
     else:
         raise Exception("bruh, pick a better variable set (mass, angular, shape, combined, mass_and_angular, mass_and_shape)")
 

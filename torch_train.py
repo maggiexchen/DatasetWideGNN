@@ -215,18 +215,12 @@ full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels, test_bkg_labels))
 # raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
 
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
-# full_x = full_x.to(torch.float16)
 del full_sig
 del full_bkg
 
 full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
 full_y = full_y.to(torch.float)
 full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)), dim=0)
-# full_wgts = full_wgts.to(torch.float16)
-
-# del train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels
-# del val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels
-# del test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_sig_labels, test_bkg_labels
 
 ### load edge indices if gnn layers are used
 edge_ind = None
