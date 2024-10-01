@@ -12,6 +12,7 @@ sys.path.append(parent_dir)
 import utils.adj_mat as adj
 import utils.misc as misc
 import utils.normalisation as norm
+import utils.plotting as plotting
 
 import torch
 import torch.nn as nn
@@ -51,13 +52,15 @@ user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
 
 variable = user_config["variable"]
-kinematics = misc.get_kinematics(variable)
+feature_dim = user_config["feature_dim"]
+kinematics = misc.get_kinematics(variable, feature_dim)
 signal = user_config["signal"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 signal_label, background_label = plotting.get_plot_labels(signal)
 
 h5_path = user_config["h5_path"]
 model_save_path = user_config["model_path"]
+plot_path = user_config["plot_path"]
 signal = user_config["signal"]
 embedding_dim = user_config["embedding_dim"]
 
@@ -98,6 +101,7 @@ print("Training ...")
 print("Margin: ", margin)
 print("Embedding dim: ", embedding_dim)
 print("LR: ", LR)
+print("Penalty lambda: ", penalty)
 
 for epoch in range(num_epochs):
     model.train()
@@ -128,6 +132,7 @@ for epoch in range(num_epochs):
     running_val_loss = 0.0
     with torch.no_grad():  # Disable gradient computation
         for batch in val_loader:
+            # event 1 and event 2 are the events in a pair 
             event1, event2, labels = batch
             batchsize = event1.size(0)
             event1 = event1.float()
@@ -152,7 +157,7 @@ for epoch in range(num_epochs):
 
 logging.info("Saving trained model and performance...")
 model_file_name = "EmbeddingNet_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(penalty)+"_model.pth"
-model_path = modle_save_path + "embedding_"+str(embedding_dim)+"feats/"
+model_path = model_save_path + "embedding_"+str(embedding_dim)+"feats/"
 os.makedirs(model_path, exist_ok=True)
 torch.save({
     'model_state': model.state_dict(),
@@ -259,8 +264,8 @@ def plot_embeddings(embeddings, labels, epoch, margin, feat, radius=1.0, pen=1.0
     ymin, ymax = ax.get_ylim()
     ax.set_xlim((xmin*1.2, xmax*1.2))
     ax.set_ylim((ymin*1.2, ymax*1.2))
-    plot_path = "scan_plots/embedding_"+str(feat)+"feats/"
-    os.makedirs(plot_path, exist_ok=True)
+    plotting_path = plot_path+"embedding_"+str(feat)+"feats/"
+    os.makedirs(plotting_path, exist_ok=True)
     if num_epochs == 0:
         fig.savefig(plot_path+"embedding_e0.pdf")
     else:
