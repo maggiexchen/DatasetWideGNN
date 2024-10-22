@@ -1,6 +1,6 @@
 import numpy as np
 
-def find_threshold(tpr, fpr, eff, cut):
+def find_threshold(tpr, fpr, eff, cut, flip=False):
     """
     Function to find the threshold on the distance metric that provides a given sig-sig efficiency.
     Args:
@@ -8,11 +8,15 @@ def find_threshold(tpr, fpr, eff, cut):
         fpr (numpy.array): of false-positive rates, bkg-bkg(sig-bkg) passing cut
         eff (float): sig-sig efficiency desired
         cut (numpy.array): of thresholds considered
+        flip (bool): True if sig-sig have smaller distances, False if sig-sig have larger distances
     Returns:
         (list(float)): coordinates of cut point to draw on on ROC curve
         (float): cut to apply on distance
     """
     # the tpr here is in reverse order with the discriminant cut, so it's <=
-    tpr_index = np.argmax(tpr <= eff)
+    if flip:
+        tpr_index = np.argmax(tpr <= eff)
+    else:
+        tpr_index = np.argmax(tpr >= eff)
     return [tpr[tpr_index], fpr[tpr_index]], cut[tpr_index]
 

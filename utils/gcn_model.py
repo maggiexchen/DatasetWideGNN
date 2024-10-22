@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from torch_geometric.nn import GCNConv, GATConv, GraphConv
+from torch.utils.checkpoint import checkpoint
 import pdb
 
 class GCNClassifier(nn.Module):
@@ -40,7 +41,10 @@ class GCNClassifier(nn.Module):
         for j in range(len(hidden_sizes_mlp)):
             self.layers_mlp.append(nn.Linear(input_size, hidden_sizes_mlp[j]))
             self.batch_norms_mlp.append(nn.BatchNorm1d(hidden_sizes_mlp[j]))
-            self.dropout_mlp.append(nn.Dropout(p=dropout_rates[i+j]))
+            if len(hidden_sizes_gcn) > 0:
+                self.dropout_mlp.append(nn.Dropout(p=dropout_rates[i+j]))
+            else:
+                self.dropout_mlp.append(nn.Dropout(p=dropout_rates[j]))
             input_size = hidden_sizes_mlp[j]
         
         
@@ -57,14 +61,21 @@ class GCNClassifier(nn.Module):
         Returns:
             (torch.tensor) 
         """
-        for layer, batch_norm, dropout in zip(self.layers_gcn, self.batch_norms_gcn, self.dropout_gcn):
-            # when using sparse tensor object, edge_weight is not used
-            # Weights are the edge values in the sparse tensor object
-            # for GATConv, use edge_attr instead of edge_weight
-            # x = F.relu(dropout(batch_norm(layer(x, edge_index, edge_weight=edge_weights)))) 
-            x = F.relu(dropout(batch_norm(layer(x, edge_index))))
-        for layer, batch_norm, dropout in zip(self.layers_mlp, self.batch_norms_mlp, self.dropout_mlp):
-            x = F.relu(dropout(batch_norm(layer(x))))
+        def gcn_forward(x, edge_index):
+            for layer, batch_norm, dropout in zip(self.layers_gcn, self.batch_norms_gcn, self.dropout_gcn):
+                # when using sparse tensor object, edge_weight is not used
+                # Weights are the edge values in the sparse tensor object
+                # for GATConv, use edge_attr instead of edge_weight
+                # x = F.relu(dropout(batch_norm(layer(x, edge_index, edge_weight=edge_weights)))) 
+                x = F.relu(dropout(batch_norm(layer(x, edge_index))))
+            return x
+        x = checkpoint(gcn_forward, x, edge_index, use_reentrant=False)
         
+        def mlp_forward(x):
+            for layer, batch_norm, dropout in zip(self.layers_mlp, self.batch_norms_mlp, self.dropout_mlp):
+                x = F.relu(dropout(batch_norm(layer(x))))
+            return x
+        x = checkpoint(mlp_forward, x, use_reentrant=False)
+
         output = torch.sigmoid(self.output_layer(x))
         return output

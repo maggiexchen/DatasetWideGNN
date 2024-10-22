@@ -260,7 +260,7 @@ def get_batched_distances(dist_path, variable, distance, t, sample=True):
     distance = torch.empty(0, dtype=torch.float16)
     wgt = torch.empty(0, dtype=torch.float16)
     if sample:
-        num_sample = 10000
+        num_sample = 20000
         batch_sample = math.ceil(num_sample / len(files))
         sample_count = 0
         while sample_count < num_sample:

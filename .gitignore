@@ -21,3 +21,4 @@ data/batched_mass_euclidean_distances/
 data/graph/
 data/dnn_scores/
 data/stau_split_files/
+trained_models/

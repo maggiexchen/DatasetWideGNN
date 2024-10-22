@@ -70,8 +70,9 @@ plot_path = user_config["plot_path"]
 dist_path = user_config["dist_path"]
 ll_path = user_config["ll_path"]
 
-# TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
+assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
+signal_label, background_label = plotting.get_plot_labels(signal)
 
 logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
@@ -100,7 +101,7 @@ norm_sigsig = norm.minmax(sigsig_distance, 0, d_max)
 norm_sigbkg = norm.minmax(sigbkg_distance, 0, d_max)
 norm_bkgbkg = norm.minmax(bkgbkg_distance, 0, d_max)
 
-plot_path = plot_path+"standardised_weighted/"+variable+"/"
+plot_path = plot_path+"/"+variable+"/"
 misc.create_dirs(plot_path)
 plotting.plot_distances(norm_sigsig, norm_sigbkg, norm_bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, variable, distance, plot_path, label="minmaxNormed")
 
@@ -121,7 +122,7 @@ roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(),
             "ss_sb_sig_cut": cut_ss_sb.tolist(),
             "tpr_sb_bb": tpr_ss_bb.tolist(),
             "fpr_sb_bb": fpr_ss_bb.tolist()}
-roc_path = plot_path+"standardised_weighted/ROC/"
+roc_path = plot_path+"/"+variable+"/ROC/"
 misc.create_dirs(roc_path)
 roc_name = roc_path+variable+"_"+distance+"_ROC.json"
 with open(roc_name, "w") as outfile:
@@ -129,8 +130,8 @@ with open(roc_name, "w") as outfile:
 
 # pick sig-sig efficiencies at 0.6, 0.7, 0.8, 0.9
 # TODO: finer granularity for linking length scan?
-sigsig_eff = [0.6, 0.7, 0.8, 0.9]
-eff_labels = ["60%", "70%", "80%", "90%"]
+sigsig_eff = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+eff_labels = ["40%", "50%","60%", "70%", "80%", "90%"]
 ss_sb_roc_cuts = []
 ss_sb_thresholds = []
 ss_bb_roc_cuts = []
@@ -139,10 +140,10 @@ ss_thresholds = []
 # finding the tpr, fpr and distance thresholds for each efficiency, then reverse minmax the distance threshold
 # note the ss_bb and ss_sb thresholds are the same as they are just determined as the threshold for the given ss efficiency.
 for eff in sigsig_eff:
-    ss_sb_roc_cut, ss_sb_threshold = graph_def.find_threshold(tpr_ss_sb,fpr_ss_sb, eff, cut_ss_sb)
+    ss_sb_roc_cut, ss_sb_threshold = graph_def.find_threshold(tpr_ss_sb,fpr_ss_sb, eff, cut_ss_sb, flip=True)
     ss_sb_roc_cuts.append(ss_sb_roc_cut)
     ss_sb_thresholds.append(norm.reverse_minmax(ss_sb_threshold, 0 ,d_max))
-    ss_bb_roc_cut, ss_bb_threshold = graph_def.find_threshold(tpr_ss_bb,fpr_ss_bb, eff, cut_ss_bb)
+    ss_bb_roc_cut, ss_bb_threshold = graph_def.find_threshold(tpr_ss_bb,fpr_ss_bb, eff, cut_ss_bb, flip=True)
     ss_bb_roc_cuts.append(ss_bb_roc_cut)
     ss_thresholds.append(norm.reverse_minmax(ss_bb_threshold, 0 ,d_max).item())
 
@@ -153,47 +154,10 @@ ll_path = ll_path+""+variable+"_"+distance+"_linking_length.json"
 with open(ll_path, "w") as lengthfile:
     json.dump(length_dict, lengthfile)
 
-logging.info("Plotting distance with linking lengths selected from ROC ...")
-nBins = 70
-
 # plotting sig-sig and bkg-bkg distributions and the linking lengths
 # TODO: moving plotting to utils
-fig, ax = plt.subplots()
-binning = np.linspace(0,12,nBins)
-ax.hist(sigsig_distance, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
-ax.hist(sigbkg_distance, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="darkorange")
-ax.hist(bkgbkg_distance, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt, alpha=0.5, density=True, color="forestgreen")
-ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.text(0.04, 0.88, r"$\sqrt{s}=13$ TeV, 5b data", verticalalignment="bottom", size=10, transform=ax.transAxes)
-ax.text(0.04, 0.83, r"6b resonant TRSM signals", verticalalignment="bottom", size=10, transform=ax.transAxes)
-y_min, y_max = ax.get_ylim()
-x_min, x_max = ax.get_xlim()
-for i, eff in enumerate(sigsig_eff):
-    ax.axvline(x=ss_thresholds[i], ymax=0.6+i*0.02, linestyle="--", color="red")
-    ax.text(x=ss_thresholds[i], y=0.65+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_labels[i], ha='center', va='bottom', fontsize=7)
-ax.legend(loc='upper right')
-ax.set_ylim(y_min, y_max*1.2)
-ax.set_xlim(x_min, x_max*0.8)
-ax.set_xlabel(variable + " " + distance +" distance", loc="right")
-ax.set_ylabel("Normalised # event pairs / bin", loc="top")
-ssbb_path = plot_path+"standardised_weighted/linking_lengths/"
-misc.create_dirs(ssbb_path)
-fig.savefig(ssbb_path+"/"+variable+"_"+distance+"_linking_lengths.pdf", transparent=True)
+logging.info("Plotting linking lengths ...")
+plotting.plot_linking_length(sigsig_distance, sigbkg_distance, bkgbkg_distance, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, ss_thresholds, signal_label, background_label, plot_path, variable, distance, sigsig_eff)
 
 logging.info("Plotting ROC curves ...")
-fig, ax = plt.subplots()
-plt.style.use(hep.style.ROOT)
-plt.plot(fpr_ss_bb, tpr_ss_bb, label='sig-sig bkg-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_bb))
-plt.plot(fpr_ss_sb, tpr_ss_sb, label='sig-sig sig-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_sb))
-plt.scatter(np.array(ss_bb_roc_cuts)[:,1], np.array(ss_bb_roc_cuts)[:,0], marker='x', s=50, label="linking lengths",color="red")
-plt.scatter(np.array(ss_sb_roc_cuts)[:,1], np.array(ss_sb_roc_cuts)[:,0], marker='x', s=50, color="red")
-plt.legend(loc="lower right", fontsize="11")
-ymin, ymax = plt.ylim()
-plt.ylim(0.,1.)
-plt.xlim(0.,1.)
-plt.xlabel("sig(bkg)-bkg Efficiency")
-plt.ylabel("sig-sig Efficiency")
-plot_dir = plot_path+"standardised_weighted/ROC/"
-misc.create_dirs(plot_dir)
-fig.savefig(plot_dir+"/"+variable+"_"+distance+"_ROC.pdf", transparent=True)
+plotting.plot_ROC(fpr_ss_bb, tpr_ss_bb, fpr_ss_sb, tpr_ss_sb, roc_auc_ss_bb, roc_auc_ss_sb, ss_bb_roc_cuts, ss_sb_roc_cuts, variable, distance, plot_path)

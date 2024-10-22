@@ -6,6 +6,26 @@ import utils.normalisation as norm
 import utils.misc as misc
 import numpy
 
+def get_plot_labels(signal_type):
+    """
+    Args:
+    signal_type (str): the type of signal being plotted, specified in the user config (hhh, LQ or stau)
+    
+    Returns:
+    The signal and background labels used in plots
+
+    """
+    if signal_type == "hhh":
+        signal = "6b resonant TRSM HHH signal"
+        background = "Data-driven QCD background estimate (5b data)"
+    elif signal_type == "LQ":
+        signal = "Leptoquark signal"
+        background = r"$t\bar{t}$ and Single top"
+    elif signal_type == "stau":
+        background = r"$W$ jets, $Z\rightarrow ll$ jets, Diboson (0$l$, 1$l$, 2$l$, 3$l$, 4$l$), Triboson, Higgs, Single top, $t\bar{t}V$, $t\bar{t}$"
+    return signal, background
+
+
 def add_text(ax, text, doATLAS=True, startx=0.04, starty=0.93):
     """
     Function to add text to figures
@@ -66,7 +86,7 @@ def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, labe
 
     return 0
 
-def plot_kinematic_hists(df_sig, df_bkg, var, file_path, standardise=True):
+def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var, file_path, standardise=True):
     """
     Function to plot the histogram of a kinematic variable for signal and background on one figure.
 
@@ -82,21 +102,25 @@ def plot_kinematic_hists(df_sig, df_bkg, var, file_path, standardise=True):
     """
     # plot
     fig, ax = plt.subplots()
-    binning = np.linspace(min(min(df_sig.loc[:, var]), min(df_bkg.loc[:, var])), max(max(df_sig.loc[:, var]), max(df_bkg.loc[:, var])), 50)
-    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal (6b TRSM)", alpha=0.3, color="red")
-    yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background (5b data)", alpha=0.3, color="steelblue")
-    add_text(ax, [r"$\sqrt{s}=13$ TeV, 5b data", r"6b resonant TRSM signals"])
     if standardise:
-        ax.text(0.04, 0.78, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)
+        add_text(ax, ["Signal - "+sig_label, "Background - "+bkg_label, "Standardised to (mean, std) = (0, 1)"])
         plot_name = "/standardised_"
+        binning = np.linspace(min(min(df_sig.loc[:, var]), min(df_bkg.loc[:, var])), max(max(df_sig.loc[:, var]), max(df_bkg.loc[:, var])), 50)
+        bool_density = True
     else:
+        add_text(ax, ["Signal - "+sig_label, "Background - "+bkg_label])
         plot_name = "/"
-    # aesthetics
-    #hep.atlas.label(ax=ax, data=False, label="Internal", lumi="129")
+        binning = np.linspace(min(min(df_sig.loc[:, var]), min(df_bkg.loc[:, var])), max(max(df_sig.loc[:, var]), max(df_bkg.loc[:, var])), 50)
+        bool_density = False
+    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal", alpha=0.3, color="red", density=bool_density)
+    yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background", alpha=0.3, color="steelblue", density=bool_density)
     ax.legend(loc='upper right')
     ax.set_ylim([0.01, 1.2*max(max(ys),max(yb))])
     ax.set_xlabel("\n"+str(var) + " [GeV]", loc="right")
-    ax.set_ylabel("No. Events", loc="top")
+    if bool_density:
+        ax.set_ylabel("Normalised Events / Bin", loc="top")
+    else:
+        ax.set_ylabel("Events / Bin", loc="top")
     # save
     save_path = file_path+"/training_kinematics/"
     misc.create_dirs(save_path)
@@ -104,7 +128,6 @@ def plot_kinematic_hists(df_sig, df_bkg, var, file_path, standardise=True):
     for ext in exts:
         fig.tight_layout()
         fig.savefig(save_path+plot_name+var+ext, transparent=True)
-
     return 0
 
 def plot_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, normalisation, standardise=True, nconv=1):
@@ -147,7 +170,7 @@ def plot_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, norma
         #conv_conv_x = torch.matmul(adj_mat, torch.matmul(adj_mat, x))
         post_conv_x = torch.matmul(adj_mat, post_conv_x)
         label = label + "conv_"
-        convcount ++1
+        convcount += 1
     post_conv_x_numpy = post_conv_x.detach().cpu().numpy()
     
     if standardise:
@@ -207,3 +230,46 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
         save_path = file_path+"/"+plot
         misc.create_dirs(save_path)
         fig.savefig(save_path+"/"+plot+"_sigsig_eff_"+str(eff)+".pdf", transparent=True)
+
+def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, ss_thresholds, sig_label, bkg_label, plot_path, variable, distance, sigsig_eff):
+    fig, ax = plt.subplots()
+    nBins = 70
+    binning = np.linspace(0,12,nBins)
+    ax.hist(sigsig, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
+    ax.hist(sigbkg, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="darkorange")
+    ax.hist(bkgbkg, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt, alpha=0.5, density=True, color="forestgreen")
+    ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.04, 0.88, "Signal - " + sig_label, verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.04, 0.83, "Background - " + bkg_label, verticalalignment="bottom", size=10, transform=ax.transAxes)
+    y_min, y_max = ax.get_ylim()
+    x_min, x_max = ax.get_xlim()
+    for i, eff in enumerate(sigsig_eff):
+        eff_label=str(eff*100)+"%"
+        ax.axvline(x=ss_thresholds[i], ymax=0.6+i*0.02, linestyle="--", color="red")
+        ax.text(x=ss_thresholds[i], y=0.65+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label, ha='center', va='bottom', fontsize=7)
+    ax.legend(loc='upper right')
+    ax.set_ylim(y_min, y_max*1.2)
+    ax.set_xlim(x_min, x_max*0.8)
+    ax.set_xlabel(variable + " " + distance +" distance", loc="right")
+    ax.set_ylabel("Normalised # event pairs / bin", loc="top")
+    ssbb_path = plot_path+"linking_lengths/"
+    misc.create_dirs(ssbb_path)
+    fig.savefig(ssbb_path+"/"+variable+"_"+distance+"_linking_lengths.pdf", transparent=True)
+
+def plot_ROC(fpr_ss_bb, tpr_ss_bb, fpr_ss_sb, tpr_ss_sb, roc_auc_ss_bb, roc_auc_ss_sb, ss_bb_roc_cuts, ss_sb_roc_cuts, variable, distance, plot_path):
+    fig, ax = plt.subplots()
+    plt.style.use(hep.style.ROOT)
+    plt.plot(fpr_ss_bb, tpr_ss_bb, label='sig-sig bkg-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_bb))
+    plt.plot(fpr_ss_sb, tpr_ss_sb, label='sig-sig sig-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_sb))
+    plt.scatter(np.array(ss_bb_roc_cuts)[:,1], np.array(ss_bb_roc_cuts)[:,0], marker='x', s=50, label="linking lengths",color="red")
+    plt.scatter(np.array(ss_sb_roc_cuts)[:,1], np.array(ss_sb_roc_cuts)[:,0], marker='x', s=50, color="red")
+    plt.legend(loc="lower right", fontsize="11")
+    ymin, ymax = plt.ylim()
+    plt.ylim(0.,1.)
+    plt.xlim(0.,1.)
+    plt.xlabel("sig(bkg)-bkg Efficiency")
+    plt.ylabel("sig-sig Efficiency")
+    plot_dir = plot_path+"ROC/"
+    misc.create_dirs(plot_dir)
+    fig.savefig(plot_dir+"/"+variable+"_"+distance+"_ROC.pdf", transparent=True)

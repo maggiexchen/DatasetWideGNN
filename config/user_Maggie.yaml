@@ -7,11 +7,12 @@ signal: hhh
 
 # input paths
 ntuple_path: /data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/
-h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/hhh_split_files/ 
-ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/tests/linking_lengths/ 
-dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/tests/distances/
+h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/hhh_split_files/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/linking_lengths/ 
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/tests/plots/ 
-adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/tests/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/tests/models/ 
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/plots/ 
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/models/ 

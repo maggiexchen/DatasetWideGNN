@@ -9,7 +9,7 @@ import mplhep as hep
 import utils.normalisation as norm
 import utils.torch_distances as dis
 import utils.misc as misc
-import utils.plotting as plot
+import utils.plotting as plotting
 import re
 import pdb
 import glob
@@ -20,7 +20,7 @@ import psutil
 process = psutil.Process()
 
 
-def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, norm_kin=True, signal="hhh"):
+def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"):
     """
     Function to load our sign and bkg data into pandas dataframes
 
@@ -29,9 +29,7 @@ def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, 
         plot_path (str): path for output plot directory
         f_type (str): input file extension
         kinematics (list(str)): list of kinematic variables to load as dataframe columns
-        n_sig (int): number of sig events to load # no longer used
-        n_bkg (int): number of bkg events to load # no longer used
-        norm_kin (bool): flag to standardise the kinematics in the input file
+        plot (bool): flag to plot raw and standardised kinematics
         signal (str): type of signal, to determine the bkgs present
     Returns:
         (torch.tensor(float32)): signal events/kinematics tensor
@@ -41,6 +39,7 @@ def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, 
         (torch.tensor(float32)): background event weight tensor
         (torce.tensor(float32)): all event truth labels ie. 1 for sig, 0 for bkg
     """
+    signal_label, background_label = plotting.get_plot_labels(signal)
     bkg_typedict = {"hhh": ["bkg"], "LQ": ["singletop", "ttbar"], 
                     "stau": ['Wjets','Zlljets','Zttjets','diboson0L','diboson1L', 
                               'diboson2L','diboson3L','diboson4L', 'higgs',
@@ -79,23 +78,27 @@ def data_loader(h5_path, plot_path, f_type, kinematics, n_sig=1000, n_bkg=1000, 
     bkg_label = [0]*len(df_bkg)
     # Standardising kinematics
     for var in kinematics:
+        if plot:
+            df_sig = df_all.iloc[:len(df_sig)]
+            df_bkg = df_all.iloc[len(df_sig):]
+            plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=False)
         print(f"-----> Standardising {var}:")
-        if norm_kin:
-            standardised_values = norm.standardise(df_all.loc[:, var])
-            df_all.loc[:, var] = standardised_values.astype('float32')  # convert to float32
+        standardised_values = norm.standardise(df_all.loc[:, var])
+        standardised_values = norm.standardise(df_all.loc[:, var])
+        df_all.loc[:, var] = standardised_values.astype('float32')  # convert to float32
         df_sig = df_all.iloc[:len(df_sig)]
         df_bkg = df_all.iloc[len(df_sig):]
-        if plot_path != "": plot.plot_kinematic_hists(df_sig, df_bkg, var, plot_path, standardise=norm_kin)
+        if plot:
+            plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=True)
     # convert pd dataframes to torch tensors
     torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)
     torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)
     torch_sig_wgts = torch.tensor(df_sig_wgts.values, dtype=torch.float32)
     torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
-    # concatenating signal and background events / weights
+    # concatenating signal and background events
     torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
-    # truth_labels = torch.tensor(numpy.concatenate((sig_label, bkg_label)), dtype=torch.float32)
 
-    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label), torch.tensor(bkg_label) #truth_labels
+    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label), torch.tensor(bkg_label)
 
 
 def create_adj_mat(a, length):
