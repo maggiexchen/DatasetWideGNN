@@ -105,7 +105,7 @@ epochs = train_config["epochs"]
 num_nb_list = train_config["num_nb_list"] 
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
-patience = train_config["patience"]
+patience_early_stopping = train_config["patience_early_stopping"]
 
 variable = train_config["variable"]
 if variable is None:
@@ -280,13 +280,13 @@ def weighted_bce_loss(output, target, class_weights, event_weights):
     return -loss.mean()
 
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = 3)
+### NOTE: patience for the scheculer is different from the early stopping patience
+### LR scheduler patience should be less than early stopping patience, so that the LR can be reduced before training stops
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = 1)
 
 def binary_class_weights(labels, event_weights):
     num_sig = np.sum(event_weights[labels == 1])
     num_bkg = np.sum(event_weights[labels == 0])
-    # sig_weight = num_bkg/num_sig
-    # return torch.tensor(sig_weight, dtype=torch.float)
     # bkg_weight = num_sig/num_bkg
     # sig_weight = 1
     bkg_weight = 1
@@ -423,7 +423,7 @@ for epoch in range(epochs):
 
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
 
-    if patience_counter >= patience:
+    if patience_counter >= patience_early_stopping:
         print(f"Early stopping after {epoch+1} epochs.")
         break
 
@@ -451,8 +451,9 @@ train_bkg_pred = train_outputs[torch.logical_not(train_label_bool)]
 train_bkg_wgts = train_wgts[torch.logical_not(train_label_bool)]
 
 train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
-train_fpr = np.clip(train_fpr, 0, 1)
-train_fpr = np.sort(train_fpr)
+if signal == "stau": ### stau fpr needs to be clipped and sorted due to rounding errors
+    train_fpr = np.clip(train_fpr, 0, 1)
+    train_fpr = np.sort(train_fpr)
 train_auc = auc(train_fpr, train_tpr)
 # train_auc = roc_auc_score(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
 print("Training AUC", train_auc)
@@ -465,8 +466,9 @@ val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
 val_bkg_wgts = val_wgts[torch.logical_not(val_label_bool)]
 
 val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
-val_fpr = np.clip(val_fpr, 0, 1)
-val_fpr = np.sort(val_fpr)
+if signal == "stau": ### stau fpr needs to be clipped and sorted due to rounding errors
+    val_fpr = np.clip(val_fpr, 0, 1)
+    val_fpr = np.sort(val_fpr)
 val_auc = auc(val_fpr, val_tpr)
 #  val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
 print("Validation AUC", val_auc)
