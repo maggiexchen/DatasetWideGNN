@@ -89,6 +89,7 @@ model_path = user_config["model_path"]
 score_path = user_config["score_path"]
 
 signal = user_config["signal"]
+h5_path = h5_path + "/" + signal + "_split_files/"
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 signal_label, background_label = plotting.get_plot_labels(signal)
 
@@ -104,6 +105,7 @@ epochs = train_config["epochs"]
 num_nb_list = train_config["num_nb_list"] 
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
+patience = train_config["patience"]
 
 variable = train_config["variable"]
 if variable is None:
@@ -273,21 +275,23 @@ def compute_class_weights(labels, event_weights):
 ### define loss function and optimiser
 def weighted_bce_loss(output, target, class_weights, event_weights):
     sig_loss = event_weights * (class_weights[1] * target * torch.log(output+1e-10))
-    bkg_loss = class_weights[0] * (1-target) * torch.log(1-output+1e-10)
+    bkg_loss = event_weights * (class_weights[0] * (1-target) * torch.log(1-output+1e-10))
     loss = sig_loss+bkg_loss
     return -loss.mean()
 
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, 'min')
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = 3)
 
 def binary_class_weights(labels, event_weights):
     num_sig = np.sum(event_weights[labels == 1])
     num_bkg = np.sum(event_weights[labels == 0])
     # sig_weight = num_bkg/num_sig
     # return torch.tensor(sig_weight, dtype=torch.float)
-    bkg_weight = num_sig/num_bkg
-    sig_weight = 1
-    return torch.tensor([bkg_weight, 1], dtype=torch.float)
+    # bkg_weight = num_sig/num_bkg
+    # sig_weight = 1
+    bkg_weight = 1
+    sig_weight = num_bkg/num_sig
+    return torch.tensor([bkg_weight, sig_weight], dtype=torch.float)
 
 logging.info("Training ...")
 print("full x", len(full_x))
@@ -329,14 +333,15 @@ val_loader = NeighborLoader(
     data,
     input_nodes = val_idx,
     num_neighbors = num_nb_list,
-    shuffle = True,
+    shuffle = False,
     batch_size = batch_size,
     # num_workers = 6,
     # persistent_workers = True
 )
 
 # BCE_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([sig_class_weight]))
-
+best_val_loss = float('inf')
+patience_counter = 0
 logging.info("Starting training ...")
 for epoch in range(epochs):
 
@@ -390,12 +395,9 @@ for epoch in range(epochs):
         outputs = outputs[:batch_size]
         event_wgts = batch.wgts[:batch_size]
 
+        pdb.set_trace()
         loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
-        current_lr = optimiser.param_groups[0]['lr']
-        scheduler.step(loss)
-        new_lr = optimiser.param_groups[0]['lr']
-        if new_lr < current_lr:
-            print(f"Learning rate reduced to: {new_lr}")
+        
 
         total_examples += batch_size
         total_loss += float(loss) * batch_size
@@ -405,9 +407,28 @@ for epoch in range(epochs):
 
     avg_vl_loss = total_loss / total_examples
     val_loss.append(avg_vl_loss)
-        
+
+    current_lr = optimiser.param_groups[0]['lr']
+    scheduler.step(avg_vl_loss)
+    new_lr = optimiser.param_groups[0]['lr']
+    if new_lr < current_lr:
+        print(f"Learning rate reduced to: {new_lr}")
+
+    if avg_vl_loss < best_val_loss:
+        best_val_loss = avg_vl_loss
+        patience_counter = 0
+    else:
+        patience_counter += 1
+        print(f"No improvement in validation loss for {patience_counter} epoch(s).")
+
     print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
 
+    if patience_counter >= patience:
+        print(f"Early stopping after {epoch+1} epochs.")
+        break
+
+        
+    
 logging.info("Training complete.")
 print("train truth labels", len(train_truth_labels))
 print("val truth labels", len(val_truth_labels))
@@ -430,7 +451,10 @@ train_bkg_pred = train_outputs[torch.logical_not(train_label_bool)]
 train_bkg_wgts = train_wgts[torch.logical_not(train_label_bool)]
 
 train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
-train_auc = roc_auc_score(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
+train_fpr = np.clip(train_fpr, 0, 1)
+train_fpr = np.sort(train_fpr)
+train_auc = auc(train_fpr, train_tpr)
+# train_auc = roc_auc_score(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
 print("Training AUC", train_auc)
 
 val_outputs = val_outputs.view(-1).to(device)
@@ -441,7 +465,10 @@ val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
 val_bkg_wgts = val_wgts[torch.logical_not(val_label_bool)]
 
 val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
-val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
+val_fpr = np.clip(val_fpr, 0, 1)
+val_fpr = np.sort(val_fpr)
+val_auc = auc(val_fpr, val_tpr)
+#  val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
 print("Validation AUC", val_auc)
 
 # save performance to json
@@ -451,8 +478,8 @@ perf.save_metadata(len(train_sig), len(train_bkg), len(val_sig), len(val_bkg), h
 logging.info("Plotting training/validation losses ...")
 fig, ax = plt.subplots()
 x_epoch = numpy.arange(1,epochs+1,1)
-ax.plot(x_epoch, train_loss, label="Training loss")
-ax.plot(x_epoch, val_loss, label="Validation loss")
+ax.plot(np.arange(len(train_loss)), train_loss, label="Training loss")
+ax.plot(np.arange(len(val_loss)), val_loss, label="Validation loss")
 ax.legend(loc='upper right', fontsize=9)
 ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.set_xlabel("Epoch", loc="right")

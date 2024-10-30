@@ -3,10 +3,11 @@ distance: "euclidean"
 sigsig_eff: 0.6
 linking_length: 0.1
 hidden_sizes_gcn: []
-hidden_sizes_mlp: [200, 200, 100, 100,50]
+hidden_sizes_mlp: [64,32,16,16]
 LR: 0.001
-dropout_rates: [0.0, 0.0, 0.0, 0.0, 0.0]
-epochs: 10
+dropout_rates: [0.3, 0.2, 0.1, 0.1]
+epochs: 100
 num_nb_list: [20, 20, 20, 20]
 batch_size: 2048
 gnn_type: "Graph"
+patience: 10
