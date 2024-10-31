@@ -395,10 +395,8 @@ for epoch in range(epochs):
         outputs = outputs[:batch_size]
         event_wgts = batch.wgts[:batch_size]
 
-        pdb.set_trace()
         loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
         
-
         total_examples += batch_size
         total_loss += float(loss) * batch_size
         val_outputs = torch.cat((val_outputs, outputs.detach()))
