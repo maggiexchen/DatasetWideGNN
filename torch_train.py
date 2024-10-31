@@ -101,12 +101,15 @@ print("Using training config ",train_config)
 hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
 hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
+patience_LR = train_config["patience_LR"]
 dropout_rates = train_config["dropout_rates"]
 epochs = train_config["epochs"]
 num_nb_list = train_config["num_nb_list"] 
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
 patience_early_stopping = train_config["patience_early_stopping"]
+### LR scheduler patience should be less than early stopping patience, so that the LR can be reduced before training stops
+assert patience_LR < patience_early_stopping, "LR scheduler patience should be less than early stopping patience"
 
 variable = train_config["variable"]
 if variable is None:
@@ -282,8 +285,7 @@ def weighted_bce_loss(output, target, class_weights, event_weights):
 
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 ### NOTE: patience for the scheculer is different from the early stopping patience
-### LR scheduler patience should be less than early stopping patience, so that the LR can be reduced before training stops
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = 1)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = patience_LR)
 
 def binary_class_weights(labels, event_weights):
     num_sig = np.sum(event_weights[labels == 1])

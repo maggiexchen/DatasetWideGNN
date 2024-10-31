@@ -4,10 +4,11 @@ sigsig_eff: 0.6
 linking_length: 0.1
 hidden_sizes_gcn: []
 hidden_sizes_mlp: [64,32,16,16]
-LR: 0.001
 dropout_rates: [0.3, 0.2, 0.1, 0.1]
-epochs: 100
+LR: 0.001
+patience_LR: 3
 num_nb_list: [20, 20, 20, 20]
 batch_size: 2048
 gnn_type: "Graph"
+epochs: 100
 patience_early_stopping: 10
