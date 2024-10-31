@@ -43,6 +43,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 
 torch.cuda.empty_cache()
+torch.manual_seed(42)
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
