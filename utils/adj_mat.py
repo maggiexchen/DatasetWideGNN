@@ -189,7 +189,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
         distance (str): distance metric type in the file names
         t (str): type of distance (sigsig, sigbkg or bkgbkg)
         linking length (float): chosen linking length to apply
-        flip (bool): if the sigisg distances are smaller than bkgbkg distances
+        flip (bool): True if edges are made for distance < linking length
     
     Returns:
         (torch.tensor())indices of non-empty elements in the adj matrix

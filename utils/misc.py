@@ -4,6 +4,7 @@ import glob
 import torch
 import math
 import pandas as pd
+import uproot
 torch.manual_seed(42)
 
 def print_mem_info():
@@ -69,7 +70,11 @@ def get_kinematics(variable, dim):
     elif variable == "mass_and_shape":
         kinematics = ["mH1","mH2","mH3","mHHH","sphere3dv2b","sphere3dv2btrans","aplan3dv2b","theta3dv2b"]
     elif variable == "LQ":
-        kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
+        #kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
+        kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
+                      'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta', 'lep1flav',
+                      'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi', 'lep2flav',
+                      'met', 'metphi']
     elif variable == "embedding":
         if dim == None:
             raise Exception("Please specify the number of emdedded features used")
@@ -246,6 +251,17 @@ def get_h5_paths(path, variable, distance, label="sampled_train"):
 
     return files[0], files[1], files[2]
 
+def get_ntuples(path, signal):
+    if signal == "hhh":
+        signal_file = uproot.open(path + "6b_resonant_TRSM/out3_reco_6j_521176.root:tree")
+        background_file = uproot.open(path + "data/out3_data_reco_5j.root:tree")
+        return signal_file, background_file
+    elif signal == "LQ":
+        signal_file = uproot.open(path + "GNNTree_LQ.root:tree")
+        singletop_file = uproot.open(path + "GNNTree_singletop.root:tree")
+        ttbar_file = uproot.open(path + "GNNTree_ttbar.root:tree")
+        return signal_file, singletop_file, ttbar_file
+
 def get_batched_distances(dist_path, variable, distance, t, sample=True):
     """
     Function to obtain a list of .pt path+filenames for sig-sig, sig-bkg and bkg-bkg distance storage. 
@@ -266,7 +282,7 @@ def get_batched_distances(dist_path, variable, distance, t, sample=True):
     distance = torch.empty(0, dtype=torch.float16)
     wgt = torch.empty(0, dtype=torch.float16)
     if sample:
-        num_sample = 20000
+        num_sample = 40000
         batch_sample = math.ceil(num_sample / len(files))
         sample_count = 0
         while sample_count < num_sample:
