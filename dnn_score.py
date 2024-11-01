@@ -105,22 +105,22 @@ val_sig_wgts = np.ones(len(val_sig_pred))
 val_bkg_wgts = np.ones(len(val_bkg_pred))
 
 
-
 logging.info("Plotting model outputs ...")
 fig, axs = plt.subplots(2,1,#figsize=(8,10),
                         gridspec_kw={'height_ratios': [4, 1]},
                         sharex=True)
 binning = np.linspace(0,1,51)
-axs[0].hist(val_sig_pred, bins=binning, label="Signal (validation)", alpha=0.5, density=False, color="darkorange", weights=val_sig_wgts)
-axs[0].hist(val_bkg_pred, bins=binning, label="Background (validation)", alpha=0.5, density=False, color="steelblue", weights=val_bkg_wgts)
+axs[0].hist(val_sig_pred, bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange", weights=val_sig_wgts)
+axs[0].hist(val_bkg_pred, bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue", weights=val_bkg_wgts)
 
 # plotting.add_text(axs[0], text, doATLAS=False, startx=0.02, starty=0.95)
 axs[0].legend(loc='upper right', fontsize=9)
 # axs[0].set_xlabel("Output score", loc="right")
 axs[0].set_ylabel("No. Events", loc="top")
 ymin, ymax = axs[0].get_ylim()
-axs[0].set_yscale('log')
-axs[0].set_ylim((ymin, ymax*10))
+# axs[0].set_yscale('log')
+# axs[0].set_ylim((ymin, ymax*10))
+axs[0].set_xlim((0, 1))
 
 
 def get_Z(n, b, sigma):
@@ -162,3 +162,4 @@ fig.subplots_adjust(hspace=0.1)
 print(np.nanmax(Z_val), np.nanmax(Z2_val))
 plt.tight_layout()
 plt.show()
+fig.savefig("gcn_outputs_noWeights.pdf")
