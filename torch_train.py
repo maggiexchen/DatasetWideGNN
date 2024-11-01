@@ -80,7 +80,7 @@ device = torch.device('cpu')
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
 print("Using user config ",user_config)
-distance_h5_path = user_config["distance_h5_path"]
+feature_h5_path = user_config["feature_h5_path"]
 kinematic_h5_path = user_config["kinematic_h5_path"]
 plot_path = user_config["plot_path"]
 ll_path = user_config["ll_path"]
@@ -173,7 +173,7 @@ logging.info("signal: "+signal)
 logging.info("chosen model: "+model_label)
 logging.info("kinematic variable set: "+kinematic_variable)
 logging.info("embedding variable set: "+embedding_variable)
-logging.info("input data path: "+distance_h5_path)
+logging.info("input data path: "+feature_h5_path)
 logging.info("input ll json path: "+ll_path)
 logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
@@ -184,7 +184,7 @@ model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, 
 model.to(device)
 
 logging.info("distance metric: "+distance)
-if eff is not None:
+if eff is not None:    
     logging.info("desired efficieny: "+str(eff))
 elif linking_length is not None:
     logging.info("linking length: "+str(linking_length))
@@ -279,10 +279,11 @@ def compute_class_weights(labels, event_weights):
 
 ### define loss function and optimiser
 def weighted_bce_loss(output, target, class_weights, event_weights):
-    sig_loss = event_weights * (class_weights[1] * target * torch.log(output+1e-10))
-    bkg_loss = class_weights[0] * (1-target) * torch.log(1-output+1e-10)
-    loss = sig_loss+bkg_loss
-    return -loss.mean()
+    # sig_loss = event_weights * (class_weights[1] * target * torch.log(output+1e-10))
+    sig_loss = target * torch.log(output+1e-10)
+    bkg_loss = (1-target) * torch.log(1-output+1e-10)
+    loss = (-1)*(sig_loss+bkg_loss)
+    return loss.mean()
 
 optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, 'min')
@@ -292,18 +293,21 @@ def binary_class_weights(labels, event_weights):
     # num_bkg = np.sum(event_weights[labels == 0])
     num_sig = len(labels[labels == 1])
     num_bkg = len(labels[labels == 0])
-    print("num sig ", num_sig, "num bkg ", num_bkg)
+    # print("num sig ", num_sig, "num bkg ", num_bkg)
     # sig_weight = num_bkg/num_sig
     # return torch.tensor(sig_weight, dtype=torch.float)
     bkg_weight = num_sig/num_bkg
     sig_weight = 1
-    return torch.tensor([bkg_weight, 1])
+    # sig_weight = num_bkg/num_sig
+    # bkg_weight = 1
+    # return torch.tensor([bkg_weight, sig_weight])
+    return torch.tensor([1, 1])
 
 logging.info("Training ...")
 print("full x", len(full_x))
 print("full y", len(full_y))
 if len(hidden_sizes_gcn) > 0:
-    print("edge ind", len(edge_ind))
+    print("Checking edge indices dim: ", len(edge_ind))
 
 gc.collect()
 torch.cuda.empty_cache()
@@ -319,7 +323,6 @@ print("val idx", len(val_idx))
 
 all_labels = data.y[train_idx].cpu().numpy()
 all_wgts = data.wgts[train_idx].cpu().numpy()
-print("LABEL 0 ", len(all_labels[all_labels==0]))
 # class_weights = compute_class_weights(all_labels, all_wgts).to(device)
 class_weights = binary_class_weights(all_labels, all_wgts).to(device)
 print("class weights", class_weights)
@@ -403,11 +406,11 @@ for epoch in range(epochs):
             event_wgts = batch.wgts[:batch_size]
 
             loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
-            current_lr = optimiser.param_groups[0]['lr']
-            scheduler.step(loss)
-            new_lr = optimiser.param_groups[0]['lr']
-            if new_lr < current_lr:
-                print(f"Learning rate reduced to: {new_lr}")
+            # current_lr = optimiser.param_groups[0]['lr']
+            # scheduler.step(loss)
+            # new_lr = optimiser.paramgroups[0]['lr']
+            # if new_lr < current_lr:
+                # print(f"Learning rate reduced to: {new_lr}")
 
             total_examples += batch_size
             total_loss += float(loss) * batch_size
@@ -461,17 +464,18 @@ perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc, va
 perf.save_metadata(len(train_sig), len(train_bkg), len(val_sig), len(val_bkg), hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
 
 logging.info("Plotting training/validation losses ...")
-fig, ax = plt.subplots()
+fig_loss, ax_loss = plt.subplots()
 x_epoch = numpy.arange(1,epochs+1,1)
-ax.plot(x_epoch, train_loss, label="Training loss")
-ax.plot(x_epoch, val_loss, label="Validation loss")
-ax.legend(loc='upper right', fontsize=9)
-ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
-ax.set_xlabel("Epoch", loc="right")
-ax.set_ylabel("Loss", loc="top")
+ax_loss.plot(x_epoch, train_loss, label="Training loss")
+ax_loss.plot(x_epoch, val_loss, label="Validation loss")
+ax_loss.legend(loc='upper right', fontsize=9)
+ax_loss.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax_loss.transAxes)
+ax_loss.set_xlabel("Epoch", loc="right")
+ax_loss.set_ylabel("Loss", loc="top")
+ax_loss.set_yscale('log')
 misc.create_dirs(plot_path)
 logging.info("Saving plots to "+plot_path)
-fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
+fig_loss.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
 
 logging.info("Plotting model outputs ...")
 fig, ax = plt.subplots()
@@ -508,21 +512,31 @@ np.save(score_path+"val_sig_wgts.npy", val_sig_wgts.detach().cpu().numpy())
 np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().cpu().numpy())
 np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().cpu().numpy())
 
+auc_text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc)]
 if signal == "hhh":
-    if eff is not None:
-        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length at sig-sig efficiency "+str(eff)]
-    elif linking_length is not None:
-        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length "+str(linking_length)]
+    if gnn_type == "DNN":
+        text = auc_text + ["6b Resonant TRSM signal, 5b data"]
+    else:
+        if eff is not None:
+            text = auc_text+["6b Resonant TRSM signal, 5b data", "Linking length at sig-sig efficiency "+str(eff)]
+        elif linking_length is not None:
+            text = auc_text+["6b Resonant TRSM signal, 5b data", "Linking length "+str(linking_length)]
 elif signal == "stau":
-    if eff is not None:
-        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", "Linking length at sig-sig efficiency "+str(eff)]
-    elif linking_length is not None:
-        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", "Linking length "+str(linking_length)]
+    if gnn_type == "DNN":
+        text = auc_text, "stau stau signal"
+    else:
+        if eff is not None:
+            text = auc_text+["stau stau signal", "Linking length at sig-sig efficiency "+str(eff)]
+        elif linking_length is not None:
+            text = auc_text+["stau stau signal", "Linking length "+str(linking_length)]
 elif signal == "LQ":
-    if eff is not None:
-        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", "Linking length at sig-sig efficiency "+str(eff)]
-    elif linking_length is not None:
-        text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", "Linking length "+str(linking_length)]
+    if gnn_type == "DNN":
+        text = auc_text+["LQ signal"]
+    else:
+        if eff is not None:
+            text = auc_text+["LQ signal", "Linking length at sig-sig efficiency "+str(eff)]
+        elif linking_length is not None:
+            text = auc_text+["LQ signal", "Linking length "+str(linking_length)]
 
 plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
 ax.legend(loc='upper right', fontsize=9)
