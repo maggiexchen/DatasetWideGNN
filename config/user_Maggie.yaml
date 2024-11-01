@@ -3,16 +3,18 @@
 #######################
 
 # signal model hhh, LQ, stau
-signal: hhh
+signal: LQ
+feature_dim:
 
 # input paths
-ntuple_path: /data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/
-h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/hhh_split_files/
-ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/linking_lengths/ 
-dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/distances/
-score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/output_scores/
+ntuple_path: /data/atlas/atlasdata3/maggiechen/LQ_ntuples/
+kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/LowLevelKinematics/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/linking_lengths/
+feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/LowLevelKinematics/
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/plots/ 
-adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/subsampling/models/ 
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/plots/ 
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/models/ 

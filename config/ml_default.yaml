@@ -1,13 +1,14 @@
 kinematic_variable: "LQ"
-embedding_variable: "embedding"
+embedding_variable:
 distance: "euclidean"
-sigsig_eff: 0.2
-linking_length:
-hidden_sizes_gcn: [24, 24, 24, 24, 24]
-hidden_sizes_mlp: []
+flip: True
+sigsig_eff:
+linking_length: 4
+hidden_sizes_gcn: []
+hidden_sizes_mlp: [4, 4, 4, 4]
 LR: 0.01
-dropout_rates: [0.0, 0.0, 0.0, 0.0, 0.0]
+dropout_rates: [0.0, 0.0, 0.0, 0.0]
 epochs: 30
 num_nb_list: [20, 20]
-batch_size: 1024
-gnn_type: "GAT"
+batch_size: 128
+gnn_type: "GCN"

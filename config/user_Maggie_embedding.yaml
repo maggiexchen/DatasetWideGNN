@@ -4,17 +4,17 @@
 
 # signal model hhh, LQ, stau
 signal: LQ
-feature_dim: 2
+feature_dim:
 
 # input paths
-ntuple_path: /data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/
-distance_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/
-kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/LQ_test/
-ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/linking_lengths/ 
-dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/distances/
-score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/output_scores/
+ntuple_path: /data/atlas/atlasdata3/maggiechen/LQ_ntuples/
+feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/sigsig_clustering/
+kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/LowLevelKinematics/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/linking_lengths/ 
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/plots/ 
-adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/models/ 
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/plots/ 
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/models/ 
