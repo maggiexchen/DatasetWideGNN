@@ -203,7 +203,6 @@ print("val bkg", len(val_bkg))
 print("test sig", len(test_sig))
 print("test bkg", len(test_bkg))
 
-
 full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
 full_sig_labels = torch.cat((train_sig_labels, val_sig_labels, test_sig_labels))
 
@@ -309,8 +308,10 @@ torch.cuda.empty_cache()
 data = Data(x = full_x, y = full_y, edge_index = edge_ind, wgts = full_wgts)#, edge_weight = edge_wgts)
 del edge_ind
 
-train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)+len(val_sig), len(train_sig)+len(val_sig)+len(train_bkg))), dim=0).tolist()
-val_idx = torch.cat((torch.arange(len(train_sig), len(train_sig)+len(val_sig)), torch.arange(len(full_x)-len(val_bkg), len(full_x))), dim=0).tolist()
+train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg))), dim=0).tolist()
+val_idx =   torch.cat((torch.arange(len(train_sig), len(train_sig)+len(val_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg))), dim=0).tolist()
+test_idx =  torch.cat((torch.arange(len(train_sig)+len(val_sig), len(train_sig)+len(val_sig)+len(test_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg)+len(test_bkg))), dim=0).tolist()
+
 print("train idx", len(train_idx))
 print("val idx", len(val_idx))
 
@@ -380,7 +381,8 @@ for epoch in range(epochs):
         
     avg_tr_loss = total_loss / total_examples
     train_loss.append(avg_tr_loss)
-        
+
+
     ### start validation loop in the epoch
     model.eval()
     total_examples = total_loss = 0
