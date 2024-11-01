@@ -267,9 +267,9 @@ def plot_embeddings(embeddings, labels, epoch, margin, feat, radius=1.0, pen=1.0
     plotting_path = plot_path+"embedding_"+str(feat)+"feats/"
     os.makedirs(plotting_path, exist_ok=True)
     if num_epochs == 0:
-        fig.savefig(plot_path+"embedding_e0.pdf")
+        fig.savefig(plotting_path+"embedding_e0.pdf")
     else:
-        fig.savefig(plot_path+"embedding_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(pen)+".pdf")
+        fig.savefig(plotting_path+"embedding_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(pen)+".pdf")
 
     # graph info saved into a dictionary
     graph_dict = {"loss_margin": margin,
@@ -306,6 +306,7 @@ if num_epochs > 0:
     ax.set_xlabel("Epoch", loc="right")
     ax.set_ylabel("Loss", loc="top")
     ax.legend(loc="upper right")
-    plot_path = "scan_plots/embedding_"+str(embedding_dim)+"feats/loss/"
-    os.makedirs(plot_path, exist_ok=True)
-    fig.savefig(plot_path+"loss_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(penalty)+".pdf", transparent=True)
+    plotting_path = plot_path+"embedding_"+str(embedding_dim)+"feats/loss/"
+    os.makedirs(plotting_path, exist_ok=True)
+    os.makedirs(plotting_path, exist_ok=True)
+    fig.savefig(plotting_path+"embedding_e"+str(num_epochs)+"_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(penalty)+".pdf")
