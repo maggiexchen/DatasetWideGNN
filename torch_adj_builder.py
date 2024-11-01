@@ -74,12 +74,13 @@ train_config = misc.load_config(train_config_path)
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
 print(user_config)
-distance_h5_path = user_config["distance_h5_path"]
+feature_h5_path = user_config["feature_h5_path"]
 kinematic_h5_path = user_config["kinematic_h5_path"]
 plot_path = user_config["plot_path"]
 ll_path = user_config["ll_path"]
 adj_path = user_config["adj_path"]
 dist_path = user_config["dist_path"]
+flip = train_config["flip"]
 
 # TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
@@ -126,7 +127,7 @@ input_size = len(kinematics)
 logging.info("signal: "+signal)
 logging.info("kinematic variable set: "+kinematic_variable)
 logging.info("embedding variable set: "+embedding_variable)
-logging.info("input data distance path: "+distance_h5_path)
+logging.info("input data distance path: "+feature_h5_path)
 logging.info("input data kinematic path: "+kinematic_h5_path)
 logging.info("input ll json path: "+ll_path)
 logging.info("input distances path: "+dist_path)
@@ -157,11 +158,11 @@ print("numevents: ",full_x.size(0))
 ### load distances and apply linking length to receieve indices
 logging.info("Batch applying the linking length and getting non-zero indices ...")
 logging.info("For sigsig ...")
-sigsig_ind = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigsig", linking_length, flip=True)
+sigsig_ind = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigsig", linking_length, flip=flip)
 print("sigsig: ",sigsig_ind.shape)
 
 logging.info("For sigbkg ...")
-sigbkg_ind = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigbkg", linking_length, flip=True)
+sigbkg_ind = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigbkg", linking_length, flip=flip)
 print("sigbg: ", sigbkg_ind.shape)
 
 logging.info("For bkgsig ...")
@@ -170,7 +171,7 @@ bkgsig_ind = bkgsig_ind[:, [1, 0]]
 print("bgsig: ", bkgsig_ind.shape)
 
 logging.info("For bkgbkg ...")
-bkgbkg_ind = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "bkgbkg", linking_length, flip=True)
+bkgbkg_ind = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "bkgbkg", linking_length, flip=flip)
 print("bgbg: ", bkgbkg_ind.shape)
 
 # adding to the indices to form the full matrix indices
