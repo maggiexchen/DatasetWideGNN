@@ -58,7 +58,7 @@ distance = str(args.distance)
 
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
-distance_h5_path = user_config["distance_h5_path"]
+feature_h5_path = user_config["feature_h5_path"]
 plot_path = user_config["plot_path"]
 dist_path = user_config["dist_path"]
 
@@ -70,7 +70,7 @@ logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("signal: "+signal)
 logging.info("variable set: "+variable)
-logging.info("input data path: "+distance_h5_path)
+logging.info("input data path: "+feature_h5_path)
 logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
 kinematics = misc.get_kinematics(variable, feature_dim)
@@ -78,9 +78,9 @@ kinematics = misc.get_kinematics(variable, feature_dim)
 # load in input files
 logging.info('Importing signal and background files...')
 if signal == "hhh": SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_sig_labels, train_truth_bkg_labels = adj.data_loader(distance_h5_path, plot_path, "train", kinematics, signal=signal, plot=True)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_sig_labels, val_truth_bkg_labels = adj.data_loader(distance_h5_path, plot_path, "val", kinematics, signal=signal)
-test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels, test_truth_bkg_labels = adj.data_loader(distance_h5_path, plot_path, "test", kinematics, signal=signal)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_sig_labels, train_truth_bkg_labels = adj.data_loader(feature_h5_path, plot_path, "train", kinematics, signal=signal, plot=True)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_sig_labels, val_truth_bkg_labels = adj.data_loader(feature_h5_path, plot_path, "val", kinematics, signal=signal)
+test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels, test_truth_bkg_labels = adj.data_loader(feature_h5_path, plot_path, "test", kinematics, signal=signal)
 
 full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
 full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)

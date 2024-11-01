@@ -65,7 +65,7 @@ distance = str(args.distance)
 
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
-distance_h5_path = user_config["distance_h5_path"]
+feature_h5_path = user_config["feature_h5_path"]
 plot_path = user_config["plot_path"]
 dist_path = user_config["dist_path"]
 ll_path = user_config["ll_path"]
@@ -78,7 +78,7 @@ logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("signal: "+signal)
 logging.info("variable set: "+variable)
-logging.info("input data path: "+distance_h5_path)
+logging.info("input data path: "+feature_h5_path)
 logging.info("input distances path: "+dist_path)
 logging.info("output ll json path: "+ll_path)
 logging.info("output plot path: "+plot_path)
@@ -140,10 +140,10 @@ ss_thresholds = []
 # finding the tpr, fpr and distance thresholds for each efficiency, then reverse minmax the distance threshold
 # note the ss_bb and ss_sb thresholds are the same as they are just determined as the threshold for the given ss efficiency.
 for eff in sigsig_eff:
-    ss_sb_roc_cut, ss_sb_threshold = graph_def.find_threshold(tpr_ss_sb,fpr_ss_sb, eff, cut_ss_sb, flip=True)
+    ss_sb_roc_cut, ss_sb_threshold = graph_def.find_threshold(tpr_ss_sb, fpr_ss_sb, eff, cut_ss_sb, flip=args.flip)
     ss_sb_roc_cuts.append(ss_sb_roc_cut)
     ss_sb_thresholds.append(norm.reverse_minmax(ss_sb_threshold, 0 ,d_max))
-    ss_bb_roc_cut, ss_bb_threshold = graph_def.find_threshold(tpr_ss_bb,fpr_ss_bb, eff, cut_ss_bb, flip=True)
+    ss_bb_roc_cut, ss_bb_threshold = graph_def.find_threshold(tpr_ss_bb, fpr_ss_bb, eff, cut_ss_bb, flip=args.flip)
     ss_bb_roc_cuts.append(ss_bb_roc_cut)
     ss_thresholds.append(norm.reverse_minmax(ss_bb_threshold, 0 ,d_max).item())
 
