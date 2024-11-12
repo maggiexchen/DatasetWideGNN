@@ -4,6 +4,7 @@ import glob
 import torch
 import math
 import pandas as pd
+import pdb
 torch.manual_seed(42)
 
 def print_mem_info():
@@ -86,77 +87,82 @@ def get_kinematics_staus(variable):
     Returns:
         list(str): the list of names of kinematic variables
     """
-    if variable == "all":    
-        kin_var_0J = [
-            ### met
-            'met_Et', 'met_Signif', 'TST_Et',
-            ### tau
-            'tauPt', 'tauEta', 'tauNTracks', 
-            # 'tauM', #check this
-            ### lep
-            'lepPt', 'lepEta', 'lepD0', 'lepD0Sig', 'lepZ0',
-            'lepZ0SinTheta','lepFlavor', 'lepCharge',
-            ### dphi (losing parity info bc of abs? check this!)
-            'dPhi_met_tst', 'dPhi_met_lep', 'dPhi_met_tau', 
-            'dPhi_tst_lep', 'dPhi_tst_tau', 'dPhi_lep_tau', 
-            ### dEta and dR
-            'dEta_lep_tau', 'dR_lep_tau', 
-            ### angular
-            'sum_cos', 
-            'met_cen', 
-            'cPhi1', 'cPhi2', 
-            'cos_star',
-            ### balance
-            'tau_lep_bal', 'met_bal',
-            ### mass
-            'mT_tau_met', 'mT_lep_met', 
-            'mT_sum', 'mCT_tau_lep','m_inv_tau_lep', 
-            ### mt2
-            'mT2_0', 'mT2_10', 'mT2_20', 'mT2_30', 
-            'mT2_40', 'mT2_50', 'mT2_60',
-            ### meff
-            # 'myMeffInc20', 'myMeffInc20_tau',
-            # 'myMeffInc30', 'myMeffInc30_tau', 
-            'myMeffInc40', 'myMeffInc40_tau', 
-            # 'myMeffInc50', 'myMeffInc50_tau',
-            'nbjets_85WP'
-            ### also try absEta?
+       
+    kin_var_0J = [
+        ### met
+        'met_Et', 'met_Signif', 'TST_Et',
+        ### tau
+        'tauPt', 'tauEta', 'tauNTracks', 
+        # 'tauM', #check this
+        ### lep
+        'lepPt', 'lepEta', 'lepD0', 'lepD0Sig', 'lepZ0',
+        'lepZ0SinTheta','lepFlavor', #'lepCharge',
+        ### dphi (losing parity info bc of abs? check this!)
+        'dPhi_met_tst', 'dPhi_met_lep', 'dPhi_met_tau', 
+        'dPhi_tst_lep', 'dPhi_tst_tau', 'dPhi_lep_tau', 
+        ### dEta and dR
+        'dEta_lep_tau', 'dR_lep_tau', 
+        ### angular
+        'sum_cos', 
+        'met_cen', 
+        'cPhi1', 'cPhi2', 
+        'cos_star',
+        ### balance
+        'tau_lep_bal', 'met_bal',
+        ### mass
+        'mT_tau_met', 'mT_lep_met', 
+        'mT_sum', 'mCT_tau_lep','m_inv_tau_lep', 
+        ### mt2
+        'mT2_0', 'mT2_10', 'mT2_20', 'mT2_30', 
+        'mT2_40', 'mT2_50', 'mT2_60',
+        ### meff
+        # 'myMeffInc20', 'myMeffInc20_tau',
+        # 'myMeffInc30', 'myMeffInc30_tau', 
+        'myMeffInc40', 'myMeffInc40_tau', 
+        # 'myMeffInc50', 'myMeffInc50_tau',
+        # 'nbjets_85WP'
+        ### also try absEta?
+    ]
+
+    kin_var_J =  [
+        'jetPt', 'jetEta', 'jetM',
+        'dPhi_met_jet', 'dPhi_tst_jet', 
+        'dPhi_lep_jet', 'dPhi_tau_jet',
+        'dEta_lep_jet', 'dEta_tau_jet',
+        'dR_lep_jet', 'dR_tau_jet',
+        'myHt40', 
+        'njets20', 'njets30', 'njets40', 'njets50',
         ]
 
-        kin_var_J =  [
-            'jetPt', 'jetEta', 'jetM',
-            'dPhi_met_jet', 'dPhi_tst_jet', 
-            'dPhi_lep_jet', 'dPhi_tau_jet',
-            'dEta_lep_jet', 'dEta_tau_jet',
-            'dR_lep_jet', 'dR_tau_jet',
-            'myHt40', 
-            'njets20', 'njets30', 'njets40', 'njets50',
+    rtaus_var_0J = [#'rtau1_x', 'rtau1_y', 'rtau2_x', 'rtau2_y', 
+            'rtau1Pt', #'rtau1Phi',
+            'rtau2Pt', #'rtau2Phi', 
+            'dPhi_met_rtau1', 'dPhi_met_rtau2',
+            'dPhi_tst_rtau1', 'dPhi_tst_rtau2', 
+            'dPhi_rtau1_rtau2',
+            'dR_rtau1_rtau2',  
+            'm_inv_rtaus', 
+            'rtaus_bal', 
+            'mCT_rtaus',
+            'cos_star_rtaus', #'scale_factor'
             ]
 
-        rtaus_var_0J = [#'rtau1_x', 'rtau1_y', 'rtau2_x', 'rtau2_y', 
-                'rtau1Pt', #'rtau1Phi',
-                'rtau2Pt', #'rtau2Phi', 
-                'dPhi_met_rtau1', 'dPhi_met_rtau2',
-                'dPhi_tst_rtau1', 'dPhi_tst_rtau2', 
-                'dPhi_rtau1_rtau2',
-                'dR_rtau1_rtau2',  
-                'm_inv_rtaus', 
-                'rtaus_bal', 
-                'mCT_rtaus',
-                'cos_star_rtaus', #'scale_factor'
-                ]
+    rtaus_var_J = [
+            'dPhi_rtau1_jet',  
+            'dPhi_rtau2_jet',
+            'dR_rtau1_jet',
+            'dR_rtau2_jet', 
+            ]
 
-        rtaus_var_J = [
-                'dPhi_rtau1_jet',  
-                'dPhi_rtau2_jet',
-                'dR_rtau1_jet',
-                'dR_rtau2_jet', 
-                ]
+    kin_var_0J = kin_var_0J + rtaus_var_0J
+    kin_var_J = kin_var_J + rtaus_var_J
 
-        kin_var_0J = kin_var_0J + rtaus_var_0J
-        kin_var_J = kin_var_J + rtaus_var_J
+    if variable == "all": 
         kinematics = kin_var_0J + kin_var_J
-
+    elif variable == "no_jets":
+        kinematics = kin_var_0J
+    elif variable == "jets":
+        kinematics = kin_var_J
     elif variable == "distance":
         # distance_var = kin_var
         kinematics = [
@@ -171,7 +177,7 @@ def get_kinematics_staus(variable):
             'tauPt',
         ]
     else:
-        raise Exception("bruh, pick a better variable set for staus (all, distance)")
+        raise Exception("bruh, pick a better variable set for staus (all, no_jets, jets, distance)")
     
     return kinematics
 
@@ -218,6 +224,23 @@ def sig_mass_point(df_sig, mass_points = ['100_50']):
         df_sig_new = pd.concat([df_sig_new, df_sig_mp])
     
     return df_sig_new
+
+def stau_selections(df):
+
+    ### zero out the kinematic variables for events with no jets
+    kin_var_J = get_kinematics_staus("jets")
+    df.loc[df.njets40 == 0, kin_var_J] = 0
+
+    df = df[df.nbjets_85WP == 0]
+    df = df[df.met_Et > 15]
+    df = df[df.met_Signif > 1.5]
+    df = df[df.mT2_0 < 100]
+    df = df[abs(df.dR_lep_tau) < 3.6]
+    df = df[((df.mT_sum) > 70) & ((df.mT_lep_met > 20) | (df.mT_tau_met > 90)) & ((df.mT_lep_met > 90) | (df.mT_tau_met > 20))]
+    df = df[((df.cPhi2+df.cPhi1)> -1.25) & ((df.cPhi1 > 0.5) | (df.cPhi2 > -0.75)) & ((df.cPhi1 > -0.75) | (df.cPhi2 > 0.5))]
+
+    return df
+
 
 def get_h5_paths(path, variable, distance, label="sampled_train"):
     """

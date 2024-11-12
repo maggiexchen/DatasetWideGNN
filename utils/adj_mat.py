@@ -41,22 +41,32 @@ def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"
     """
     signal_label, background_label = plotting.get_plot_labels(signal)
     bkg_typedict = {"hhh": ["bkg"], "LQ": ["singletop", "ttbar"], 
-                    "stau": ['Wjets','Zlljets','Zttjets','diboson0L','diboson1L', 
-                              'diboson2L','diboson3L','diboson4L', 'higgs',
-                                'singletop','topOther','triboson','ttV','ttbar_incl']}
+                    "stau": [
+                            'Wjets',
+                            'Zlljets',
+                            'Zttjets2214',
+                            'diboson0L','diboson1L','diboson2L',
+                            'diboson3L','diboson4L','triboson',
+                            'higgs',
+                            'singletop','topOther','ttV','ttbar_incl'
+                            ]}
     bkg_types = bkg_typedict[signal]
 
     if signal == "stau":
+        print(f"loading stau signal sample(s) for {f_type}")
         df_sig = pd.read_hdf(h5_path+"/StauStau_"+str(f_type)+".h5")
         df_sig = misc.sig_mass_point(df_sig, mass_points = ['100_50'])
+        df_sig = misc.stau_selections(df_sig)
     else:
         df_sig =  pd.read_hdf(h5_path+"/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
     
     df_bkg = pd.DataFrame()
     if signal == "stau":
         for bkg in bkg_types:
+            print(f"loading {bkg} background sample for {f_type}")
             tmp_df_bkg = pd.read_hdf(h5_path+"/"+bkg+"_"+str(f_type)+".h5")
             df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
+            df_bkg = misc.stau_selections(df_bkg)
     else:
         for bkg in bkg_types:
             tmp_df_bkg = pd.read_hdf(h5_path+"/"+bkg+"_"+str(f_type)+".h5", key=bkg+"_"+str(f_type))
