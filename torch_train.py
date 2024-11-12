@@ -37,6 +37,7 @@ import time
 st = time.time()
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
 from sklearn.utils import shuffle
+from sklearn.model_selection import StratifiedKFold
 
 import shap
 import logging
@@ -90,7 +91,7 @@ model_path = user_config["model_path"]
 score_path = user_config["score_path"]
 
 signal = user_config["signal"]
-h5_path = h5_path + "/" + signal + "_split_files/"
+# h5_path = h5_path + "/" + signal + "_split_files/"
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 signal_label, background_label = plotting.get_plot_labels(signal)
 
@@ -108,6 +109,7 @@ num_nb_list = train_config["num_nb_list"]
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
 patience_early_stopping = train_config["patience_early_stopping"]
+num_folds = train_config["num_folds"]
 ### LR scheduler patience should be less than early stopping patience, so that the LR can be reduced before training stops
 assert patience_LR < patience_early_stopping, "LR scheduler patience should be less than early stopping patience"
 
@@ -146,7 +148,8 @@ if len(hidden_sizes_gcn) == 0:
           + "_lr" + str(LR).replace(".", "p")\
           + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
           + "_bs" + str(batch_size)\
-          + "_e" + str(epochs)
+          + "_e" + str(epochs)\
+          + "_nf" + str(num_folds)
 else:
     model_label = signal\
             + f"_{gnn_type}" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
@@ -156,7 +159,9 @@ else:
             + ll_str\
             + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
             + "_bs" + str(batch_size)\
-            + "_e" + str(epochs)    
+            + "_e" + str(epochs)\
+            + "_nf" + str(num_folds)
+    
 plot_path = plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
@@ -165,9 +170,6 @@ if signal == "stau":
 else:
     kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
-
-train_loss = []
-val_loss = []
 
 logging.info("signal: "+signal)
 logging.info("chosen model: "+model_label)
@@ -179,8 +181,8 @@ logging.info("output plot path: "+plot_path)
 logging.info("adj matrix storage path: "+adj_path)
 logging.info("model storage path: "+model_path)
 
-model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
-model.to(device)
+# model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
+# model.to(device)
 
 logging.info("distance metric: "+distance)
 if eff is not None:
@@ -191,34 +193,68 @@ elif linking_length is not None:
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
 
+###### when loading train_val separately
 # normalised signal and background kinematics
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels = adj.data_loader(h5_path, plot_path, "train", kinematics, plot=False, signal=signal)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels = adj.data_loader(h5_path, plot_path, "val", kinematics, plot=False, signal=signal)
-test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_sig_labels, test_bkg_labels = adj.data_loader(h5_path, plot_path, "test", kinematics, plot=False, signal=signal)
+# train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels = adj.data_loader(h5_path, plot_path, "train", kinematics, plot=False, signal=signal)
+# val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels = adj.data_loader(h5_path, plot_path, "val", kinematics, plot=False, signal=signal)
+# test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_sig_labels, test_bkg_labels = adj.data_loader(h5_path, plot_path, "test", kinematics, plot=False, signal=signal)
 
-print("train sig", len(train_sig))
-print("train bkg", len(train_bkg))
-print("val sig", len(val_sig))
-print("val bkg", len(val_bkg))
-print("test sig", len(test_sig))
-print("test bkg", len(test_bkg))
+# print("train sig", len(train_sig))
+# print("train bkg", len(train_bkg))
+# print("val sig", len(val_sig))
+# print("val bkg", len(val_bkg))
+# print("test sig", len(test_sig))
+# print("test bkg", len(test_bkg))
 
-full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
-full_sig_labels = torch.cat((train_sig_labels, val_sig_labels, test_sig_labels))
+# full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
+# full_sig_labels = torch.cat((train_sig_labels, val_sig_labels, test_sig_labels))
 
-full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
-full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels, test_bkg_labels))
+# full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
+# full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels, test_bkg_labels))
 
-# raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
-# raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
+# # raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
+# # raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
+
+# full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
+# del full_sig
+# del full_bkg
+
+# full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
+# full_y = full_y.float()
+# full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)), dim=0)#.cuda()
+
+mc20a_sig, mc20a_bkg, _, mc20a_sig_wgts, mc20a_bkg_wgts, mc20a_sig_labels, mc20a_bkg_labels = adj.data_loader(h5_path, plot_path, "mc20a", kinematics, plot=False, signal=signal)
+mc20d_sig, mc20d_bkg, _, mc20d_sig_wgts, mc20d_bkg_wgts, mc20d_sig_labels, mc20d_bkg_labels = adj.data_loader(h5_path, plot_path, "mc20d", kinematics, plot=False, signal=signal)
+mc20e_sig, mc20e_bkg, _, mc20e_sig_wgts, mc20e_bkg_wgts, mc20e_sig_labels, mc20e_bkg_labels = adj.data_loader(h5_path, plot_path, "mc20e", kinematics, plot=False, signal=signal)
+
+full_sig = torch.cat((mc20a_sig, mc20d_sig, mc20e_sig), dim=0)
+full_sig_labels = torch.cat((mc20a_sig_labels, mc20d_sig_labels, mc20e_sig_labels))
+del mc20a_sig, mc20d_sig, mc20e_sig
+del mc20a_sig_labels, mc20d_sig_labels, mc20e_sig_labels
+
+full_bkg = torch.cat((mc20a_bkg, mc20d_bkg, mc20e_bkg), dim=0)
+full_bkg_labels = torch.cat((mc20a_bkg_labels, mc20d_bkg_labels, mc20e_bkg_labels))
+del mc20a_bkg, mc20d_bkg, mc20e_bkg
+del mc20a_bkg_labels, mc20d_bkg_labels, mc20e_bkg_labels
+
+print("full sig size", full_sig.size())
+print("full bkg size", full_bkg.size())
 
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
-del full_sig
-del full_bkg
-
 full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
-full_y = full_y.float()
-full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)), dim=0)#.cuda()
+del full_sig, full_bkg, full_sig_labels, full_bkg_labels
+
+full_sig_wgts = torch.cat((mc20a_sig_wgts, mc20d_sig_wgts, mc20e_sig_wgts), dim=0)
+del mc20a_sig_wgts, mc20d_sig_wgts, mc20e_sig_wgts
+full_bkg_wgts = torch.cat((mc20a_bkg_wgts, mc20d_bkg_wgts, mc20e_bkg_wgts), dim=0)
+del mc20a_bkg_wgts, mc20d_bkg_wgts, mc20e_bkg_wgts
+
+print("full sig wgts", full_sig_wgts.sum())
+print("full bkg wgts", full_bkg_wgts.sum())
+
+full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
+del full_sig_wgts, full_bkg_wgts
+
 
 ### load edge indices if gnn layers are used
 edge_ind = None
@@ -282,9 +318,9 @@ def weighted_bce_loss(output, target, class_weights, event_weights):
     loss = sig_loss+bkg_loss
     return -loss.mean()
 
-optimiser = torch.optim.Adam(model.parameters(), lr=LR)
-### NOTE: patience for the scheculer is different from the early stopping patience
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = patience_LR)
+# optimiser = torch.optim.Adam(model.parameters(), lr=LR)
+# ### NOTE: patience for the scheculer is different from the early stopping patience
+# scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = patience_LR)
 
 def binary_class_weights(labels, event_weights):
     num_sig = np.sum(event_weights[labels == 1])
@@ -308,142 +344,178 @@ torch.cuda.empty_cache()
 data = Data(x = full_x, y = full_y, edge_index = edge_ind, wgts = full_wgts)#, edge_weight = edge_wgts)
 del edge_ind
 
-train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg))), dim=0).tolist()
-val_idx =   torch.cat((torch.arange(len(train_sig), len(train_sig)+len(val_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg))), dim=0).tolist()
-test_idx =  torch.cat((torch.arange(len(train_sig)+len(val_sig), len(train_sig)+len(val_sig)+len(test_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg)+len(test_bkg))), dim=0).tolist()
-
-print("train idx", len(train_idx))
-print("val idx", len(val_idx))
-
-all_labels = data.y[train_idx].cpu().numpy()
-all_wgts = data.wgts[train_idx].cpu().numpy()
-# class_weights = compute_class_weights(all_labels, all_wgts).to(device)
-class_weights = binary_class_weights(all_labels, all_wgts).to(device)
-print("class weights", class_weights)
-
-logging.info("Graph sub-sampling for training ...")
-train_loader = NeighborLoader(
-    data,
-    input_nodes = train_idx,
-    num_neighbors = num_nb_list,
-    shuffle = True,
-    batch_size = batch_size,
-    # num_workers = 6, 
-    # persistent_workers = True
-)
-
-logging.info("Graph sub-sampling for validation ...")
-val_loader = NeighborLoader(
-    data,
-    input_nodes = val_idx,
-    num_neighbors = num_nb_list,
-    shuffle = False,
-    batch_size = batch_size,
-    # num_workers = 6,
-    # persistent_workers = True
-)
-
-# BCE_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([sig_class_weight]))
-best_val_loss = float('inf')
-patience_counter = 0
-logging.info("Starting training ...")
-for epoch in range(epochs):
-
-    ### start training loop in the epoch
-    model.train()
-    total_examples = total_loss = 0
-    train_outputs = torch.tensor([])
-    train_truth_labels = torch.tensor([])
-    train_wgts = torch.tensor([])
-    for batch in train_loader:
-
-        optimiser.zero_grad()
-        batch = batch.to(device)
-        batch_size = batch.batch_size
-        outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
-        
-        ### NOTE only consider predictions and labels of seed nodes
-        y = batch.y[:batch_size]
-        outputs = outputs[:batch_size]
-        event_wgts = batch.wgts[:batch_size]
-
-        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts) 
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        optimiser.step()
-
-        torch.cuda.empty_cache()
-        total_examples += batch_size
-        total_loss += float(loss) * batch_size
-        train_outputs = torch.cat((train_outputs, outputs.detach()))
-        train_truth_labels = torch.cat((train_truth_labels, y.detach()))
-        train_wgts = torch.cat((train_wgts, event_wgts.detach()))
-        
-    avg_tr_loss = total_loss / total_examples
-    train_loss.append(avg_tr_loss)
+# train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg))), dim=0).tolist()
+# val_idx =   torch.cat((torch.arange(len(train_sig), len(train_sig)+len(val_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg))), dim=0).tolist()
+# test_idx =  torch.cat((torch.arange(len(train_sig)+len(val_sig), len(train_sig)+len(val_sig)+len(test_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg)+len(test_bkg))), dim=0).tolist()
 
 
-    ### start validation loop in the epoch
-    model.eval()
-    total_examples = total_loss = 0
-    val_outputs = torch.tensor([])
-    val_truth_labels = torch.tensor([])
-    val_wgts = torch.tensor([])
-    for batch in val_loader:
-        
-        batch = batch.to(device)
-        batch_size = batch.batch_size
-        outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
+kfold = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=42)
+fold_no = 0
+train_losses = []
+val_losses = []
+train_outputs = torch.tensor([])
+train_truth_labels = torch.tensor([])
+train_wgts = torch.tensor([])
+val_outputs = torch.tensor([])
+val_truth_labels = torch.tensor([])
+val_wgts = torch.tensor([])
+for train_idx, val_idx in kfold.split(np.zeros(len(full_y)), full_y.cpu().numpy()):
+    fold_no += 1
+    print(f"Starting fold {fold_no}/{num_folds}")
+    print("train idx", len(train_idx))
+    print("val idx", len(val_idx))
 
-        ### NOTE only consider predictions and labels of seed nodes
-        y = batch.y[:batch_size]
-        outputs = outputs[:batch_size]
-        event_wgts = batch.wgts[:batch_size]
+    model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
+    model.to(device)
 
-        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
-        
-        total_examples += batch_size
-        total_loss += float(loss) * batch_size
-        val_outputs = torch.cat((val_outputs, outputs.detach()))
-        val_truth_labels = torch.cat((val_truth_labels, y.detach()))
-        val_wgts = torch.cat((val_wgts, event_wgts.detach()))
+    optimiser = torch.optim.Adam(model.parameters(), lr=LR)
+    ### NOTE: patience for the scheculer is different from the early stopping patience
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = patience_LR)
 
-    avg_vl_loss = total_loss / total_examples
-    val_loss.append(avg_vl_loss)
+    train_loss = []
+    val_loss = []
 
-    current_lr = optimiser.param_groups[0]['lr']
-    scheduler.step(avg_vl_loss)
-    new_lr = optimiser.param_groups[0]['lr']
-    if new_lr < current_lr:
-        print(f"Learning rate reduced to: {new_lr}")
+    all_labels = data.y[train_idx].cpu().numpy()
+    all_wgts = data.wgts[train_idx].cpu().numpy()
+    # class_weights = compute_class_weights(all_labels, all_wgts).to(device)
+    class_weights = binary_class_weights(all_labels, all_wgts).to(device)
+    print("class weights", class_weights)
 
-    if avg_vl_loss < best_val_loss:
-        best_val_loss = avg_vl_loss
-        patience_counter = 0
-    else:
-        patience_counter += 1
-        print(f"No improvement in validation loss for {patience_counter} epoch(s).")
+    logging.info("Graph sub-sampling for training ...")
+    train_loader = NeighborLoader(
+        data,
+        input_nodes = train_idx,
+        num_neighbors = num_nb_list,
+        shuffle = True,
+        batch_size = batch_size,
+        # num_workers = 6, 
+        # persistent_workers = True
+    )
 
-    print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
+    logging.info("Graph sub-sampling for validation ...")
+    val_loader = NeighborLoader(
+        data,
+        input_nodes = val_idx,
+        num_neighbors = num_nb_list,
+        shuffle = False,
+        batch_size = batch_size,
+        # num_workers = 6,
+        # persistent_workers = True
+    )
 
-    if patience_counter >= patience_early_stopping:
-        print(f"Early stopping after {epoch+1} epochs.")
-        break
+    # BCE_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([sig_class_weight]))
+    best_val_loss = float('inf')
+    patience_counter = 0
+    logging.info("Starting training ...")
+    for epoch in range(epochs):
 
+        ### start training loop in the epoch
+        model.train()
+        total_examples = total_loss = 0
+        train_outputs_fold = torch.tensor([])
+        train_truth_labels_fold = torch.tensor([])
+        train_wgts_fold = torch.tensor([])
+        for batch in train_loader:
+
+            optimiser.zero_grad()
+            batch = batch.to(device)
+            batch_size = batch.batch_size
+            outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
+            
+            ### NOTE only consider predictions and labels of seed nodes
+            y = batch.y[:batch_size]
+            outputs = outputs[:batch_size]
+            event_wgts = batch.wgts[:batch_size]
+
+            loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts) 
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimiser.step()
+
+            torch.cuda.empty_cache()
+            total_examples += batch_size
+            total_loss += float(loss) * batch_size
+            train_outputs_fold = torch.cat((train_outputs_fold, outputs.detach()))
+            train_truth_labels_fold = torch.cat((train_truth_labels_fold, y.detach()))
+            train_wgts_fold = torch.cat((train_wgts_fold, event_wgts.detach()))
+            
+        avg_tr_loss = total_loss / total_examples
+        train_loss.append(avg_tr_loss)
+
+
+        ### start validation loop in the epoch
+        model.eval()
+        total_examples = total_loss = 0
+        val_outputs_fold= torch.tensor([])
+        val_truth_labels_fold = torch.tensor([])
+        val_wgts_fold = torch.tensor([])
+        for batch in val_loader:
+            
+            batch = batch.to(device)
+            batch_size = batch.batch_size
+            outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
+
+            ### NOTE only consider predictions and labels of seed nodes
+            y = batch.y[:batch_size]
+            outputs = outputs[:batch_size]
+            event_wgts = batch.wgts[:batch_size]
+
+            loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
+            
+            total_examples += batch_size
+            total_loss += float(loss) * batch_size
+            val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach()))
+            val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach()))
+            val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach()))
+
+        avg_vl_loss = total_loss / total_examples
+        val_loss.append(avg_vl_loss)
+
+        current_lr = optimiser.param_groups[0]['lr']
+        scheduler.step(avg_vl_loss)
+        new_lr = optimiser.param_groups[0]['lr']
+        if new_lr < current_lr:
+            print(f"Learning rate reduced to: {new_lr}")
+
+        if avg_vl_loss < best_val_loss:
+            best_val_loss = avg_vl_loss
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            print(f"No improvement in validation loss for {patience_counter} epoch(s).")
+
+        print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
+
+        if patience_counter >= patience_early_stopping:
+            print(f"Early stopping after {epoch+1} epochs.")
+            break
+
+    logging.info(f"Finished fold {fold_no}/{num_folds}")
+    logging.info(f"Number of epochs: {epoch+1}/{epochs}, Final train Loss: {avg_tr_loss}, final validation Loss: {avg_vl_loss}")
+    logging.info("Saving trained model and performance...")
+    model_file_name = f"model_fold_{fold_no}.pth"
+    model_path = model_path+model_label+"/"
+    misc.create_dirs(model_path)
+    torch.save({
+        'model_state': model.state_dict(),
+        'optimiser_state': optimiser.state_dict(),
+    }, model_path+model_file_name)
+
+    train_losses.append(train_loss)
+    val_losses.append(val_loss)
+    train_outputs = torch.cat((train_outputs, train_outputs_fold))
+    train_truth_labels = torch.cat((train_truth_labels, train_truth_labels_fold))
+    train_wgts = torch.cat((train_wgts, train_wgts_fold))
+    val_outputs = torch.cat((val_outputs, val_outputs_fold))
+    val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
+    val_wgts = torch.cat((val_wgts, val_wgts_fold))
         
     
 logging.info("Training complete.")
 print("train truth labels", len(train_truth_labels))
 print("val truth labels", len(val_truth_labels))
 
-logging.info("Saving trained model and performance...")
-model_file_name = "model.pth"
-model_path = model_path+model_label+"/"
-misc.create_dirs(model_path)
-torch.save({
-    'model_state': model.state_dict(),
-    'optimiser_state': optimiser.state_dict(),
-}, model_path+model_file_name)
+
 
 ### compute ROC curve and AUC
 train_outputs = train_outputs.view(-1).to(device)
@@ -478,13 +550,21 @@ print("Validation AUC", val_auc)
 
 # save performance to json
 perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc, val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
-perf.save_metadata(len(train_sig), len(train_bkg), len(val_sig), len(val_bkg), hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
+# perf.save_metadata(len(train_sig), len(train_bkg), len(val_sig), len(val_bkg), hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
+perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), num_folds, hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
 
 logging.info("Plotting training/validation losses ...")
 fig, ax = plt.subplots()
 x_epoch = numpy.arange(1,epochs+1,1)
-ax.plot(np.arange(len(train_loss)), train_loss, label="Training loss")
-ax.plot(np.arange(len(val_loss)), val_loss, label="Validation loss")
+loss_loop = 0
+for train_loss, val_loss in zip(train_losses, val_losses):
+    if loss_loop == 0:
+        ax.plot(np.arange(len(train_loss)), train_loss, label="Training loss", color="b")
+        ax.plot(np.arange(len(val_loss)), val_loss, label="Validation loss", color="r")
+    else:
+        ax.plot(np.arange(len(train_loss)), train_loss, color="b")
+        ax.plot(np.arange(len(val_loss)), val_loss, color="r")
+    loss_loop += 1
 ax.legend(loc='upper right', fontsize=9)
 ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
 ax.set_xlabel("Epoch", loc="right")
