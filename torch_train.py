@@ -167,6 +167,7 @@ misc.create_dirs(plot_path)
 
 if signal == "stau":
     kinematics = misc.get_kinematics_staus(variable)
+    ss_diff = True
 else:
     kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
@@ -255,6 +256,48 @@ print("full bkg wgts", full_bkg_wgts.sum())
 full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
 del full_sig_wgts, full_bkg_wgts
 
+if ss_diff == True:
+    mc20a_sig_ss, mc20a_bkg_ss, _, mc20a_sig_wgts_ss, mc20a_bkg_wgts_ss, mc20a_sig_labels_ss, mc20a_bkg_labels_ss = adj.data_loader(h5_path, plot_path, "mc20a_SS", kinematics, plot=False, signal=signal)
+    mc20d_sig_ss, mc20d_bkg_ss, _, mc20d_sig_wgts_ss, mc20d_bkg_wgts_ss, mc20d_sig_labels_ss, mc20d_bkg_labels_ss = adj.data_loader(h5_path, plot_path, "mc20d_SS", kinematics, plot=False, signal=signal)
+    mc20e_sig_ss, mc20e_bkg_ss, _, mc20e_sig_wgts_ss, mc20e_bkg_wgts_ss, mc20e_sig_labels_ss, mc20e_bkg_labels_ss = adj.data_loader(h5_path, plot_path, "mc20e_SS", kinematics, plot=False, signal=signal)
+
+    full_sig_ss = torch.cat((mc20a_sig_ss, mc20d_sig_ss, mc20e_sig_ss), dim=0)
+    full_sig_labels_ss = torch.cat((mc20a_sig_labels_ss, mc20d_sig_labels_ss, mc20e_sig_labels_ss))
+    del mc20a_sig_ss, mc20d_sig_ss, mc20e_sig_ss
+    del mc20a_sig_labels_ss, mc20d_sig_labels_ss, mc20e_sig_labels_ss
+
+    full_bkg_ss = torch.cat((mc20a_bkg_ss, mc20d_bkg_ss, mc20e_bkg_ss), dim=0)
+    full_bkg_labels_ss = torch.cat((mc20a_bkg_labels_ss, mc20d_bkg_labels_ss, mc20e_bkg_labels_ss))
+    del mc20a_bkg_ss, mc20d_bkg_ss, mc20e_bkg_ss
+    del mc20a_bkg_labels_ss, mc20d_bkg_labels_ss, mc20e_bkg_labels_ss
+
+    print("full sig SS size", full_sig_ss.size())
+    print("full bkg SS size", full_bkg_ss.size())
+
+    full_x_ss = torch.cat((full_sig_ss, full_bkg_ss), dim=0).to(device)
+    full_y_ss = torch.cat((full_sig_labels_ss, full_bkg_labels_ss), dim=0).to(device)
+    del full_sig_ss, full_bkg_ss, full_sig_labels_ss, full_bkg_labels_ss
+
+    full_sig_wgts_ss = torch.cat((mc20a_sig_wgts_ss, mc20d_sig_wgts_ss, mc20e_sig_wgts_ss), dim=0)
+    del mc20a_sig_wgts_ss, mc20d_sig_wgts_ss, mc20e_sig_wgts_ss
+    full_bkg_wgts_ss = torch.cat((mc20a_bkg_wgts_ss, mc20d_bkg_wgts_ss, mc20e_bkg_wgts_ss), dim=0)
+    del mc20a_bkg_wgts_ss, mc20d_bkg_wgts_ss, mc20e_bkg_wgts_ss
+
+    print("full sig SS wgts", full_sig_wgts_ss.sum())
+    print("full bkg SS wgts", full_bkg_wgts_ss.sum())
+
+    full_wgts_ss = torch.cat((full_sig_wgts_ss, full_bkg_wgts_ss), dim=0)
+    del full_sig_wgts_ss, full_bkg_wgts_ss
+
+    ### same sign is negative
+    full_sig_wgts_ss = -1*full_sig_wgts_ss
+
+    full_x = torch.cat((full_x, full_x_ss), dim=0)
+    full_y = torch.cat((full_y, full_y_ss), dim=0)
+    full_wgts = torch.cat((full_wgts, full_wgts_ss), dim=0)
+    del full_x_ss, full_y_ss, full_wgts_ss
+
+    
 
 ### load edge indices if gnn layers are used
 edge_ind = None
