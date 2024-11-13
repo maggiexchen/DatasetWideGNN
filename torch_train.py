@@ -168,6 +168,7 @@ misc.create_dirs(plot_path)
 if signal == "stau":
     kinematics = misc.get_kinematics_staus(variable)
     ss_diff = True
+    single_fold = True
 else:
     kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
@@ -297,7 +298,8 @@ if ss_diff == True:
     full_wgts = torch.cat((full_wgts, full_wgts_ss), dim=0)
     del full_x_ss, full_y_ss, full_wgts_ss
 
-    
+logging.info("Loaded signal and background data.")
+logging.info("Time taken so far: "+str(time.time()-st))    
 
 ### load edge indices if gnn layers are used
 edge_ind = None
@@ -327,39 +329,49 @@ misc.print_mem_info()
 #     class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
 #     return torch.tensor(class_weights, dtype=torch.float)
 
-def compute_class_weights(labels, event_weights):
-    '''
-    Compute weighted class weights for binary classification with event weights
+# def compute_class_weights(labels, event_weights):
+#     '''
+#     Compute weighted class weights for binary classification with event weights
     
-    Args:
-        labels (np.ndarray): Array of labels.
-        event_weights (np.ndarray): Array of event weights corresponding to each label.
+#     Args:
+#         labels (np.ndarray): Array of labels.
+#         event_weights (np.ndarray): Array of event weights corresponding to each label.
     
-    Returns:
-        torch.Tensor: Tensor of class weights.
-    '''
-    labels = labels.astype(int)  # Ensure labels are integers
-    unique_labels = np.unique(labels)
+#     Returns:
+#         torch.Tensor: Tensor of class weights.
+#     '''
+#     labels = labels.astype(int)  # Ensure labels are integers
+#     unique_labels = np.unique(labels)
 
-    # Initialize an array to hold the weighted count for each class
-    weighted_counts = np.zeros(len(unique_labels), dtype=float)
+#     # Initialize an array to hold the weighted count for each class
+#     weighted_counts = np.zeros(len(unique_labels), dtype=float)
 
-    # Accumulate the weighted counts for each class
-    for label in unique_labels:
-        weighted_counts[label] = np.sum(event_weights[labels == label])
+#     # Accumulate the weighted counts for each class
+#     for label in unique_labels:
+#         weighted_counts[label] = np.sum(event_weights[labels == label])
     
-    # Compute the class weights as the inverse of the weighted counts
-    class_weights = 1.0 / weighted_counts
-    class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
+#     # Compute the class weights as the inverse of the weighted counts
+#     class_weights = 1.0 / weighted_counts
+#     class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
 
-    return torch.tensor(class_weights, dtype=torch.float)
+#     return torch.tensor(class_weights, dtype=torch.float)
 
 ### define loss function and optimiser
+# def weighted_bce_loss(output, target, class_weights, event_weights):
+#     sig_loss = event_weights * (class_weights[1] * target * torch.log(output+1e-10))
+#     bkg_loss = event_weights * (class_weights[0] * (1-target) * torch.log(1-output+1e-10))
+#     loss = sig_loss+bkg_loss
+#     return -loss.mean()
+
 def weighted_bce_loss(output, target, class_weights, event_weights):
-    sig_loss = event_weights * (class_weights[1] * target * torch.log(output+1e-10))
-    bkg_loss = event_weights * (class_weights[0] * (1-target) * torch.log(1-output+1e-10))
+    sig_w_sum = class_weights[1] * target * event_weights
+    bkg_w_sum = class_weights[0] * (1-target) * event_weights
+    sig_loss =  sig_w_sum * torch.log(output+1e-10)
+    bkg_loss =  bkg_w_sum * torch.log(1-output+1e-10)
     loss = sig_loss+bkg_loss
-    return -loss.mean()
+    sum_w = (sig_w_sum + bkg_w_sum).sum()
+    loss = loss.sum() / sum_w
+    return -loss
 
 # optimiser = torch.optim.Adam(model.parameters(), lr=LR)
 # ### NOTE: patience for the scheculer is different from the early stopping patience
@@ -402,6 +414,9 @@ train_wgts = torch.tensor([])
 val_outputs = torch.tensor([])
 val_truth_labels = torch.tensor([])
 val_wgts = torch.tensor([])
+
+logging.info("Starting k-fold cross validation ...")
+logging.info("Time taken so far: "+str(time.time()-st))
 for train_idx, val_idx in kfold.split(np.zeros(len(full_y)), full_y.cpu().numpy()):
     fold_no += 1
     print(f"Starting fold {fold_no}/{num_folds}")
@@ -535,6 +550,7 @@ for train_idx, val_idx in kfold.split(np.zeros(len(full_y)), full_y.cpu().numpy(
 
     logging.info(f"Finished fold {fold_no}/{num_folds}")
     logging.info(f"Number of epochs: {epoch+1}/{epochs}, Final train Loss: {avg_tr_loss}, final validation Loss: {avg_vl_loss}")
+    logging.info("Time taken so far: "+str(time.time()-st))
     logging.info("Saving trained model and performance...")
     model_file_name = f"model_fold_{fold_no}.pth"
     model_path = model_path+model_label+"/"
@@ -552,7 +568,10 @@ for train_idx, val_idx in kfold.split(np.zeros(len(full_y)), full_y.cpu().numpy(
     val_outputs = torch.cat((val_outputs, val_outputs_fold))
     val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
     val_wgts = torch.cat((val_wgts, val_wgts_fold))
-        
+
+    if single_fold == True:
+        print("Single fold training, breaking loop ...")
+        break    
     
 logging.info("Training complete.")
 print("train truth labels", len(train_truth_labels))
