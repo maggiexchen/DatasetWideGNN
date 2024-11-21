@@ -167,7 +167,6 @@ misc.create_dirs(plot_path)
 
 if signal == "stau":
     kinematics = misc.get_kinematics_staus(variable)
-    ss_diff = True
     single_fold = True
 else:
     kinematics = misc.get_kinematics(variable)
@@ -183,9 +182,6 @@ logging.info("output plot path: "+plot_path)
 logging.info("adj matrix storage path: "+adj_path)
 logging.info("model storage path: "+model_path)
 
-# model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
-# model.to(device)
-
 logging.info("distance metric: "+distance)
 if eff is not None:
     logging.info("desired efficieny: "+str(eff))
@@ -194,36 +190,6 @@ elif linking_length is not None:
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
-
-###### when loading train_val separately
-# normalised signal and background kinematics
-# train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels = adj.data_loader(h5_path, plot_path, "train", kinematics, plot=False, signal=signal)
-# val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels = adj.data_loader(h5_path, plot_path, "val", kinematics, plot=False, signal=signal)
-# test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_sig_labels, test_bkg_labels = adj.data_loader(h5_path, plot_path, "test", kinematics, plot=False, signal=signal)
-
-# print("train sig", len(train_sig))
-# print("train bkg", len(train_bkg))
-# print("val sig", len(val_sig))
-# print("val bkg", len(val_bkg))
-# print("test sig", len(test_sig))
-# print("test bkg", len(test_bkg))
-
-# full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
-# full_sig_labels = torch.cat((train_sig_labels, val_sig_labels, test_sig_labels))
-
-# full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
-# full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels, test_bkg_labels))
-
-# # raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
-# # raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
-
-# full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
-# del full_sig
-# del full_bkg
-
-# full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
-# full_y = full_y.float()
-# full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)), dim=0)#.cuda()
 
 mc20a_sig, mc20a_bkg, _, mc20a_sig_wgts, mc20a_bkg_wgts, mc20a_sig_labels, mc20a_bkg_labels = adj.data_loader(h5_path, plot_path, "mc20a", kinematics, plot=False, signal=signal)
 mc20d_sig, mc20d_bkg, _, mc20d_sig_wgts, mc20d_bkg_wgts, mc20d_sig_labels, mc20d_bkg_labels = adj.data_loader(h5_path, plot_path, "mc20d", kinematics, plot=False, signal=signal)
@@ -257,47 +223,6 @@ print("full bkg wgts", full_bkg_wgts.sum())
 full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
 del full_sig_wgts, full_bkg_wgts
 
-if ss_diff == True:
-    mc20a_sig_ss, mc20a_bkg_ss, _, mc20a_sig_wgts_ss, mc20a_bkg_wgts_ss, mc20a_sig_labels_ss, mc20a_bkg_labels_ss = adj.data_loader(h5_path, plot_path, "mc20a_SS", kinematics, plot=False, signal=signal)
-    mc20d_sig_ss, mc20d_bkg_ss, _, mc20d_sig_wgts_ss, mc20d_bkg_wgts_ss, mc20d_sig_labels_ss, mc20d_bkg_labels_ss = adj.data_loader(h5_path, plot_path, "mc20d_SS", kinematics, plot=False, signal=signal)
-    mc20e_sig_ss, mc20e_bkg_ss, _, mc20e_sig_wgts_ss, mc20e_bkg_wgts_ss, mc20e_sig_labels_ss, mc20e_bkg_labels_ss = adj.data_loader(h5_path, plot_path, "mc20e_SS", kinematics, plot=False, signal=signal)
-
-    full_sig_ss = torch.cat((mc20a_sig_ss, mc20d_sig_ss, mc20e_sig_ss), dim=0)
-    full_sig_labels_ss = torch.cat((mc20a_sig_labels_ss, mc20d_sig_labels_ss, mc20e_sig_labels_ss))
-    del mc20a_sig_ss, mc20d_sig_ss, mc20e_sig_ss
-    del mc20a_sig_labels_ss, mc20d_sig_labels_ss, mc20e_sig_labels_ss
-
-    full_bkg_ss = torch.cat((mc20a_bkg_ss, mc20d_bkg_ss, mc20e_bkg_ss), dim=0)
-    full_bkg_labels_ss = torch.cat((mc20a_bkg_labels_ss, mc20d_bkg_labels_ss, mc20e_bkg_labels_ss))
-    del mc20a_bkg_ss, mc20d_bkg_ss, mc20e_bkg_ss
-    del mc20a_bkg_labels_ss, mc20d_bkg_labels_ss, mc20e_bkg_labels_ss
-
-    print("full sig SS size", full_sig_ss.size())
-    print("full bkg SS size", full_bkg_ss.size())
-
-    full_x_ss = torch.cat((full_sig_ss, full_bkg_ss), dim=0).to(device)
-    full_y_ss = torch.cat((full_sig_labels_ss, full_bkg_labels_ss), dim=0).to(device)
-    del full_sig_ss, full_bkg_ss, full_sig_labels_ss, full_bkg_labels_ss
-
-    full_sig_wgts_ss = torch.cat((mc20a_sig_wgts_ss, mc20d_sig_wgts_ss, mc20e_sig_wgts_ss), dim=0)
-    del mc20a_sig_wgts_ss, mc20d_sig_wgts_ss, mc20e_sig_wgts_ss
-    full_bkg_wgts_ss = torch.cat((mc20a_bkg_wgts_ss, mc20d_bkg_wgts_ss, mc20e_bkg_wgts_ss), dim=0)
-    del mc20a_bkg_wgts_ss, mc20d_bkg_wgts_ss, mc20e_bkg_wgts_ss
-
-    print("full sig SS wgts", full_sig_wgts_ss.sum())
-    print("full bkg SS wgts", full_bkg_wgts_ss.sum())
-
-    full_wgts_ss = torch.cat((full_sig_wgts_ss, full_bkg_wgts_ss), dim=0)
-    del full_sig_wgts_ss, full_bkg_wgts_ss
-
-    ### same sign is negative
-    full_sig_wgts_ss = -1*full_sig_wgts_ss
-
-    full_x = torch.cat((full_x, full_x_ss), dim=0)
-    full_y = torch.cat((full_y, full_y_ss), dim=0)
-    full_wgts = torch.cat((full_wgts, full_wgts_ss), dim=0)
-    del full_x_ss, full_y_ss, full_wgts_ss
-
 logging.info("Loaded signal and background data.")
 logging.info("Time taken so far: "+str(time.time()-st))    
 
@@ -319,50 +244,7 @@ if len(hidden_sizes_gcn) > 0:
 
 misc.print_mem_info()
 
-# def compute_class_weights(labels):
-#     '''
-#     Compute class weights for binary classification
-#     '''
-#     labels = labels.astype(int)  # Ensure labels are integers
-#     class_counts = np.bincount(labels)
-#     class_weights = 1.0 / class_counts
-#     class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
-#     return torch.tensor(class_weights, dtype=torch.float)
-
-# def compute_class_weights(labels, event_weights):
-#     '''
-#     Compute weighted class weights for binary classification with event weights
-    
-#     Args:
-#         labels (np.ndarray): Array of labels.
-#         event_weights (np.ndarray): Array of event weights corresponding to each label.
-    
-#     Returns:
-#         torch.Tensor: Tensor of class weights.
-#     '''
-#     labels = labels.astype(int)  # Ensure labels are integers
-#     unique_labels = np.unique(labels)
-
-#     # Initialize an array to hold the weighted count for each class
-#     weighted_counts = np.zeros(len(unique_labels), dtype=float)
-
-#     # Accumulate the weighted counts for each class
-#     for label in unique_labels:
-#         weighted_counts[label] = np.sum(event_weights[labels == label])
-    
-#     # Compute the class weights as the inverse of the weighted counts
-#     class_weights = 1.0 / weighted_counts
-#     class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
-
-#     return torch.tensor(class_weights, dtype=torch.float)
-
 ### define loss function and optimiser
-# def weighted_bce_loss(output, target, class_weights, event_weights):
-#     sig_loss = event_weights * (class_weights[1] * target * torch.log(output+1e-10))
-#     bkg_loss = event_weights * (class_weights[0] * (1-target) * torch.log(1-output+1e-10))
-#     loss = sig_loss+bkg_loss
-#     return -loss.mean()
-
 def weighted_bce_loss(output, target, class_weights, event_weights):
     sig_w_sum = class_weights[1] * target * event_weights
     bkg_w_sum = class_weights[0] * (1-target) * event_weights
@@ -372,10 +254,6 @@ def weighted_bce_loss(output, target, class_weights, event_weights):
     sum_w = (sig_w_sum + bkg_w_sum).sum()
     loss = loss.sum() / sum_w
     return -loss
-
-# optimiser = torch.optim.Adam(model.parameters(), lr=LR)
-# ### NOTE: patience for the scheculer is different from the early stopping patience
-# scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = patience_LR)
 
 def binary_class_weights(labels, event_weights):
     num_sig = np.sum(event_weights[labels == 1])
@@ -398,10 +276,6 @@ torch.cuda.empty_cache()
 ### create data object, train and val loaders
 data = Data(x = full_x, y = full_y, edge_index = edge_ind, wgts = full_wgts)#, edge_weight = edge_wgts)
 del edge_ind
-
-# train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg))), dim=0).tolist()
-# val_idx =   torch.cat((torch.arange(len(train_sig), len(train_sig)+len(val_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg))), dim=0).tolist()
-# test_idx =  torch.cat((torch.arange(len(train_sig)+len(val_sig), len(train_sig)+len(val_sig)+len(test_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg)+len(test_bkg))), dim=0).tolist()
 
 try: 
     kfold = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=42)
@@ -435,7 +309,6 @@ try:
 
         all_labels = data.y[train_idx].cpu().numpy()
         all_wgts = data.wgts[train_idx].cpu().numpy()
-        # class_weights = compute_class_weights(all_labels, all_wgts).to(device)
         class_weights = binary_class_weights(all_labels, all_wgts).to(device)
         print("class weights", class_weights)
 
@@ -461,7 +334,6 @@ try:
             # persistent_workers = True
         )
 
-        # BCE_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([sig_class_weight]))
         best_val_loss = float('inf')
         patience_counter = 0
         logging.info("Starting training ...")
