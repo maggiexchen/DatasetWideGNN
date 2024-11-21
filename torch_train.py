@@ -76,7 +76,8 @@ print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU i
 CUDA_LAUNCH_BLOCKING=1
 # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 # print(torch.cuda.mem_get_info())
-device = torch.device('cpu')
+cpu = torch.device('cpu')
+device = torch.device('cuda:0')
 
 ### load user config
 user_config_path = args.userconfig
@@ -220,7 +221,7 @@ del mc20a_bkg_wgts, mc20d_bkg_wgts, mc20e_bkg_wgts
 print("full sig wgts", full_sig_wgts.sum())
 print("full bkg wgts", full_bkg_wgts.sum())
 
-full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
+full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0).to(device)
 del full_sig_wgts, full_bkg_wgts
 
 logging.info("Loaded signal and background data.")
@@ -282,12 +283,12 @@ try:
     fold_no = 0
     train_losses = []
     val_losses = []
-    train_outputs = torch.tensor([])
-    train_truth_labels = torch.tensor([])
-    train_wgts = torch.tensor([])
-    val_outputs = torch.tensor([])
-    val_truth_labels = torch.tensor([])
-    val_wgts = torch.tensor([])
+    train_outputs = torch.tensor([]).to(cpu)
+    train_truth_labels = torch.tensor([]).to(cpu)
+    train_wgts = torch.tensor([]).to(cpu)
+    val_outputs = torch.tensor([]).to(cpu)
+    val_truth_labels = torch.tensor([]).to(cpu)
+    val_wgts = torch.tensor([]).to(cpu)
 
     logging.info("Starting k-fold cross validation ...")
     logging.info("Time taken so far: "+str(time.time()-st))
@@ -342,9 +343,9 @@ try:
             ### start training loop in the epoch
             model.train()
             total_examples = total_loss = 0
-            train_outputs_fold = torch.tensor([])
-            train_truth_labels_fold = torch.tensor([])
-            train_wgts_fold = torch.tensor([])
+            train_outputs_fold = torch.tensor([]).to(cpu)
+            train_truth_labels_fold = torch.tensor([]).to(cpu)
+            train_wgts_fold = torch.tensor([]).to(cpu)
             for batch in train_loader:
 
                 optimiser.zero_grad()
@@ -365,9 +366,9 @@ try:
                 torch.cuda.empty_cache()
                 total_examples += batch_size
                 total_loss += float(loss) * batch_size
-                train_outputs_fold = torch.cat((train_outputs_fold, outputs.detach()))
-                train_truth_labels_fold = torch.cat((train_truth_labels_fold, y.detach()))
-                train_wgts_fold = torch.cat((train_wgts_fold, event_wgts.detach()))
+                train_outputs_fold = torch.cat((train_outputs_fold, outputs.detach().to(cpu)))
+                train_truth_labels_fold = torch.cat((train_truth_labels_fold, y.detach().to(cpu)))
+                train_wgts_fold = torch.cat((train_wgts_fold, event_wgts.detach().to(cpu)))
                 
             avg_tr_loss = total_loss / total_examples
             train_loss.append(avg_tr_loss)
@@ -376,9 +377,9 @@ try:
             ### start validation loop in the epoch
             model.eval()
             total_examples = total_loss = 0
-            val_outputs_fold= torch.tensor([])
-            val_truth_labels_fold = torch.tensor([])
-            val_wgts_fold = torch.tensor([])
+            val_outputs_fold= torch.tensor([]).to(cpu)
+            val_truth_labels_fold = torch.tensor([]).to(cpu)
+            val_wgts_fold = torch.tensor([]).to(cpu)
             for batch in val_loader:
                 
                 batch = batch.to(device)
@@ -394,9 +395,9 @@ try:
                 
                 total_examples += batch_size
                 total_loss += float(loss) * batch_size
-                val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach()))
-                val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach()))
-                val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach()))
+                val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach().to(cpu)))
+                val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach().to(cpu)))
+                val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach().to(cpu)))
 
             avg_vl_loss = total_loss / total_examples
             val_loss.append(avg_vl_loss)

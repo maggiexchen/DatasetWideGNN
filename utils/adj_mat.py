@@ -19,6 +19,9 @@ logging.getLogger().setLevel(logging.INFO)
 import psutil
 process = psutil.Process()
 
+cpu = torch.device('cpu')
+device = torch.device('cuda:0')
+
 
 def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"):
     """
@@ -101,14 +104,14 @@ def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"
         if plot:
             plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=True)
     # convert pd dataframes to torch tensors
-    torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)
-    torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)
-    torch_sig_wgts = torch.tensor(df_sig_wgts.values, dtype=torch.float32)
-    torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
+    torch_sig = torch.tensor(df_sig.values, dtype=torch.float32).to(cpu)
+    torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32).to(cpu)
+    torch_sig_wgts = torch.tensor(df_sig_wgts.values, dtype=torch.float32).to(cpu)
+    torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32).to(cpu)
     # concatenating signal and background events
     torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
 
-    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label), torch.tensor(bkg_label)
+    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label).to(cpu), torch.tensor(bkg_label).to(cpu)
 
 
 def create_adj_mat(a, length):
