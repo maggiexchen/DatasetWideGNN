@@ -53,8 +53,8 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ"):
         df_sig = pd.DataFrame()
         for camp in camps:
             df_sig_camp = pd.read_hdf(h5_path+"/StauStau_"+camp+str(ex)+".h5")
-            df_sig_camp = misc.sig_mass_point(df_sig, mass_points = ['100_50'])
-            df_sig_camp = misc.stau_selections(df_sig)
+            df_sig_camp = misc.sig_mass_point(df_sig_camp, mass_points = ['100_50'])
+            df_sig_camp = misc.stau_selections(df_sig_camp)
             df_sig = pd.concat([df_sig, df_sig_camp], ignore_index=True, axis=0)
     else:
         df_sig =  pd.read_hdf(h5_path+str(signal)+str(ex)+".h5", key=str(signal)+str(ex))

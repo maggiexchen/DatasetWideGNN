@@ -189,6 +189,7 @@ logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
 logging.info("adj matrix storage path: "+adj_path)
 logging.info("model storage path: "+model_path)
+model_path = model_path + model_label + "/"
 
 logging.info("distance metric: "+distance)
 if eff is not None:
@@ -422,7 +423,7 @@ try:
         logging.info("Time taken so far: "+str(time.time()-st))
         logging.info("Saving trained model and performance...")
         model_file_name = f"model_fold_{fold_no}.pth"
-        model_path = model_path+model_label+"/"
+        # model_path= model_path+model_label+"/"
         misc.create_dirs(model_path)
         torch.save({
             'model_state': model.state_dict(),

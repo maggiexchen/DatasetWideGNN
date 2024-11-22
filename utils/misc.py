@@ -61,7 +61,8 @@ def get_background_types(signal_type):
     elif signal_type == "LQ":
         background_type = ["singletop", "ttbar"]
     elif signal_type == "stau":
-        background_type = ['Wjets',
+        background_type = [
+                            'Wjets',
                             'Zlljets',
                             'Zttjets2214',
                             'diboson0L','diboson1L','diboson2L',
