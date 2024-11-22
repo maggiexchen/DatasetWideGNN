@@ -45,6 +45,15 @@ assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 logging.info("signal: "+signal)
 logging.info("input ntuple path: "+ntuple_path)
 logging.info("output h5 data path: "+h5_path)
+os.makedirs(h5_path, exist_ok=True)
+
+def met_cut(df, cut):
+    if "met" in df.columns:
+        met_filter = df["met"] > cut
+        return df[met_filter]
+    else:
+        print("MET is not in file!")
+        return df
 
 # load in input files
 logging.info('Importing signal and background files...')
@@ -60,9 +69,15 @@ elif signal == "LQ":
     signal_file, singletop_file, ttbar_file = misc.get_ntuples(ntuple_path, signal)
     features = signal_file.keys()
     df_sig = signal_file.arrays(library="pd")
+    df_sig = met_cut(df_sig, 200)
+
     df_singletop = singletop_file.arrays(library="pd")
     df_ttbar = ttbar_file.arrays(library="pd")
+    df_singletop = met_cut(df_singletop, 200)
+    df_ttbar = met_cut(df_ttbar, 200)
+
     df_background = pd.concat([df_singletop, df_ttbar], axis=0)
+
 
 print("Features in file: \n", features)
 # TODO: making this mutli-class!
