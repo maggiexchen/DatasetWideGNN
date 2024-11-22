@@ -8,13 +8,13 @@ feature_dim:
 
 # input paths
 ntuple_path: /data/atlas/atlasdata3/maggiechen/LQ_ntuples/
-kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/LowLevelKinematics/
-ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/linking_lengths/
-feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/LowLevelKinematics/
-dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/distances/
-score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/output_scores/
+kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/MetCut200/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/MetCut200_flip/linking_lengths/
+feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/MetCut200/
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/MetCut200_flip/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/MetCut200_flip/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/plots/ 
-adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LowLevelKinematics/models/ 
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/MetCut200_flip/plots/ 
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/MetCut200_flip/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/MetCut200_flip/models/ 

@@ -2,13 +2,15 @@ kinematic_variable: "LQ"
 embedding_variable:
 distance: "euclidean"
 flip: True
-sigsig_eff:
-linking_length: 4
-hidden_sizes_gcn: []
-hidden_sizes_mlp: [4, 4, 4, 4]
+sigsig_eff: 0.4
+linking_length:
+hidden_sizes_gcn: [16, 16, 16, 16]
+hidden_sizes_mlp: []
 LR: 0.01
-dropout_rates: [0.0, 0.0, 0.0, 0.0]
-epochs: 30
-num_nb_list: [20, 20]
-batch_size: 128
-gnn_type: "GCN"
+dropout_rates: [0., 0., 0., 0.]
+epochs: 100
+patience_LR: 3
+num_nb_list: [32, 32]
+batch_size: 512
+patience_early_stopping: 20
+gnn_type: "GAT"
