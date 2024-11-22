@@ -298,6 +298,11 @@ try:
         print("train idx", len(train_idx))
         print("val idx", len(val_idx))
 
+        ### standardise input data to training set and move to cpu after standardisation
+        means, stds = misc.get_train_mean_std(full_x[train_idx])
+        data.x = misc.torch_standardise(data.x, means, stds)
+        means, stds = means.to(cpu), stds.to(cpu)
+
         model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
         model.to(device)
 
@@ -431,6 +436,7 @@ try:
         torch.save({
             'model_state': model.state_dict(),
             'optimiser_state': optimiser.state_dict(),
+            'normalisation_params': {"means": means, "stds": stds}
         }, model_path+model_file_name)
 
         train_losses.append(train_loss)
@@ -454,7 +460,7 @@ finally:
 
 
     ### compute ROC curve and AUC
-    train_outputs = train_outputs.view(-1).to(device)
+    train_outputs = train_outputs.view(-1)
     train_label_bool = train_truth_labels.bool()
     train_sig_pred = train_outputs[train_label_bool]
     train_sig_wgts = train_wgts[train_label_bool]
@@ -469,7 +475,7 @@ finally:
     # train_auc = roc_auc_score(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
     print("Training AUC", train_auc)
 
-    val_outputs = val_outputs.view(-1).to(device)
+    val_outputs = val_outputs.view(-1)
     val_label_bool = val_truth_labels.bool()
     val_sig_pred = val_outputs[val_label_bool]
     val_sig_wgts = val_wgts[val_label_bool]

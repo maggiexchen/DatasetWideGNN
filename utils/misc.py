@@ -7,6 +7,9 @@ import pandas as pd
 import pdb
 torch.manual_seed(42)
 
+cpu = torch.device('cpu')
+device = torch.device('cuda:0')
+
 def print_mem_info():
     """
     Function to calculate and print out the total memory available and used on CUDA.
@@ -321,3 +324,31 @@ def load_config(file_path):
     with open(file_path, "r") as yaml_file:
         config = yaml.safe_load(yaml_file)
     return config
+
+def get_train_mean_std(train_data):
+    """
+    Function to calculate the mean and standard deviation of the training data for all variables
+    Args:
+        train_data (pd.DataFrame): the training data
+    Returns:
+        tensor of len(number of variables): the mean of the training data
+        tensor of len(number of variables): the standard deviation of the training data
+    Additional Note:
+        After testing, the std returned is different to the one used by the tensorflow or numpy.
+        This is because the std is calculated using the unbiased estimator (N-1) in torch (Bessel's correction) by default.
+    """
+    means = train_data.mean(0)
+    stds = train_data.std(0) #, correction = 0) ### correction = 0 turns off Bessel's correction
+    return means, stds
+
+def torch_standardise(input, train_mean, train_std):
+    """
+    Function to standardise a tensor using the mean and standard deviation of the training set
+    Args:
+        input (torch tensor): the tensor to standardise
+        train_mean (torch tensor): the mean of the training set
+        train_std (torch tensor): the standard deviation of the training set
+    Returns:
+        (torch tensor): the standardised tensor
+    """
+    return (input - train_mean) / train_std
