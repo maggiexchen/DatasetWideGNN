@@ -166,6 +166,7 @@ else:
 plot_path = plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
+single_fold = False
 if signal == "stau":
     kinematics = misc.get_kinematics_staus(variable)
     single_fold = True
@@ -192,10 +193,17 @@ elif linking_length is not None:
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
 
-mc20a_sig, mc20a_bkg, _, mc20a_sig_wgts, mc20a_bkg_wgts, mc20a_sig_labels, mc20a_bkg_labels = adj.data_loader(h5_path, plot_path, "mc20a", kinematics, plot=False, signal=signal)
-mc20d_sig, mc20d_bkg, _, mc20d_sig_wgts, mc20d_bkg_wgts, mc20d_sig_labels, mc20d_bkg_labels = adj.data_loader(h5_path, plot_path, "mc20d", kinematics, plot=False, signal=signal)
-mc20e_sig, mc20e_bkg, _, mc20e_sig_wgts, mc20e_bkg_wgts, mc20e_sig_labels, mc20e_bkg_labels = adj.data_loader(h5_path, plot_path, "mc20e", kinematics, plot=False, signal=signal)
+# normal loading setup
+# sig, bkg, full_x, sig_wgts, bkg_wgts, sig_labels, bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal=signal)
+# full_y = torch.cat((sig_labels, bkg_labels), dim=0).to(device)
+# full_y = full_y.float()
+# full_wgts = torch.cat((sig_wgts, bkg_wgts), dim=0)#.cuda()
 
+# Seb's stau loading setup
+mc20a_sig, mc20a_bkg, _, mc20a_sig_wgts, mc20a_bkg_wgts, mc20a_sig_labels, mc20a_bkg_labels = adj.data_loader(h5_path, plot_path, ex="mc20a", kinematics, plot=False, signal=signal)
+mc20d_sig, mc20d_bkg, _, mc20d_sig_wgts, mc20d_bkg_wgts, mc20d_sig_labels, mc20d_bkg_labels = adj.data_loader(h5_path, plot_path, ex="mc20d", kinematics, plot=False, signal=signal)
+mc20e_sig, mc20e_bkg, _, mc20e_sig_wgts, mc20e_bkg_wgts, mc20e_sig_labels, mc20e_bkg_labels = adj.data_loader(h5_path, plot_path, ex="mc20e", kinematics, plot=False, signal=signal)
+ 
 full_sig = torch.cat((mc20a_sig, mc20d_sig, mc20e_sig), dim=0)
 full_sig_labels = torch.cat((mc20a_sig_labels, mc20d_sig_labels, mc20e_sig_labels))
 del mc20a_sig, mc20d_sig, mc20e_sig
@@ -207,6 +215,11 @@ del mc20a_bkg, mc20d_bkg, mc20e_bkg
 del mc20a_bkg_labels, mc20d_bkg_labels, mc20e_bkg_labels
 
 print("full sig size", full_sig.size())
+print("full bkg size", full_bkg.size())
+
+full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
+
+full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
 print("full bkg size", full_bkg.size())
 
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
