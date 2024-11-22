@@ -55,6 +55,7 @@ features = signal_file.keys()
 df_sig = {str(signal):{}}
 df_sig[signal] = signal_file.arrays(library="pd")
 df_sig[signal]["target"] = [1]*len(df_sig[signal])
+df_sig[signal]["eventWeight"] = misc.calc_eventWeight(df_sig[signal])
 df_sig[signal].to_hdf(h5_path + str(signal)+".h5", key=str(signal), mode="w")
 
 logging.info('Importing and writing background ')
@@ -65,4 +66,5 @@ for background in backgrounds:
     background_file = uproot.open(ntuple_path + "GNNTree_"+str(background)+".root:tree")
     df_bkgs[background] = background_file.arrays(library="pd")
     df_bkgs[background]["target"] = [0]*len(df_bkgs[background])
+    df_bkgs[background]["eventWeight"] = misc.calc_eventWeight(df_bkgs[background])
     df_bkgs[background].to_hdf(h5_path + str(background)+".h5", key=str(background), mode="w")
