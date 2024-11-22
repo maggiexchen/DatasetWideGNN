@@ -111,6 +111,7 @@ batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
 patience_early_stopping = train_config["patience_early_stopping"]
 num_folds = train_config["num_folds"]
+single_fold = train_config["single_fold"]
 ### LR scheduler patience should be less than early stopping patience, so that the LR can be reduced before training stops
 assert patience_LR < patience_early_stopping, "LR scheduler patience should be less than early stopping patience"
 
@@ -142,6 +143,13 @@ else:
         ll_str = "_LL" + str(linking_length).replace(".", "p")
         adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
 
+### str for train/val split label. If single fold, then val_frac is 1/num_folds. Otherwise, nf is num_folds
+if single_fold == True:
+    val_frac = 1/num_folds
+    nf_str = f"_val_frac{val_frac:.2f}"
+else:
+    nf_str = "_nf" + str(num_folds)
+
 ### create model label and result plot path
 if len(hidden_sizes_gcn) == 0:
     model_label = signal\
@@ -150,7 +158,7 @@ if len(hidden_sizes_gcn) == 0:
           + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
           + "_bs" + str(batch_size)\
           + "_e" + str(epochs)\
-          + "_nf" + str(num_folds)
+          + nf_str
 else:
     model_label = signal\
             + f"_{gnn_type}" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
@@ -161,15 +169,13 @@ else:
             + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
             + "_bs" + str(batch_size)\
             + "_e" + str(epochs)\
-            + "_nf" + str(num_folds)
+            + nf_str
     
 plot_path = plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
-single_fold = False
 if signal == "stau":
     kinematics = misc.get_kinematics_staus(variable)
-    single_fold = True
 else:
     kinematics = misc.get_kinematics(variable)
 input_size = len(kinematics)
@@ -215,11 +221,6 @@ del mc20a_bkg, mc20d_bkg, mc20e_bkg
 del mc20a_bkg_labels, mc20d_bkg_labels, mc20e_bkg_labels
 
 print("full sig size", full_sig.size())
-print("full bkg size", full_bkg.size())
-
-full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
-
-full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
 print("full bkg size", full_bkg.size())
 
 full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)

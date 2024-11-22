@@ -12,4 +12,5 @@ batch_size: 2048
 gnn_type: "Graph"
 epochs: 100
 patience_early_stopping: 10
-num_folds: 5
+num_folds: 5 
+single_fold: 0
