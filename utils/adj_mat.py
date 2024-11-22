@@ -23,17 +23,17 @@ cpu = torch.device('cpu')
 device = torch.device('cuda:0')
 
 
-def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"):
+def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ"):
     """
     Function to load our sign and bkg data into pandas dataframes
 
     Args:
         h5_path (str): path for input file directory
         plot_path (str): path for output plot directory
-        f_type (str): input file extension
         kinematics (list(str)): list of kinematic variables to load as dataframe columns
-        plot (bool): flag to plot raw and standardised kinematics
-        signal (str): type of signal, to determine the bkgs present
+        ex (str): input file extension, default is empty
+        plot (bool): flag to plot raw and standardised kinematics, default is False
+        signal (str): type of signal, to determine the bkgs present, default is LQ
     Returns:
         (torch.tensor(float32)): signal events/kinematics tensor
         (torch.tensor(float32)): background events/kinematics tensor
@@ -43,36 +43,28 @@ def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"
         (torce.tensor(float32)): all event truth labels ie. 1 for sig, 0 for bkg
     """
     signal_label, background_label = plotting.get_plot_labels(signal)
-    bkg_typedict = {"hhh": ["bkg"], "LQ": ["singletop", "ttbar"], 
-                    "stau": [
-                            'Wjets',
-                            'Zlljets',
-                            'Zttjets2214',
-                            'diboson0L','diboson1L','diboson2L',
-                            'diboson3L','diboson4L','triboson',
-                            'higgs',
-                            'singletop','topOther','ttV','ttbar_incl'
-                            ]}
-    bkg_types = bkg_typedict[signal]
-
+    bkg_types = misc.get_background_types(signal)
+    
+    if len(ex) > 0:
+        ex = "_"+ex
     if signal == "stau":
-        print(f"loading stau signal sample(s) for {f_type}")
-        df_sig = pd.read_hdf(h5_path+"/StauStau_"+str(f_type)+".h5")
+        logging.info("Loading stau signal sample(s) ...")
+        df_sig = pd.read_hdf(h5_path+"/StauStau"+str(ex)+".h5")
         df_sig = misc.sig_mass_point(df_sig, mass_points = ['100_50'])
         df_sig = misc.stau_selections(df_sig)
     else:
-        df_sig =  pd.read_hdf(h5_path+"/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
+        df_sig =  pd.read_hdf(h5_path+str(signal)+str(ex)+".h5", key=str(signal)+str(ex))
     
     df_bkg = pd.DataFrame()
     if signal == "stau":
         for bkg in bkg_types:
-            print(f"loading {bkg} background sample for {f_type}")
-            tmp_df_bkg = pd.read_hdf(h5_path+"/"+bkg+"_"+str(f_type)+".h5")
+            print(f"loading {bkg} background sample for {ex}")
+            tmp_df_bkg = pd.read_hdf(h5_path+bkg+str(ex)+".h5")
             df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
             df_bkg = misc.stau_selections(df_bkg)
     else:
         for bkg in bkg_types:
-            tmp_df_bkg = pd.read_hdf(h5_path+"/"+bkg+"_"+str(f_type)+".h5", key=bkg+"_"+str(f_type))
+            tmp_df_bkg = pd.read_hdf(h5_path+bkg+str(ex)+".h5", key=bkg+str(ex))
             df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
 
     ### get event weights

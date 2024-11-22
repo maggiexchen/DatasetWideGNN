@@ -45,6 +45,35 @@ def create_dirs(path):
 
     return 0
 
+def get_background_types(signal_type):
+    """
+    Function to obtain the list of background types to use for a given signal type.
+    Throws an exception for an unknown category
+
+    Args:
+        signal_type (str): the category of signal you want fetch the corresponding backgrounds for
+
+    Returns:
+        list(str): the list of background types
+    """
+    if signal_type == "hhh":
+        background_type = ["bkg"]
+    elif signal_type == "LQ":
+        background_type = ["singletop", "ttbar"]
+    elif signal_type == "stau":
+        background_type = ['Wjets',
+                            'Zlljets',
+                            'Zttjets2214',
+                            'diboson0L','diboson1L','diboson2L',
+                            'diboson3L','diboson4L','triboson',
+                            'higgs',
+                            'singletop','topOther','ttV','ttbar_incl'
+                            ]
+    else:
+        raise Exception("Signal type is either hhh, LQ or stau")
+    return background_type
+
+
 def get_kinematics(variable):
     """
     Function to obtain the list of names of kinematic variables to use for a given category.
@@ -243,6 +272,15 @@ def stau_selections(df):
     df = df[((df.cPhi2+df.cPhi1)> -1.25) & ((df.cPhi1 > 0.5) | (df.cPhi2 > -0.75)) & ((df.cPhi1 > -0.75) | (df.cPhi2 > 0.5))]
 
     return df
+
+def calc_eventWeight(df):
+    lumiWeight = df["lumiWeight"]
+    xsec = df["xsec"]
+    lumi = df["lumi"]
+    genWeight = df["genWeight"]
+    df["prod"] = lumiWeight*xsec*lumi*genWeight
+    eventWeight = df['prod'] / df['prod'].sum()
+    return eventWeight
 
 
 def get_h5_paths(path, variable, distance, label="sampled_train"):
