@@ -69,8 +69,14 @@ def get_kinematics(variable, dim):
         kinematics = ["mH1","mH2","mH3","mHHH","dRH1","dRH2","dRH3","meandRBB"]
     elif variable == "mass_and_shape":
         kinematics = ["mH1","mH2","mH3","mHHH","sphere3dv2b","sphere3dv2btrans","aplan3dv2b","theta3dv2b"]
-    elif variable == "LQ":
+    # elif variable == "LQ":
         #kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
+    #     kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
+    #                   'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta', 'lep1flav',
+    #                   'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi', 'lep2flav',
+    #                   'met', 'metphi']
+    elif variable == "LQ":
+        # kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
         kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
                       'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta', 'lep1flav',
                       'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi', 'lep2flav',
@@ -282,7 +288,7 @@ def get_batched_distances(dist_path, variable, distance, t, sample=True):
     distance = torch.empty(0, dtype=torch.float16)
     wgt = torch.empty(0, dtype=torch.float16)
     if sample:
-        num_sample = 40000
+        num_sample = 50000
         batch_sample = math.ceil(num_sample / len(files))
         sample_count = 0
         while sample_count < num_sample:
