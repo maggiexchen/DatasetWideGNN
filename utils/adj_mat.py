@@ -85,7 +85,7 @@ def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"
         print(f"-----> Standardising {var}:")
         standardised_values = norm.standardise(df_all.loc[:, var])
         standardised_values = norm.standardise(df_all.loc[:, var])
-        df_all.loc[:, var] = standardised_values.astype('float32')  # convert to float32
+        df_all.loc[:, var] = standardised_values  # convert to float32
         df_sig = df_all.iloc[:len(df_sig)]
         df_bkg = df_all.iloc[len(df_sig):]
         if plot:
