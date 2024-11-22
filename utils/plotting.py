@@ -76,13 +76,13 @@ def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, labe
     # aesthesics
     ax.legend(loc='upper right')
     ax.set_xlabel(var+" "+distance +" distance", loc="right")
-    ax.set_ylabel("Normalised # event pairs / bin", loc="top")
+    ax.set_ylabel("Normalised event pairs / bin", loc="top")
     # save
     if label!="": label = "_"+label
     exts = [".pdf"]
     for ext in exts:
         fig.tight_layout()
-        fig.savefig(path+"/"+var+"_"+distance+label+"_distances"+ext)
+        fig.savefig(path+"/"+var+"_"+distance+label+"_distances"+ext, transparent=True)
 
     return 0
 
@@ -116,7 +116,7 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var, file_path, s
     yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background", alpha=0.3, color="steelblue", density=bool_density)
     ax.legend(loc='upper right')
     ax.set_ylim([0.01, 1.2*max(max(ys),max(yb))])
-    ax.set_xlabel("\n"+str(var) + " [GeV]", loc="right")
+    ax.set_xlabel("\n"+str(var), loc="right")
     if bool_density:
         ax.set_ylabel("Normalised Events / Bin", loc="top")
     else:
@@ -189,13 +189,14 @@ def plot_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, norma
         binning = numpy.linspace(min(post_conv_bkg[:,v]),max(post_conv_bkg[:,v]), 50)
         ax.hist(post_conv_sig[:,v], bins=binning, label="Signal", alpha=0.3, density=True, color="red")
         ax.hist(post_conv_bkg[:,v], bins=binning, label="Background", alpha=0.3, density=True, color="steelblue")
-        add_text(ax, [r"$\sqrt{s}=13$ TeV, 5b data", r"6b resonant TRSM signals", r"Linking length at sig-sig eff "+str(eff), "After "+nconv+" convolutions"])
+        # add_text(ax, [r"$\sqrt{s}=13$ TeV, ", r"LQ signals", r"Linking length at sig-sig eff "+str(eff), "After "+nconv+" convolutions"])
+        add_text(ad, [r"LQ signal"])
         if standardise:
             ax.text(0.04, 0.68, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.legend(loc='upper right')
         ymin, ymax = ax.get_ylim()
         ax.set_ylim((ymin, ymax*1.4))
-        ax.set_xlabel("\n"+str(var)+" [GeV]", loc="right")
+        ax.set_xlabel("\n"+str(var), loc="right")
         ax.set_ylabel("Normalised No. Events", loc="top")
         fig.tight_layout()
         fig.savefig(file_path+plot_name+var+".pdf", transparent=True)
@@ -233,8 +234,8 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
 
 def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, ss_thresholds, sig_label, bkg_label, plot_path, variable, distance, sigsig_eff):
     fig, ax = plt.subplots()
-    nBins = 70
-    binning = np.linspace(0,15,nBins)
+    nBins = 50
+    binning = np.linspace(0,1500,nBins)
     ax.hist(sigsig, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
     ax.hist(sigbkg, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="darkorange")
     ax.hist(bkgbkg, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt, alpha=0.5, density=True, color="forestgreen")
