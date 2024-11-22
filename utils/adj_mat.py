@@ -49,9 +49,13 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ"):
         ex = "_"+ex
     if signal == "stau":
         logging.info("Loading stau signal sample(s) ...")
-        df_sig = pd.read_hdf(h5_path+"/StauStau"+str(ex)+".h5")
-        df_sig = misc.sig_mass_point(df_sig, mass_points = ['100_50'])
-        df_sig = misc.stau_selections(df_sig)
+        camps = ["mc20a", "mc20d","mc20e"]
+        df_sig = pd.DataFrame()
+        for camp in camps:
+            df_sig_camp = pd.read_hdf(h5_path+"/StauStau_"+camp+str(ex)+".h5")
+            df_sig_camp = misc.sig_mass_point(df_sig, mass_points = ['100_50'])
+            df_sig_camp = misc.stau_selections(df_sig)
+            df_sig = pd.concat([df_sig, df_sig_camp], ignore_index=True, axis=0)
     else:
         df_sig =  pd.read_hdf(h5_path+str(signal)+str(ex)+".h5", key=str(signal)+str(ex))
     
@@ -59,9 +63,14 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ"):
     if signal == "stau":
         for bkg in bkg_types:
             print(f"loading {bkg} background sample for {ex}")
-            tmp_df_bkg = pd.read_hdf(h5_path+bkg+str(ex)+".h5")
+            camps = ["mc20a", "mc20d","mc20e"]
+            tmp_df_bkg = pd.DataFrame()
+            for camp in camps:
+                tmp_df_bkg_camp = pd.read_hdf(h5_path+bkg+"_"+camp+str(ex)+".h5")
+                tmp_df_bkg_camp = misc.stau_selections(tmp_df_bkg_camp)
+                tmp_df_bkg = pd.concat([tmp_df_bkg, tmp_df_bkg_camp], ignore_index=True, axis=0)
             df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
-            df_bkg = misc.stau_selections(df_bkg)
+            
     else:
         for bkg in bkg_types:
             tmp_df_bkg = pd.read_hdf(h5_path+bkg+str(ex)+".h5", key=bkg+str(ex))
