@@ -307,9 +307,7 @@ def cut_operation(df, cuts):
     combined_condition = conditions[0]
     for condition in conditions[1:]:
         combined_condition &= condition
-
-    return combined_condition
-
+    return df[combined_condition]
 
 def get_h5_paths(path, variable, distance, label="sampled_train"):
     """
