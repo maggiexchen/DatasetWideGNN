@@ -5,6 +5,7 @@ import torch
 import math
 import pandas as pd
 import pdb
+import uproot
 torch.manual_seed(42)
 
 cpu = torch.device('cpu')
@@ -274,13 +275,13 @@ def stau_selections(df):
 
     return df
 
-def calc_eventWeight(df):
-    lumiWeight = df["lumiWeight"]
+def calc_eventWeight(df, initialWeights_arr, lumi):
+    sumInitialWeight = initialWeights_arr[0][2]
     xsec = df["xsec"]
-    lumi = df["lumi"]
     genWeight = df["genWeight"]
-    df["prod"] = lumiWeight*xsec*lumi*genWeight
-    eventWeight = df['prod'] / df['prod'].sum()
+    
+    # event weights = xsec * genWeight * lumi / sumInitialWeight
+    eventWeight = xsec * genWeight * lumi / sumInitialWeight
     return eventWeight
 
 
@@ -380,6 +381,7 @@ def get_train_mean_std(train_data):
     stds = train_data.std(0) #, correction = 0) ### correction = 0 turns off Bessel's correction
     return means, stds
 
+
 def torch_standardise(input, train_mean, train_std):
     """
     Function to standardise a tensor using the mean and standard deviation of the training set
@@ -391,3 +393,26 @@ def torch_standardise(input, train_mean, train_std):
         (torch tensor): the standardised tensor
     """
     return (input - train_mean) / train_std
+
+
+def get_histInitialWeights(file_path):
+    """
+    Function to open appropriate TTrees in our Ntuple Root files, for a given input path and signal choice
+    Args:
+        file_path (str): The path to the directory containing the ntuples
+    Returns:
+        a dictionary: containing N arrays of IntialWeights where N is the nubmer of signal or background
+    """
+    histInitialWeights = uproot.open(file_path)["InitialWeights"].to_numpy()
+    return histInitialWeights
+
+
+def GetEventWeight(df, lumi, sumInitWeights):
+    """
+    Function to calculate the event weight to a given luminosity for an MC sample, and create a new column to store this for each event.
+    Args:
+        df (pandas dataframe): dataframe for the input events/variables for your MC sample
+        lumi (float): The luminoisty you want to scale your samples to.
+        sumInitWeights (float): The sum of the initial generator weights of all of the generated samples (before some cuts are placed when producing ntuples) = the effective number of events generated initially.
+    """
+    df["eventWeight"] = df["xsec"] * df["genWeight"] * lumi / sumInitWeights

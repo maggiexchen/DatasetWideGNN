@@ -41,6 +41,10 @@ os.makedirs(h5_path, exist_ok=True)
 
 # TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
+if user_config["signal_mass"] is not None:
+    signal_mass = str(user_config["signal_mass"])
+else:
+    signal_mass = ""
 backgrounds = user_config["backgrounds"]
 
 logging.info("signal: "+signal)
@@ -49,13 +53,17 @@ logging.info("input ntuple path: "+ntuple_path)
 logging.info("output h5 data path: "+h5_path)
 
 # load in input files
+lumi_Run3 = 370
 logging.info('Importing and writing signal '+str(signal)+' ...')
-signal_file = uproot.open(ntuple_path + "GNNTree_"+str(signal)+".root:tree")
+signal_file_path = ntuple_path + "GNNTree_"+str(signal)+"_"+signal_mass+".root"
+signal_file = uproot.open(signal_file_path+":tree")
 features = signal_file.keys()
 df_sig = {str(signal):{}}
 df_sig[signal] = signal_file.arrays(library="pd")
 df_sig[signal]["target"] = [1]*len(df_sig[signal])
-df_sig[signal]["eventWeight"] = misc.calc_eventWeight(df_sig[signal])
+sig_initialWeights_arr = misc.get_histInitialWeights(signal_file_path)
+df_sig[signal]["eventWeight"] = misc.calc_eventWeight(df_sig[signal], sig_initialWeights_arr, lumi_Run3)
+print(signal, " event weights: ", df_sig[signal]["eventWeight"])
 df_sig[signal].to_hdf(h5_path + str(signal)+".h5", key=str(signal), mode="w")
 
 logging.info('Importing and writing background ')
@@ -63,8 +71,11 @@ df_bkgs = {}
 for background in backgrounds:
     logging.info(str(background)+" ...")
     df_bkgs[str(background)] = {}
-    background_file = uproot.open(ntuple_path + "GNNTree_"+str(background)+".root:tree")
+    background_file_path = ntuple_path + "GNNTree_"+str(background)+".root"
+    background_file = uproot.open(background_file_path+":tree")
     df_bkgs[background] = background_file.arrays(library="pd")
     df_bkgs[background]["target"] = [0]*len(df_bkgs[background])
-    df_bkgs[background]["eventWeight"] = misc.calc_eventWeight(df_bkgs[background])
+    bkgs_initialWeights_arr = misc.get_histInitialWeights(background_file_path)
+    df_bkgs[background]["eventWeight"] = misc.calc_eventWeight(df_bkgs[background], bkgs_initialWeights_arr, lumi_Run3)
+    print(background, " event weights: ", df_bkgs[background]["eventWeight"])
     df_bkgs[background].to_hdf(h5_path + str(background)+".h5", key=str(background), mode="w")
