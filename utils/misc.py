@@ -215,6 +215,7 @@ def get_kinematics_staus(variable):
     
     return kinematics
 
+
 def sig_mass_point(df_sig, mass_points = ['100_50']):
     """
     Function to obtain signal for desired mass point(s)
@@ -275,6 +276,7 @@ def stau_selections(df):
 
     return df
 
+
 def calc_eventWeight(df, initialWeights_arr, lumi):
     sumInitialWeight = initialWeights_arr[0][2]
     xsec = df["xsec"]
@@ -283,6 +285,30 @@ def calc_eventWeight(df, initialWeights_arr, lumi):
     # event weights = xsec * genWeight * lumi / sumInitialWeight
     eventWeight = xsec * genWeight * lumi / sumInitialWeight
     return eventWeight
+
+
+def cut_operation(df, cuts):
+    conditions = []
+    for variable, cut in cuts.items():
+        threshold = cut.get("threshold")
+        operation = cut.get("operation")
+        if operation == ">":
+            conditions.append(df[variable] > threshold)
+        elif operation == "<":
+            conditions.append(df[variable] < threshold)
+        elif operation == ">=":
+            conditions.append(df[variable] >= threshold)
+        elif operation == "<=":
+            conditions.append(df[variable] <= threshold)
+        elif operation == "==":
+            conditions.append(df[variable] == threshold)
+        else:
+            raise ValueError(f"Unsupported operation: {operation}")
+    combined_condition = conditions[0]
+    for condition in conditions[1:]:
+        combined_condition &= condition
+
+    return combined_condition
 
 
 def get_h5_paths(path, variable, distance, label="sampled_train"):

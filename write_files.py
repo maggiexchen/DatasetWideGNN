@@ -46,6 +46,8 @@ if user_config["signal_mass"] is not None:
 else:
     signal_mass = ""
 backgrounds = user_config["backgrounds"]
+cuts = user_config["cuts"]
+print("cuts ", cuts )
 
 logging.info("signal: "+signal)
 logging.info("backgrounds: "+str(backgrounds))
@@ -64,6 +66,8 @@ df_sig[signal]["target"] = [1]*len(df_sig[signal])
 sig_initialWeights_arr = misc.get_histInitialWeights(signal_file_path)
 df_sig[signal]["eventWeight"] = misc.calc_eventWeight(df_sig[signal], sig_initialWeights_arr, lumi_Run3)
 print(signal, " event weights: ", df_sig[signal]["eventWeight"])
+sig_cuts_condition = misc.cut_operation(df_sig[signal], cuts)
+df_sig[signal] = df_sig[signal][sig_cuts_condition]
 df_sig[signal].to_hdf(h5_path + str(signal)+".h5", key=str(signal), mode="w")
 
 logging.info('Importing and writing background ')
@@ -78,4 +82,6 @@ for background in backgrounds:
     bkgs_initialWeights_arr = misc.get_histInitialWeights(background_file_path)
     df_bkgs[background]["eventWeight"] = misc.calc_eventWeight(df_bkgs[background], bkgs_initialWeights_arr, lumi_Run3)
     print(background, " event weights: ", df_bkgs[background]["eventWeight"])
+    bkg_cuts_condition = misc.cut_operation(df_bkgs[background], cuts)
+    df_bkgs[background] = df_bkgs[background][bkg_cuts_condition]
     df_bkgs[background].to_hdf(h5_path + str(background)+".h5", key=str(background), mode="w")
