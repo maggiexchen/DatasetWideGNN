@@ -25,7 +25,7 @@ import pdb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, Subset
 import torch.optim as optim
 from torch.utils.checkpoint import checkpoint
 # from torchinfo import summary
@@ -101,6 +101,10 @@ train_config_path = args.MLconfig
 train_config = misc.load_config(train_config_path)
 print("Using training config ",train_config)
 hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
+if len(hidden_sizes_gcn) > 0:
+    gnn = True
+else:
+    gnn = False
 hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
 patience_LR = train_config["patience_LR"]
@@ -221,7 +225,7 @@ logging.info("Time taken so far: "+str(time.time()-st))
 
 ### load edge indices if gnn layers are used
 edge_ind = None
-if len(hidden_sizes_gcn) > 0:
+if gnn:
     print("constructing sparse adjacency matrix ...")
     print("loading row indices ...")
     row_ind = torch.load(adj_path+'row_ind.pt')
@@ -308,28 +312,25 @@ try:
         all_labels = data.y[train_idx].cpu().numpy()
         all_wgts = data.wgts[train_idx].cpu().numpy()
         class_weights = binary_class_weights(all_labels, all_wgts).to(device)
-        print("class weights", class_weights)
-
-        logging.info("Graph sub-sampling for training ...")
+        print("Training class weights: signal - ", class_weights[1], ", backgrounds - ", class_weights[0])
+        
+        if gnn:
+            logging.info("Graph sub-sampling for training and validation ...")
+        else:
+            logging.info("Loading for training and validation ...")
         train_loader = NeighborLoader(
             data,
             input_nodes = train_idx,
             num_neighbors = num_nb_list,
             shuffle = True,
             batch_size = batch_size,
-            # num_workers = 6, 
-            # persistent_workers = True
         )
-
-        logging.info("Graph sub-sampling for validation ...")
         val_loader = NeighborLoader(
             data,
             input_nodes = val_idx,
             num_neighbors = num_nb_list,
             shuffle = False,
             batch_size = batch_size,
-            # num_workers = 6,
-            # persistent_workers = True
         )
 
         best_val_loss = float('inf')
@@ -344,7 +345,6 @@ try:
             train_truth_labels_fold = torch.tensor([]).to(cpu)
             train_wgts_fold = torch.tensor([]).to(cpu)
             for batch in train_loader:
-
                 optimiser.zero_grad()
                 batch = batch.to(device)
                 batch_size = batch.batch_size
@@ -442,8 +442,7 @@ try:
 
         if single_fold == True:
             print("Single fold training, breaking loop ...")
-            break    
-    
+            break
 finally:
     logging.info("Training complete.")
     print("train truth labels", len(train_truth_labels))
