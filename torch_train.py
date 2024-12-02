@@ -44,7 +44,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 
 torch.cuda.empty_cache()
-torch.manual_seed(42)
+torch.manual_seed(20)
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -413,7 +413,7 @@ try:
                 print(f"No improvement in validation loss for {patience_counter} epoch(s).")
 
             print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
-
+        
             if patience_counter >= patience_early_stopping:
                 print(f"Early stopping after {epoch+1} epochs.")
                 break
@@ -439,6 +439,10 @@ try:
         val_outputs = torch.cat((val_outputs, val_outputs_fold))
         val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
         val_wgts = torch.cat((val_wgts, val_wgts_fold))
+        del train_loader, val_loader, model, optimiser, scheduler
+        del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
+        torch.cuda.empty_cache()
+        gc.collect()
 
         if single_fold == True:
             print("Single fold training, breaking loop ...")
@@ -489,15 +493,10 @@ finally:
     logging.info("Plotting training/validation losses ...")
     fig, ax = plt.subplots()
     x_epoch = numpy.arange(1,epochs+1,1)
-    loss_loop = 0
-    for train_loss, val_loss in zip(train_losses, val_losses):
-        if loss_loop == 0:
-            ax.plot(np.arange(len(train_loss)), train_loss, label="Training loss", color="b")
-            ax.plot(np.arange(len(val_loss)), val_loss, label="Validation loss", color="r")
-        else:
-            ax.plot(np.arange(len(train_loss)), train_loss, color="b")
-            ax.plot(np.arange(len(val_loss)), val_loss, color="r")
-        loss_loop += 1
+    for loss_loop, (train_loss, val_loss) in enumerate(zip(train_losses, val_losses)):
+        train_line, = ax.plot(np.arange(len(train_loss)), train_loss, label="Fold " + str(loss_loop) + " (Train)")
+        colour = train_line.get_color()
+        ax.plot(np.arange(len(val_loss)), val_loss, label="Fold " + str(loss_loop) + " (Val)", color=colour, linestyle = "-.")
     ax.legend(loc='upper right', fontsize=9)
     ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
     ax.set_xlabel("Epoch", loc="right")
