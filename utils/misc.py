@@ -76,7 +76,7 @@ def get_background_types(signal_type):
     return background_type
 
 
-def get_kinematics(variable):
+def get_kinematics(variable, dim):
     """
     Function to obtain the list of names of kinematic variables to use for a given category.
     Throws an exception for an unknown category
