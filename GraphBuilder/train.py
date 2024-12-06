@@ -66,9 +66,9 @@ embedding_dim = user_config["embedding_dim"]
 
 # load in input files
 logging.info('Importing signal and background files...')
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_sig_labels, train_truth_bkg_labels = adj.data_loader(h5_path, "", "train", kinematics, signal=signal, plot=False)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_sig_labels, val_truth_bkg_labels = adj.data_loader(h5_path, "", "val", kinematics, signal=signal, plot=False)
-test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels, test_truth_bkg_labels = adj.data_loader(h5_path, "", "test", kinematics, signal=signal, plot=False)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_sig_labels, train_truth_bkg_labels = adj.data_loader(h5_path, "", kinematics,  ex="train", signal=signal, plot=False, standardisation=True)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_sig_labels, val_truth_bkg_labels = adj.data_loader(h5_path, "", kinematics, ex="val", signal=signal, plot=False, standardisation=True)
+test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels, test_truth_bkg_labels = adj.data_loader(h5_path, "", kinematics, ex="test", signal=signal, plot=False, standardisation=True)
 
 train_pairs= PairDataset(train_sig, train_bkg, 200, 200)
 val_pairs = PairDataset(val_sig, val_bkg, 100, 100)
