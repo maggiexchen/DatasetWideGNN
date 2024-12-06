@@ -23,7 +23,7 @@ cpu = torch.device('cpu')
 device = torch.device('cuda:0')
 
 
-def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ"):
+def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", standardisation=False):
     """
     Function to load our sign and bkg data into pandas dataframes
 
@@ -34,6 +34,7 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ"):
         ex (str): input file extension, default is empty
         plot (bool): flag to plot raw and standardised kinematics, default is False
         signal (str): type of signal, to determine the bkgs present, default is LQ
+        standardisation (bool): flag to do standardisation
     Returns:
         (torch.tensor(float32)): signal events/kinematics tensor
         (torch.tensor(float32)): background events/kinematics tensor
@@ -58,6 +59,7 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ"):
             df_sig = pd.concat([df_sig, df_sig_camp], ignore_index=True, axis=0)
     else:
         df_sig =  pd.read_hdf(h5_path+str(signal)+str(ex)+".h5", key=str(signal)+str(ex))
+        # df_sig =  pd.read_hdf(h5_path+str(signal)+str(ex)+".h5", key="sig"+str(ex))
     
     df_bkg = pd.DataFrame()
     if signal == "stau":
@@ -90,20 +92,20 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ"):
     # set truth labels for is signal
     sig_label = [1]*len(df_sig)
     bkg_label = [0]*len(df_bkg)
-    # # Standardising kinematics
-    # for var in kinematics:
-    #     if plot:
-    #         df_sig = df_all.iloc[:len(df_sig)]
-    #         df_bkg = df_all.iloc[len(df_sig):]
-    #         plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=False)
-    #     print(f"-----> Standardising {var}:")
-    #     standardised_values = norm.standardise(df_all.loc[:, var])
-    #     standardised_values = norm.standardise(df_all.loc[:, var])
-    #     df_all.loc[:, var] = standardised_values.astype('float32')  # convert to float32
-    #     df_sig = df_all.iloc[:len(df_sig)]
-    #     df_bkg = df_all.iloc[len(df_sig):]
-    #     if plot:
-    #         plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=True)
+    if standardisation:
+        # Standardising kinematics
+        for var in kinematics:
+            if plot:
+                df_sig = df_all.iloc[:len(df_sig)]
+                df_bkg = df_all.iloc[len(df_sig):]
+                plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=False)
+            print(f"-----> Standardising {var}:")
+            standardised_values = norm.standardise(df_all.loc[:, var])
+            df_all.loc[:, var] = standardised_values.astype('float32')  # convert to float32
+            df_sig = df_all.iloc[:len(df_sig)]
+            df_bkg = df_all.iloc[len(df_sig):]
+            if plot:
+                plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=True)
     
     # plot kinematics
     if plot:
