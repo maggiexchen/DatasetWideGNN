@@ -53,14 +53,6 @@ logging.info("input ntuple path: "+ntuple_path)
 logging.info("output h5 data path: "+h5_path)
 os.makedirs(h5_path, exist_ok=True)
 
-def met_cut(df, cut):
-    if "met" in df.columns:
-        met_filter = df["met"] > cut
-        return df[met_filter]
-    else:
-        print("MET is not in file!")
-        return df
-
 # load in input files
 lumi_Run3 = 370
 logging.info('Importing and writing signal '+str(signal)+' ...')
@@ -72,7 +64,6 @@ df_sig[signal] = signal_file.arrays(library="pd")
 df_sig[signal]["target"] = [1]*len(df_sig[signal])
 sig_initialWeights_arr = misc.get_histInitialWeights(signal_file_path)
 df_sig[signal]["eventWeight"] = misc.calc_eventWeight(df_sig[signal], sig_initialWeights_arr, lumi_Run3)
-print(signal, " event weights: ", df_sig[signal]["eventWeight"])
 if cuts is not None:
     df_sig[signal] = misc.cut_operation(df_sig[signal], cuts)
 df_sig[signal].to_hdf(h5_path + str(signal)+".h5", key=str(signal), mode="w")
