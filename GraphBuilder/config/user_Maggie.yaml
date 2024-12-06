@@ -9,15 +9,15 @@ feature_dim:
 
 # input paths
 ntuple_path: /data/atlas/atlasdata3/maggiechen/LQ_ntuples/
-h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/LowLevelKinematics/
+h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/MetCut200/
 
 # save paths
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/models/same_class_clustering/LowLevelKinematics/
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/scan_plots/same_class_clustering/LowLevelKinematics/
-embedding_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/same_class_clustering/LowLevelKinematics/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/models/same_class_clustering/MetCut200/
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/scan_plots/same_class_clustering/MetCut200/
+embedding_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/same_class_clustering/MetCut200/
 # training parameters
 margin: 2.0
 LR: 0.01
-embedding_dim: 12
+embedding_dim: 18
 epoch: 30
 penalty: 20
