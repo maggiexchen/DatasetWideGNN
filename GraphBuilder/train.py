@@ -66,9 +66,9 @@ embedding_dim = user_config["embedding_dim"]
 
 # load in input files
 logging.info('Importing signal and background files...')
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_sig_labels, train_truth_bkg_labels = adj.data_loader(h5_path, "", "train", kinematics, signal=signal)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_sig_labels, val_truth_bkg_labels = adj.data_loader(h5_path, "", "val", kinematics, signal=signal)
-test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels, test_truth_bkg_labels = adj.data_loader(h5_path, "", "test", kinematics, signal=signal)
+train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_sig_labels, train_truth_bkg_labels = adj.data_loader(h5_path, "", "train", kinematics, signal=signal, plot=False)
+val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_sig_labels, val_truth_bkg_labels = adj.data_loader(h5_path, "", "val", kinematics, signal=signal, plot=False)
+test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels, test_truth_bkg_labels = adj.data_loader(h5_path, "", "test", kinematics, signal=signal, plot=False)
 
 train_pairs= PairDataset(train_sig, train_bkg, 200, 200)
 val_pairs = PairDataset(val_sig, val_bkg, 100, 100)
@@ -250,20 +250,20 @@ def plot_embeddings(embeddings, labels, epoch, margin, feat, radius=1.0, pen=1.0
 
     ax.legend(loc="upper right", fontsize=16)
     ax.text(0.03, 0.95, r"\textbf{Signal} - Leptoquark, \textbf{Background} - $t\bar{t}$, Single top", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.91, r"\textbf{Loss margin: }" + str(margin), size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.88, r"\textbf{Average distances:}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.84, f"sig-sig {avg_sigsig_dist.item():.3f}, bkg-bkg {avg_bkgbkg_dist.item():.3f}, sig-bkg {avg_sigbkg_dist.item():.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.79, r"\textbf{Graph at radius }" + str(radius) + f", edge fraction {edge_frac:.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.76, f"Same class: efficiency {eff:.3f}, purity {purity:.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.73, f"Sig-sig: efficiency {sigsig_eff:.3f}, purity {sigsig_pur:.3f}", size=16, transform=ax.transAxes)
-    ax.text(0.03, 0.70, f"Bkg-bkg: efficiency {bkgbkg_eff:.3f}, purity {bkgbkg_pur:.3f}", size=16, transform=ax.transAxes)
+    ax.text(0.03, 0.91, r"\textbf{Margin: }" + str(margin) + r", \textbf{penalty: }" +str(penalty) + r", \textbf{embedding dim: }" +str(embedding_dim), size=16, transform=ax.transAxes)
+    # ax.text(0.03, 0.88, r"\textbf{Average distances:}", size=16, transform=ax.transAxes)
+    # ax.text(0.03, 0.84, f"sig-sig {avg_sigsig_dist.item():.3f}, bkg-bkg {avg_bkgbkg_dist.item():.3f}, sig-bkg {avg_sigbkg_dist.item():.3f}", size=16, transform=ax.transAxes)
+    # ax.text(0.03, 0.79, r"\textbf{Graph at radius }" + str(radius) + f", edge fraction {edge_frac:.3f}", size=16, transform=ax.transAxes)
+    # ax.text(0.03, 0.76, f"Same class: efficiency {eff:.3f}, purity {purity:.3f}", size=16, transform=ax.transAxes)
+    # ax.text(0.03, 0.73, f"Sig-sig: efficiency {sigsig_eff:.3f}, purity {sigsig_pur:.3f}", size=16, transform=ax.transAxes)
+    # ax.text(0.03, 0.70, f"Bkg-bkg: efficiency {bkgbkg_eff:.3f}, purity {bkgbkg_pur:.3f}", size=16, transform=ax.transAxes)
 
     ax.set_xlabel('Embedded feature 1', loc="right", fontsize=16)
     ax.set_ylabel('Embedded feature 2', loc="top", fontsize=16)
     xmin, xmax = ax.get_xlim()
     ymin, ymax = ax.get_ylim()
-    ax.set_xlim((xmin*1.2, xmax*1.2))
-    ax.set_ylim((ymin*1.2, ymax*1.2))
+    ax.set_xlim((xmin, xmax*1.2))
+    ax.set_ylim((ymin, ymax*1.1))
     plotting_path = plot_path+"embedding_"+str(feat)+"feats/"
     os.makedirs(plotting_path, exist_ok=True)
     if num_epochs == 0:

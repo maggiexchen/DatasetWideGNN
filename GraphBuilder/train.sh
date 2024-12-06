@@ -4,8 +4,8 @@
 CONFIG_FILE="config/user_Maggie.yaml"
 
 # Define the ranges or lists of values you want to scan through
-MARGINS=(0.1 0.5 1.0 2.0)
-EMBEDDING_DIMS=(2 4 12)
+MARGINS=(0.5 1.0 2.0)
+EMBEDDING_DIMS=(18)
 PENALTY=(1 5 10 20)
 # Loop through the parameter values
 for margin in "${MARGINS[@]}"; do
