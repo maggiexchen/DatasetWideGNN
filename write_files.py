@@ -37,12 +37,23 @@ user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
 h5_path = user_config["kinematic_h5_path"]
 ntuple_path = user_config["ntuple_path"]
+os.makedirs(h5_path, exist_ok=True)
 
 signal = user_config["signal"]
+<<<<<<< HEAD
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
+=======
+if user_config["signal_mass"] is not None:
+    signal_mass = str(user_config["signal_mass"])
+else:
+    signal_mass = ""
+backgrounds = user_config["backgrounds"]
+cuts = user_config["cuts"]
+>>>>>>> a3282ee1c51fd8c1be0a11f24d9add04252b927b
 
 logging.info("signal: "+signal)
+logging.info("backgrounds: "+str(backgrounds))
 logging.info("input ntuple path: "+ntuple_path)
 logging.info("output h5 data path: "+h5_path)
 os.makedirs(h5_path, exist_ok=True)
@@ -56,6 +67,7 @@ def met_cut(df, cut):
         return df
 
 # load in input files
+<<<<<<< HEAD
 logging.info('Importing signal and background files...')
 if signal == "hhh":
     background_types = [""]
@@ -149,3 +161,35 @@ df_singletop_test.to_hdf(h5_path + "singletop_test.h5", key="singletop_test", mo
 df_ttbar_train.to_hdf(h5_path + "ttbar_train.h5", key="ttbar_train", mode="w")
 df_ttbar_val.to_hdf(h5_path + "ttbar_val.h5", key="ttbar_val", mode="w")
 df_ttbar_test.to_hdf(h5_path + "ttbar_test.h5", key="ttbar_test", mode="w")
+=======
+lumi_Run3 = 370
+logging.info('Importing and writing signal '+str(signal)+' ...')
+signal_file_path = ntuple_path + "GNNTree_"+str(signal)+"_"+signal_mass+".root"
+signal_file = uproot.open(signal_file_path+":tree")
+features = signal_file.keys()
+df_sig = {str(signal):{}}
+df_sig[signal] = signal_file.arrays(library="pd")
+df_sig[signal]["target"] = [1]*len(df_sig[signal])
+sig_initialWeights_arr = misc.get_histInitialWeights(signal_file_path)
+df_sig[signal]["eventWeight"] = misc.calc_eventWeight(df_sig[signal], sig_initialWeights_arr, lumi_Run3)
+print(signal, " event weights: ", df_sig[signal]["eventWeight"])
+if cuts is not None:
+    df_sig[signal] = misc.cut_operation(df_sig[signal], cuts)
+df_sig[signal].to_hdf(h5_path + str(signal)+".h5", key=str(signal), mode="w")
+
+logging.info('Importing and writing background ')
+df_bkgs = {}
+for background in backgrounds:
+    logging.info(str(background)+" ...")
+    df_bkgs[str(background)] = {}
+    background_file_path = ntuple_path + "GNNTree_"+str(background)+".root"
+    background_file = uproot.open(background_file_path+":tree")
+    df_bkgs[background] = background_file.arrays(library="pd")
+    df_bkgs[background]["target"] = [0]*len(df_bkgs[background])
+    bkgs_initialWeights_arr = misc.get_histInitialWeights(background_file_path)
+    df_bkgs[background]["eventWeight"] = misc.calc_eventWeight(df_bkgs[background], bkgs_initialWeights_arr, lumi_Run3)
+    print(background, " event weights: ", df_bkgs[background]["eventWeight"])
+    if cuts is not None:
+        df_bkgs[background] = misc.cut_operation(df_bkgs[background], cuts)
+    df_bkgs[background].to_hdf(h5_path + str(background)+".h5", key=str(background), mode="w")
+>>>>>>> a3282ee1c51fd8c1be0a11f24d9add04252b927b

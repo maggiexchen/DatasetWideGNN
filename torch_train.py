@@ -25,7 +25,7 @@ import pdb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, Subset
 import torch.optim as optim
 from torch.utils.checkpoint import checkpoint
 # from torchinfo import summary
@@ -37,12 +37,14 @@ import time
 st = time.time()
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
 from sklearn.utils import shuffle
+from sklearn.model_selection import StratifiedKFold
 
 import shap
 import logging
 logging.getLogger().setLevel(logging.INFO)
 
 torch.cuda.empty_cache()
+torch.manual_seed(20)
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -101,6 +103,10 @@ train_config_path = args.MLconfig
 train_config = misc.load_config(train_config_path)
 print("Using training config ",train_config)
 hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
+if len(hidden_sizes_gcn) > 0:
+    gnn = True
+else:
+    gnn = False
 hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
 patience_LR = train_config["patience_LR"]
@@ -110,6 +116,8 @@ num_nb_list = train_config["num_nb_list"]
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
 patience_early_stopping = train_config["patience_early_stopping"]
+num_folds = train_config["num_folds"]
+single_fold = train_config["single_fold"]
 ### LR scheduler patience should be less than early stopping patience, so that the LR can be reduced before training stops
 assert patience_LR < patience_early_stopping, "LR scheduler patience should be less than early stopping patience"
 
@@ -146,6 +154,13 @@ else:
         ll_str = "_LL" + str(linking_length).replace(".", "p")
         adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
 
+### str for train/val split label. If single fold, then val_frac is 1/num_folds. Otherwise, nf is num_folds
+if single_fold == True:
+    val_frac = 1/num_folds
+    nf_str = f"_val_frac{val_frac:.2f}"
+else:
+    nf_str = "_nf" + str(num_folds)
+
 ### create model label and result plot path
 if len(hidden_sizes_gcn) == 0:
     model_label = signal\
@@ -153,7 +168,8 @@ if len(hidden_sizes_gcn) == 0:
           + "_lr" + str(LR).replace(".", "p")\
           + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
           + "_bs" + str(batch_size)\
-          + "_e" + str(epochs)
+          + "_e" + str(epochs)\
+          + nf_str
 else:
     model_label = signal\
             + f"_{gnn_type}" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
@@ -163,7 +179,9 @@ else:
             + ll_str\
             + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
             + "_bs" + str(batch_size)\
-            + "_e" + str(epochs)    
+            + "_e" + str(epochs)\
+            + nf_str
+    
 plot_path = plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
@@ -172,9 +190,6 @@ if signal == "stau":
 else:
     kinematics = misc.get_kinematics(kinematic_variable, feature_dim)
 input_size = len(kinematics)
-
-train_loss = []
-val_loss = []
 
 logging.info("signal: "+signal)
 logging.info("chosen model: "+model_label)
@@ -186,9 +201,7 @@ logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
 logging.info("adj matrix storage path: "+adj_path)
 logging.info("model storage path: "+model_path)
-
-model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
-model.to(device)
+model_path = model_path + model_label + "/"
 
 logging.info("distance metric: "+distance)
 if eff is not None:    
@@ -199,42 +212,28 @@ elif linking_length is not None:
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
 
-# normalised signal and background kinematics
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_sig_labels, train_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, "train", kinematics, plot=False, signal=signal)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_sig_labels, val_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, "val", kinematics, plot=False, signal=signal)
-test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_sig_labels, test_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, "test", kinematics, plot=False, signal=signal)
+# normal loading setup
+full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal=signal)
 
-print("train sig", len(train_sig))
-print("train bkg", len(train_bkg))
-print("val sig", len(val_sig))
-print("val bkg", len(val_bkg))
-print("test sig", len(test_sig))
-print("test bkg", len(test_bkg))
+print("full sig size", full_sig.size())
+print("full bkg size", full_bkg.size())
 
-
-full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
-full_sig_labels = torch.cat((train_sig_labels, val_sig_labels, test_sig_labels))
-
-full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
-full_bkg_labels = torch.cat((train_bkg_labels, val_bkg_labels, test_bkg_labels))
-
-# raw_full_sig = torch.cat((raw_train_sig, raw_val_sig), dim=0)
-# raw_full_bkg = torch.cat((raw_train_bkg, raw_val_bkg), dim=0)
-
-full_sig_len = len(full_sig)
-full_bkg_len = len(full_bkg)
-
-full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
-del full_sig
-del full_bkg
-
+full_x = full_x.to(device)
 full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
-full_y = full_y.to(torch.float)
-full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)), dim=0)
+del full_sig, full_bkg, full_sig_labels, full_bkg_labels
+
+print("full sig wgts", full_sig_wgts.sum())
+print("full bkg wgts", full_bkg_wgts.sum())
+
+full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0).to(device)
+del full_sig_wgts, full_bkg_wgts
+
+logging.info("Loaded signal and background data.")
+logging.info("Time taken so far: "+str(time.time()-st))    
 
 ### load edge indices if gnn layers are used
 edge_ind = None
-if len(hidden_sizes_gcn) > 0:
+if gnn:
     print("constructing sparse adjacency matrix ...")
     print("loading row indices ...")
     row_ind = torch.load(adj_path+'row_ind.pt')
@@ -250,53 +249,25 @@ if len(hidden_sizes_gcn) > 0:
 
 misc.print_mem_info()
 
-def compute_class_weights(labels, event_weights):
-    '''
-    Compute weighted class weights for binary classification with event weights
-    
-    Args:
-        labels (np.ndarray): Array of labels.
-        event_weights (np.ndarray): Array of event weights corresponding to each label.
-    
-    Returns:
-        torch.Tensor: Tensor of class weights.
-    '''
-    labels = labels.astype(int)  # Ensure labels are integers
-    unique_labels = np.unique(labels)
-
-    # Initialize an array to hold the weighted count for each class
-    weighted_counts = np.zeros(len(unique_labels), dtype=float)
-
-    # Accumulate the weighted counts for each class
-    for label in unique_labels:
-        weighted_counts[label] = np.sum(event_weights[labels == label])
-    
-    # Compute the class weights as the inverse of the weighted counts
-    class_weights = 1.0 / weighted_counts
-    class_weights = class_weights / class_weights.sum()  # Normalize to sum to 1
-
-    return torch.tensor(class_weights, dtype=torch.float)
-
 ### define loss function and optimiser
 def weighted_bce_loss(output, target, class_weights, event_weights):
-    sig_loss = event_weights * (class_weights[1] * target * torch.log(output+1e-10))
-    bkg_loss = event_weights * (class_weights[0] * (1-target) * torch.log(1-output+1e-10))
+    sig_w_sum = class_weights[1] * target * event_weights
+    bkg_w_sum = class_weights[0] * (1-target) * event_weights
+    sig_loss =  sig_w_sum * torch.log(output+1e-10)
+    bkg_loss =  bkg_w_sum * torch.log(1-output+1e-10)
     loss = sig_loss+bkg_loss
-    return -loss.mean()
-
-
-optimiser = torch.optim.Adam(model.parameters(), lr=LR)
-### NOTE: patience for the scheculer is different from the early stopping patience
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = patience_LR)
-
+    sum_w = (sig_w_sum + bkg_w_sum).sum()
+    loss = loss.sum() / sum_w
+    return -loss
 
 def binary_class_weights(labels, event_weights):
-    num_sig = len(labels[labels == 1])
-    num_bkg = len(labels[labels == 0])
+    num_sig = np.sum(event_weights[labels == 1])
+    num_bkg = np.sum(event_weights[labels == 0])
+    # bkg_weight = num_sig/num_bkg
+    # sig_weight = 1
     bkg_weight = 1
     sig_weight = num_bkg/num_sig
     return torch.tensor([bkg_weight, sig_weight], dtype=torch.float)
-
 
 logging.info("Training ...")
 print("full x", len(full_x))
@@ -311,246 +282,302 @@ torch.cuda.empty_cache()
 data = Data(x = full_x, y = full_y, edge_index = edge_ind, wgts = full_wgts)#, edge_weight = edge_wgts)
 del edge_ind
 
-train_idx = torch.cat((torch.arange(len(train_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg))), dim=0).tolist()
-val_idx =   torch.cat((torch.arange(len(train_sig), len(train_sig)+len(val_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg))), dim=0).tolist()
-test_idx =  torch.cat((torch.arange(len(train_sig)+len(val_sig), len(train_sig)+len(val_sig)+len(test_sig)), torch.arange(len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg), len(train_sig)+len(val_sig)+len(test_sig)+len(train_bkg)+len(val_bkg)+len(test_bkg))), dim=0).tolist()
-print("train idx", len(train_idx))
-print("val idx", len(val_idx))
-print("test idx", len(test_idx))
+try: 
+    kfold = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=42)
+    fold_no = 0
+    train_losses = []
+    val_losses = []
+    train_outputs = torch.tensor([]).to(cpu)
+    train_truth_labels = torch.tensor([]).to(cpu)
+    train_wgts = torch.tensor([]).to(cpu)
+    val_outputs = torch.tensor([]).to(cpu)
+    val_truth_labels = torch.tensor([]).to(cpu)
+    val_wgts = torch.tensor([]).to(cpu)
 
-all_labels = data.y[train_idx].cpu().numpy()
-all_wgts = data.wgts[train_idx].cpu().numpy()
-# class_weights = compute_class_weights(all_labels, all_wgts).to(device)
-class_weights = binary_class_weights(all_labels, all_wgts).to(device)
-print("class weights", class_weights)
+    logging.info("Starting k-fold cross validation ...")
+    logging.info("Time taken so far: "+str(time.time()-st))
+    for train_idx, val_idx in kfold.split(np.zeros(len(full_y)), full_y.cpu().numpy()):
+        fold_no += 1
+        print(f"Starting fold {fold_no}/{num_folds}")
+        print("train idx", len(train_idx))
+        print("val idx", len(val_idx))
 
-logging.info("Graph sub-sampling for training ...")
-train_loader = NeighborLoader(
-    data,
-    input_nodes = train_idx,
-    num_neighbors = num_nb_list,
-    shuffle = True,
-    batch_size = batch_size,
-    # num_workers = 6, 
-    # persistent_workers = True
-)
+        ### standardise input data to training set and move to cpu after standardisation
+        means, stds = misc.get_train_mean_std(full_x[train_idx])
+        data.x = misc.torch_standardise(data.x, means, stds)
+        means, stds = means.to(cpu), stds.to(cpu)
 
-logging.info("Graph sub-sampling for validation ...")
-val_loader = NeighborLoader(
-    data,
-    input_nodes = val_idx,
-    num_neighbors = num_nb_list,
-    shuffle = True,
-    batch_size = batch_size,
-    # num_workers = 6,
-    # persistent_workers = True
-)
+        model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
+        model.to(device)
 
-best_val_loss = float('inf')
-patience_counter = 0
+        optimiser = torch.optim.Adam(model.parameters(), lr=LR)
+        ### NOTE: patience for the scheculer is different from the early stopping patience
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode = 'min', patience = patience_LR)
 
-logging.info("Starting training ...")
-for epoch in range(epochs):
+        train_loss = []
+        val_loss = []
 
-    ### start training loop in the epoch
-    model.train()
-    total_examples = total_loss = 0
-    train_outputs = torch.tensor([])
-    train_truth_labels = torch.tensor([])
-    train_wgts = torch.tensor([])
-    for batch in train_loader:
-
-        optimiser.zero_grad()
-        batch = batch.to(device)
-        batch_size = batch.batch_size
-        outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
+        all_labels = data.y[train_idx].cpu().numpy()
+        all_wgts = data.wgts[train_idx].cpu().numpy()
+        class_weights = binary_class_weights(all_labels, all_wgts).to(device)
+        print("Training class weights: signal - ", class_weights[1], ", backgrounds - ", class_weights[0])
         
-        ### NOTE only consider predictions and labels of seed nodes
-        y = batch.y[:batch_size]
-        outputs = outputs[:batch_size]
-        event_wgts = batch.wgts[:batch_size]
+        if gnn:
+            logging.info("Graph sub-sampling for training and validation ...")
+        else:
+            logging.info("Loading for training and validation ...")
+        train_loader = NeighborLoader(
+            data,
+            input_nodes = train_idx,
+            num_neighbors = num_nb_list,
+            shuffle = True,
+            batch_size = batch_size,
+        )
+        val_loader = NeighborLoader(
+            data,
+            input_nodes = val_idx,
+            num_neighbors = num_nb_list,
+            shuffle = False,
+            batch_size = batch_size,
+        )
 
-        loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts) 
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        optimiser.step()
-
-        torch.cuda.empty_cache()
-        total_examples += batch_size
-        total_loss += float(loss) * batch_size
-        train_outputs = torch.cat((train_outputs, outputs.detach()))
-        train_truth_labels = torch.cat((train_truth_labels, y.detach()))
-        train_wgts = torch.cat((train_wgts, event_wgts.detach()))
-        
-    avg_tr_loss = total_loss / total_examples
-    train_loss.append(avg_tr_loss)
-        
-    ### start validation loop in the epoch
-    model.eval()
-    total_examples = total_loss = 0
-    val_outputs = torch.tensor([])
-    val_truth_labels = torch.tensor([])
-    val_wgts = torch.tensor([])
-    with torch.no_grad():
-        for batch in val_loader:
-            
-            batch = batch.to(device)
-            batch_size = batch.batch_size
-            outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
-
-            ### NOTE only consider predictions and labels of seed nodes
-            y = batch.y[:batch_size]
-            outputs = outputs[:batch_size]
-            event_wgts = batch.wgts[:batch_size]
-
-            loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
-
-            total_examples += batch_size
-            total_loss += float(loss) * batch_size
-            val_outputs = torch.cat((val_outputs, outputs.detach()))
-            val_truth_labels = torch.cat((val_truth_labels, y.detach()))
-            val_wgts = torch.cat((val_wgts, event_wgts.detach()))
-
-    avg_vl_loss = total_loss / total_examples
-    val_loss.append(avg_vl_loss)
-    current_lr = optimiser.param_groups[0]['lr']
-    scheduler.step(avg_vl_loss)
-    new_lr = optimiser.param_groups[0]['lr']
-    if new_lr < current_lr:
-        print(f"Learning rate reduced to: {new_lr}")
-
-    if avg_vl_loss < best_val_loss:
-        best_val_loss = avg_vl_loss
+        best_val_loss = float('inf')
         patience_counter = 0
-    else:
-        patience_counter += 1
-        print(f"No improvement in validation loss for {patience_counter} epoch(s).")
+        logging.info("Starting training ...")
+        for epoch in range(epochs):
 
-    print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
+            ### start training loop in the epoch
+            model.train()
+            total_examples = total_loss = 0
+            train_outputs_fold = torch.tensor([]).to(cpu)
+            train_truth_labels_fold = torch.tensor([]).to(cpu)
+            train_wgts_fold = torch.tensor([]).to(cpu)
+            for batch in train_loader:
+                optimiser.zero_grad()
+                batch = batch.to(device)
+                batch_size = batch.batch_size
+                outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
+                
+                ### NOTE only consider predictions and labels of seed nodes
+                y = batch.y[:batch_size]
+                outputs = outputs[:batch_size]
+                event_wgts = batch.wgts[:batch_size]
 
-    if patience_counter >= patience_early_stopping:
-        print(f"Early stopping after {epoch+1} epochs.")
-        break
-    
-logging.info("Training complete.")
-print("train truth labels", len(train_truth_labels))
-print("val truth labels", len(val_truth_labels))
+                loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts) 
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                optimiser.step()
 
-logging.info("Saving trained model and performance...")
-model_file_name = "model.pth"
-model_path = model_path+model_label+"/"
-misc.create_dirs(model_path)
-torch.save({
-    'model_state': model.state_dict(),
-    'optimiser_state': optimiser.state_dict(),
-}, model_path+model_file_name)
+                torch.cuda.empty_cache()
+                total_examples += batch_size
+                total_loss += float(loss) * batch_size
+                train_outputs_fold = torch.cat((train_outputs_fold, outputs.detach().to(cpu)))
+                train_truth_labels_fold = torch.cat((train_truth_labels_fold, y.detach().to(cpu)))
+                train_wgts_fold = torch.cat((train_wgts_fold, event_wgts.detach().to(cpu)))
+                
+            avg_tr_loss = total_loss / total_examples
+            train_loss.append(avg_tr_loss)
 
-### compute ROC curve and AUC
-train_outputs = train_outputs.view(-1).to(device)
-train_label_bool = train_truth_labels.bool()
-train_sig_pred = train_outputs[train_label_bool]
-train_sig_wgts = train_wgts[train_label_bool]
-train_bkg_pred = train_outputs[torch.logical_not(train_label_bool)]
-train_bkg_wgts = train_wgts[torch.logical_not(train_label_bool)]
 
-train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
-train_auc = roc_auc_score(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
-print("Training AUC", train_auc)
+            ### start validation loop in the epoch
+            model.eval()
+            total_examples = total_loss = 0
+            val_outputs_fold= torch.tensor([]).to(cpu)
+            val_truth_labels_fold = torch.tensor([]).to(cpu)
+            val_wgts_fold = torch.tensor([]).to(cpu)
+            for batch in val_loader:
+                
+                batch = batch.to(device)
+                batch_size = batch.batch_size
+                outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
 
-val_outputs = val_outputs.view(-1).to(device)
-val_label_bool = val_truth_labels.bool()
-val_sig_pred = val_outputs[val_label_bool]
-val_sig_wgts = val_wgts[val_label_bool]
-val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
-val_bkg_wgts = val_wgts[torch.logical_not(val_label_bool)]
+                ### NOTE only consider predictions and labels of seed nodes
+                y = batch.y[:batch_size]
+                outputs = outputs[:batch_size]
+                event_wgts = batch.wgts[:batch_size]
 
-val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
-val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
-print("Validation AUC", val_auc)
+                loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
+                
+                total_examples += batch_size
+                total_loss += float(loss) * batch_size
+                val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach().to(cpu)))
+                val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach().to(cpu)))
+                val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach().to(cpu)))
 
-# save performance to json
-perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc, val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
-perf.save_metadata(len(train_sig), len(train_bkg), len(val_sig), len(val_bkg), hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
+            avg_vl_loss = total_loss / total_examples
+            val_loss.append(avg_vl_loss)
 
-logging.info("Plotting training/validation losses ...")
-fig_loss = plt.figure(figsize=(11, 9), constrained_layout=True)
-plt.style.use(hep.style.ATLAS)
-ax_loss = fig_loss.add_subplot()
-ax_loss.plot(np.arange(len(train_loss)), train_loss, label="Training loss")
-ax_loss.plot(np.arange(len(val_loss)), val_loss, label="Validation loss")
-ax_loss.legend(loc='upper right', fontsize=20)
-# ax_loss.text(0.02, 0.95, model_label, verticalalignment="bottom", size=20, transform=ax_loss.transAxes)
-ax_loss.set_xlabel("Epoch", loc="right")
-ax_loss.set_ylabel("Loss", loc="top")
-# ax_loss.set_yscale('log')
-misc.create_dirs(plot_path)
-logging.info("Saving plots to "+plot_path)
-fig_loss.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
+            current_lr = optimiser.param_groups[0]['lr']
+            scheduler.step(avg_vl_loss)
+            new_lr = optimiser.param_groups[0]['lr']
+            if new_lr < current_lr:
+                print(f"Learning rate reduced to: {new_lr}")
 
-logging.info("Plotting model outputs ...")
-fig, ax = plt.subplots()
-binning = np.linspace(0,1,51)
+            if avg_vl_loss < best_val_loss:
+                best_val_loss = avg_vl_loss
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                print(f"No improvement in validation loss for {patience_counter} epoch(s).")
 
-ax.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange", weights=train_sig_wgts.detach().cpu().numpy())
-ax.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue", weights=train_bkg_wgts.detach().cpu().numpy())
-ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange", weights=val_sig_wgts.detach().cpu().numpy())
-ax.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue", weights=val_bkg_wgts.detach().cpu().numpy())
+            print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
+        
+            if patience_counter >= patience_early_stopping:
+                print(f"Early stopping after {epoch+1} epochs.")
+                break
 
-score_path = score_path + model_label + "/"
-misc.create_dirs(score_path)
+        logging.info(f"Finished fold {fold_no}/{num_folds}")
+        logging.info(f"Number of epochs: {epoch+1}/{epochs}, Final train Loss: {avg_tr_loss}, final validation Loss: {avg_vl_loss}")
+        logging.info("Time taken so far: "+str(time.time()-st))
+        logging.info("Saving trained model and performance...")
+        model_file_name = f"model_fold_{fold_no}.pth"
+        # model_path= model_path+model_label+"/"
+        misc.create_dirs(model_path)
+        torch.save({
+            'model_state': model.state_dict(),
+            'optimiser_state': optimiser.state_dict(),
+            'normalisation_params': {"means": means, "stds": stds}
+        }, model_path+model_file_name)
 
-np.save(score_path+"train_sig_pred.npy", train_sig_pred.detach().cpu().numpy())
-np.save(score_path+"train_sig_wgts.npy", train_sig_wgts.detach().cpu().numpy())
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+        train_outputs = torch.cat((train_outputs, train_outputs_fold))
+        train_truth_labels = torch.cat((train_truth_labels, train_truth_labels_fold))
+        train_wgts = torch.cat((train_wgts, train_wgts_fold))
+        val_outputs = torch.cat((val_outputs, val_outputs_fold))
+        val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
+        val_wgts = torch.cat((val_wgts, val_wgts_fold))
+        del train_loader, val_loader, model, optimiser, scheduler
+        del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
+        torch.cuda.empty_cache()
+        gc.collect()
 
-np.save(score_path+"train_bkg_pred.npy", train_bkg_pred.detach().cpu().numpy())
-np.save(score_path+"train_bkg_wgts.npy", train_bkg_wgts.detach().cpu().numpy())
+        if single_fold == True:
+            print("Single fold training, breaking loop ...")
+            break
+finally:
+    logging.info("Training complete.")
+    print("train truth labels", len(train_truth_labels))
+    print("val truth labels", len(val_truth_labels))
 
-np.save(score_path+"val_sig_pred.npy", val_sig_pred.detach().cpu().numpy())
-np.save(score_path+"val_sig_wgts.npy", val_sig_wgts.detach().cpu().numpy())
 
-np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().cpu().numpy())
-np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().cpu().numpy())
 
-auc_text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc)]
-if signal == "hhh":
-    if len(hidden_sizes_gcn)<1:
-        text = auc_text + ["6b Resonant TRSM signal, 5b data"]
-    else:
+    ### compute ROC curve and AUC
+    train_outputs = train_outputs.view(-1)
+    train_label_bool = train_truth_labels.bool()
+    train_sig_pred = train_outputs[train_label_bool]
+    train_sig_wgts = train_wgts[train_label_bool]
+    train_bkg_pred = train_outputs[torch.logical_not(train_label_bool)]
+    train_bkg_wgts = train_wgts[torch.logical_not(train_label_bool)]
+
+    train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
+    if signal == "stau": ### stau fpr needs to be clipped and sorted due to rounding errors
+        train_fpr = np.clip(train_fpr, 0, 1)
+        train_fpr = np.sort(train_fpr)
+    train_auc = auc(train_fpr, train_tpr)
+    # train_auc = roc_auc_score(train_truth_labels.detach().cpu().numpy(), train_outputs.detach().cpu().numpy(), sample_weight = train_wgts.detach().cpu().numpy())
+    print("Training AUC", train_auc)
+
+    val_outputs = val_outputs.view(-1)
+    val_label_bool = val_truth_labels.bool()
+    val_sig_pred = val_outputs[val_label_bool]
+    val_sig_wgts = val_wgts[val_label_bool]
+    val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
+    val_bkg_wgts = val_wgts[torch.logical_not(val_label_bool)]
+
+    val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
+    if signal == "stau": ### stau fpr needs to be clipped and sorted due to rounding errors
+        val_fpr = np.clip(val_fpr, 0, 1)
+        val_fpr = np.sort(val_fpr)
+    val_auc = auc(val_fpr, val_tpr)
+    #  val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
+    print("Validation AUC", val_auc)
+
+    # save performance to json
+    perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc, val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
+    # perf.save_metadata(len(train_sig), len(train_bkg), len(val_sig), len(val_bkg), hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
+    perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), num_folds, hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
+
+    logging.info("Plotting training/validation losses ...")
+    fig, ax = plt.subplots()
+    x_epoch = numpy.arange(1,epochs+1,1)
+    for loss_loop, (train_loss, val_loss) in enumerate(zip(train_losses, val_losses)):
+        train_line, = ax.plot(np.arange(len(train_loss)), train_loss, label="Fold " + str(loss_loop) + " (Train)")
+        colour = train_line.get_color()
+        ax.plot(np.arange(len(val_loss)), val_loss, label="Fold " + str(loss_loop) + " (Val)", color=colour, linestyle = "-.")
+    ax.legend(loc='upper right', fontsize=9)
+    ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
+    ax.set_xlabel("Epoch", loc="right")
+    ax.set_ylabel("Loss", loc="top")
+    misc.create_dirs(plot_path)
+    logging.info("Saving plots to "+plot_path)
+    fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
+
+    logging.info("Plotting model outputs ...")
+    fig, ax = plt.subplots()
+    binning = np.linspace(0,1,51)
+
+    # ### save histograms values
+    # train_sig_pred_hist, bin_edges = np.histogram(train_sig_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
+    # train_bkg_pred_hist, _ = np.histogram(train_bkg_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
+    # val_sig_pred_hist, _ = np.histogram(val_sig_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
+    # val_bkg_pred_hist, _ = np.histogram(val_bkg_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
+    # np.save(plot_path+"bin_edges.npy", bin_edges)
+    # np.save(plot_path+"train_sig_pred_hist.npy", train_sig_pred_hist)
+    # np.save(plot_path+"train_bkg_pred_hist.npy", train_bkg_pred_hist)
+    # np.save(plot_path+"val_sig_pred_hist.npy", val_sig_pred_hist)
+    # np.save(plot_path+"val_bkg_pred_hist.npy", val_bkg_pred_hist)
+
+    ax.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange", weights=train_sig_wgts.detach().cpu().numpy())
+    ax.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue", weights=train_bkg_wgts.detach().cpu().numpy())
+    ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange", weights=val_sig_wgts.detach().cpu().numpy())
+    ax.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue", weights=val_bkg_wgts.detach().cpu().numpy())
+
+    score_path = score_path + model_label + "/"
+    misc.create_dirs(score_path)
+
+    np.save(score_path+"train_sig_pred.npy", train_sig_pred.detach().cpu().numpy())
+    np.save(score_path+"train_sig_wgts.npy", train_sig_wgts.detach().cpu().numpy())
+
+    np.save(score_path+"train_bkg_pred.npy", train_bkg_pred.detach().cpu().numpy())
+    np.save(score_path+"train_bkg_wgts.npy", train_bkg_wgts.detach().cpu().numpy())
+
+    np.save(score_path+"val_sig_pred.npy", val_sig_pred.detach().cpu().numpy())
+    np.save(score_path+"val_sig_wgts.npy", val_sig_wgts.detach().cpu().numpy())
+
+    np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().cpu().numpy())
+    np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().cpu().numpy())
+
+    if signal == "hhh":
         if eff is not None:
-            text = auc_text+["6b Resonant TRSM signal, 5b data", "Linking length at sig-sig efficiency "+str(eff)]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length at sig-sig efficiency "+str(eff)]
         elif linking_length is not None:
-            text = auc_text+["6b Resonant TRSM signal, 5b data", "Linking length "+str(linking_length)]
-elif signal == "stau":
-    if len(hidden_sizes_gcn)<1:
-        text = auc_text, "stau stau signal"
-    else:
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length "+str(linking_length)]
+    elif signal == "stau":
         if eff is not None:
-            text = auc_text+["stau stau signal", "Linking length at sig-sig efficiency "+str(eff)]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", "Linking length at sig-sig efficiency "+str(eff)]
         elif linking_length is not None:
-            text = auc_text+["stau stau signal", "Linking length "+str(linking_length)]
-elif signal == "LQ":
-    if len(hidden_sizes_gcn)<1:
-        text = auc_text+["LQ signal"]
-    else:
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", "Linking length "+str(linking_length)]
+    elif signal == "LQ":
         if eff is not None:
-            text = auc_text+["LQ signal", "Linking length at sig-sig efficiency "+str(eff)]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", "Linking length at sig-sig efficiency "+str(eff)]
         elif linking_length is not None:
-            text = auc_text+["LQ signal", "Linking length "+str(linking_length)]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", "Linking length "+str(linking_length)]
 
-plotting.add_text(ax, text, doATLAS=False, startx=0.03, starty=0.95)
-ax.legend(loc='upper right', fontsize=12)
-ax.set_xlabel("Output score", loc="right")
-ax.set_ylabel("Normalised No. Events", loc="top")
-ymin, ymax = ax.get_ylim()
-ax.set_ylim((0, ymax*1.2))
-fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_pred.pdf", transparent=True)
+    plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
+    ax.legend(loc='upper right', fontsize=9)
+    ax.set_xlabel("Output score", loc="right")
+    ax.set_ylabel("Normalised No. Events", loc="top")
+    ymin, ymax = ax.get_ylim()
+    ax.set_ylim((ymin, ymax*1.2))
+    fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_pred.pdf", transparent=True)
 
-logging.info("Plotting ROC curves ...")
-fig, ax = plt.subplots()
-plt.plot(train_fpr, train_tpr, label='Training ROC curve (AUC = {:.3f})'.format(train_auc))
-plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
-plt.legend(loc="upper left", fontsize=12)
-plt.xlim(0,1)
-plt.xlabel("Background Efficiency", loc="right")
-plt.ylabel("Signal Efficiency", loc="top")
-fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_ROC.pdf", transparent=True)
+    logging.info("Plotting ROC curves ...")
+    fig, ax = plt.subplots()
+    plt.plot(train_fpr, train_tpr, label='Training ROC curve (AUC = {:.3f})'.format(train_auc))
+    plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
+    plt.legend(loc="upper left", fontsize=9)
+    plt.xlim(0,1)
+    plt.xlabel("Background Efficiency", loc="right")
+    plt.ylabel("Signal Efficiency", loc="top")
+    fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_ROC.pdf", transparent=True)

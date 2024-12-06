@@ -22,6 +22,7 @@ def get_plot_labels(signal_type):
         signal = "Leptoquark signal"
         background = r"$t\bar{t}$ and Single top"
     elif signal_type == "stau":
+        signal = "StauStau signal"
         background = r"$W$ jets, $Z\rightarrow ll$ jets, Diboson (0$l$, 1$l$, 2$l$, 3$l$, 4$l$), Triboson, Higgs, Single top, $t\bar{t}V$, $t\bar{t}$"
     return signal, background
 

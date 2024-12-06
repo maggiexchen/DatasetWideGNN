@@ -112,3 +112,18 @@ def save_metadata(train_sig_size, train_bkg_size, val_sig_size, val_bkg_size, hi
     with open(save_path, "w") as outfile:
         json.dump(meta_dict, outfile)
     
+def save_metadata_kfold(full_sig_size, full_bkg_size, num_folds, hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, path):
+    meta_dict = {
+        'full_sig_size': full_sig_size,
+        'full_bkg_size': full_bkg_size,
+        'num_folds': num_folds,
+        'hidden_sizes_gcn': hidden_sizes_gcn,
+        'hidden_sizes_mlp': hidden_sizes_mlp,
+        'LR': LR,
+        'dropout_rates': dropout_rates,
+        'epochs': epochs
+    }
+    save_path = path+"metadata.json"
+    with open(save_path, "w") as outfile:
+        json.dump(meta_dict, outfile)
+    

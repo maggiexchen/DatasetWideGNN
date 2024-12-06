@@ -19,18 +19,21 @@ logging.getLogger().setLevel(logging.INFO)
 import psutil
 process = psutil.Process()
 
+cpu = torch.device('cpu')
+device = torch.device('cuda:0')
 
-def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"):
+
+def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ"):
     """
     Function to load our sign and bkg data into pandas dataframes
 
     Args:
         h5_path (str): path for input file directory
         plot_path (str): path for output plot directory
-        f_type (str): input file extension
         kinematics (list(str)): list of kinematic variables to load as dataframe columns
-        plot (bool): flag to plot raw and standardised kinematics
-        signal (str): type of signal, to determine the bkgs present
+        ex (str): input file extension, default is empty
+        plot (bool): flag to plot raw and standardised kinematics, default is False
+        signal (str): type of signal, to determine the bkgs present, default is LQ
     Returns:
         (torch.tensor(float32)): signal events/kinematics tensor
         (torch.tensor(float32)): background events/kinematics tensor
@@ -40,26 +43,37 @@ def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"
         (torce.tensor(float32)): all event truth labels ie. 1 for sig, 0 for bkg
     """
     signal_label, background_label = plotting.get_plot_labels(signal)
-    bkg_typedict = {"hhh": ["bkg"], "LQ": ["singletop", "ttbar"], 
-                    "stau": ['Wjets','Zlljets','Zttjets','diboson0L','diboson1L', 
-                              'diboson2L','diboson3L','diboson4L', 'higgs',
-                                'singletop','topOther','triboson','ttV','ttbar_incl']}
-    bkg_types = bkg_typedict[signal]
-
+    bkg_types = misc.get_background_types(signal)
+    
+    if len(ex) > 0:
+        ex = "_"+ex
     if signal == "stau":
-        df_sig = pd.read_hdf(h5_path+"/StauStau_"+str(f_type)+".h5")
-        df_sig = misc.sig_mass_point(df_sig, mass_points = ['100_50'])
+        logging.info("Loading stau signal sample(s) ...")
+        camps = ["mc20a", "mc20d","mc20e"]
+        df_sig = pd.DataFrame()
+        for camp in camps:
+            df_sig_camp = pd.read_hdf(h5_path+"/StauStau_"+camp+str(ex)+".h5")
+            df_sig_camp = misc.sig_mass_point(df_sig_camp, mass_points = ['100_50'])
+            df_sig_camp = misc.stau_selections(df_sig_camp)
+            df_sig = pd.concat([df_sig, df_sig_camp], ignore_index=True, axis=0)
     else:
-        df_sig =  pd.read_hdf(h5_path+"/sig_"+str(f_type)+".h5", key="sig_"+str(f_type))
+        df_sig =  pd.read_hdf(h5_path+str(signal)+str(ex)+".h5", key=str(signal)+str(ex))
     
     df_bkg = pd.DataFrame()
     if signal == "stau":
         for bkg in bkg_types:
-            tmp_df_bkg = pd.read_hdf(h5_path+"/"+bkg+"_"+str(f_type)+".h5")
+            print(f"loading {bkg} background sample for {ex}")
+            camps = ["mc20a", "mc20d","mc20e"]
+            tmp_df_bkg = pd.DataFrame()
+            for camp in camps:
+                tmp_df_bkg_camp = pd.read_hdf(h5_path+bkg+"_"+camp+str(ex)+".h5")
+                tmp_df_bkg_camp = misc.stau_selections(tmp_df_bkg_camp)
+                tmp_df_bkg = pd.concat([tmp_df_bkg, tmp_df_bkg_camp], ignore_index=True, axis=0)
             df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
+            
     else:
         for bkg in bkg_types:
-            tmp_df_bkg = pd.read_hdf(h5_path+"/"+bkg+"_"+str(f_type)+".h5", key=bkg+"_"+str(f_type))
+            tmp_df_bkg = pd.read_hdf(h5_path+bkg+str(ex)+".h5", key=bkg+str(ex))
             df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
 
     ### get event weights
@@ -72,33 +86,47 @@ def data_loader(h5_path, plot_path, f_type, kinematics, plot=False, signal="hhh"
 
     df_sig = df_sig[kinematics]
     df_bkg = df_bkg[kinematics]
-    df_all = pd.concat([df_sig, df_bkg], axis=0)
+    # df_all = pd.concat([df_sig, df_bkg], axis=0)
     # set truth labels for is signal
     sig_label = [1]*len(df_sig)
     bkg_label = [0]*len(df_bkg)
-    # Standardising kinematics
-    for var in kinematics:
-        if plot:
-            df_sig = df_all.iloc[:len(df_sig)]
-            df_bkg = df_all.iloc[len(df_sig):]
+    # # Standardising kinematics
+    # for var in kinematics:
+    #     if plot:
+    #         df_sig = df_all.iloc[:len(df_sig)]
+    #         df_bkg = df_all.iloc[len(df_sig):]
+    #         plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=False)
+    #     print(f"-----> Standardising {var}:")
+    #     standardised_values = norm.standardise(df_all.loc[:, var])
+    #     standardised_values = norm.standardise(df_all.loc[:, var])
+    #     df_all.loc[:, var] = standardised_values.astype('float32')  # convert to float32
+    #     df_sig = df_all.iloc[:len(df_sig)]
+    #     df_bkg = df_all.iloc[len(df_sig):]
+    #     if plot:
+    #         plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=True)
+    
+    # plot kinematics
+    if plot:
+        for var in kinematics:
             plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=False)
-        print(f"-----> Standardising {var}:")
-        standardised_values = norm.standardise(df_all.loc[:, var])
-        standardised_values = norm.standardise(df_all.loc[:, var])
-        df_all.loc[:, var] = standardised_values  # convert to float32
-        df_sig = df_all.iloc[:len(df_sig)]
-        df_bkg = df_all.iloc[len(df_sig):]
-        if plot:
-            plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=True)
+        # print(f"-----> Standardising {var}:")
+        # standardised_values = norm.standardise(df_all.loc[:, var])
+        # standardised_values = norm.standardise(df_all.loc[:, var])
+        # df_all.loc[:, var] = standardised_values  # convert to float32
+        # df_sig = df_all.iloc[:len(df_sig)]
+        # df_bkg = df_all.iloc[len(df_sig):]
+        # if plot:
+        #     plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=True)
+    
     # convert pd dataframes to torch tensors
-    torch_sig = torch.tensor(df_sig.values, dtype=torch.float32)
-    torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32)
-    torch_sig_wgts = torch.tensor(df_sig_wgts.values, dtype=torch.float32)
-    torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32)
+    torch_sig = torch.tensor(df_sig.values, dtype=torch.float32).to(cpu)
+    torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32).to(cpu)
+    torch_sig_wgts = torch.tensor(df_sig_wgts.values, dtype=torch.float32).to(cpu)
+    torch_bkg_wgts = torch.tensor(df_bkg_wgts.values, dtype=torch.float32).to(cpu)
     # concatenating signal and background events
     torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
 
-    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label), torch.tensor(bkg_label)
+    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label).to(cpu), torch.tensor(bkg_label).to(cpu)
 
 
 def create_adj_mat(a, length):
