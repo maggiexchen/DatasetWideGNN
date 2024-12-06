@@ -5,11 +5,20 @@
 # signal model hhh, LQ, stau
 signal: LQ
 variable: LQ
+
+signal: LQ
+signal_mass: 1000
+backgrounds: ["singletop", "ttbar"]
+cuts:
+  met:
+    threshold: 200
+    operation: ">"
+
 feature_dim:
 
 # input paths
-ntuple_path: /data/atlas/atlasdata3/maggiechen/LQ_ntuples/
-h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/MetCut200/
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
+h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large/embedding/
 
 # save paths
 model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/models/same_class_clustering/MetCut200/
