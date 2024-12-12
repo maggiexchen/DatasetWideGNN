@@ -78,6 +78,7 @@ def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, labe
     ax.legend(loc='upper right')
     ax.set_xlabel(var+" "+distance +" distance", loc="right")
     ax.set_ylabel("Normalised event pairs / bin", loc="top")
+    # ax.set_yscale('log')
     # save
     if label!="": label = "_"+label
     exts = [".pdf"]
@@ -236,7 +237,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
 def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, ss_thresholds, sig_label, bkg_label, plot_path, variable, distance, sigsig_eff):
     fig, ax = plt.subplots()
     nBins = 50
-    binning = np.linspace(0,1500,nBins)
+    binning = np.linspace(0, torch.max(torch.cat((sigsig, sigbkg, bkgbkg))), nBins)
     ax.hist(sigsig, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
     ax.hist(sigbkg, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="darkorange")
     ax.hist(bkgbkg, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt, alpha=0.5, density=True, color="forestgreen")
@@ -252,7 +253,6 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
         ax.text(x=ss_thresholds[i], y=0.65+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label, ha='center', va='bottom', fontsize=7)
     ax.legend(loc='upper right')
     ax.set_ylim(y_min, y_max*1.2)
-    ax.set_xlim(x_min, x_max)
     ax.set_xlabel(variable + " " + distance +" distance", loc="right")
     ax.set_ylabel("Normalised # event pairs / bin", loc="top")
     ssbb_path = plot_path+"linking_lengths/"
