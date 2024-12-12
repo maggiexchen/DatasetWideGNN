@@ -4,17 +4,23 @@
 
 # signal model hhh, LQ, stau
 signal: LQ
-feature_dim:
+signal_mass: 1000
+backgrounds: ["singletop", "ttbar"]
+cuts:
+  met:
+    threshold: 200
+    operation: ">"
+feature_dim: 18
 
 # input paths
-ntuple_path: /data/atlas/atlasdata3/maggiechen/LQ_ntuples/
-feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/sigsig_clustering/
-kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/LowLevelKinematics/
-ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/linking_lengths/ 
-dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/distances/
-score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/output_scores/
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
+feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/same_class_clustering/MetCut200/
+kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/linking_lengths/ 
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/plots/ 
-adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/sigsig_clustering/models/ 
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/plots/ 
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/models/ 
