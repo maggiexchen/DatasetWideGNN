@@ -143,15 +143,8 @@ elif linking_length is not None:
 logging.info('Importing signal and background files...')
 
 # normalised signal and background kinematics
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, _, _  = adj.data_loader(kinematic_h5_path, plot_path, "train", kinematics, plot=True, signal=signal)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, _, _ = adj.data_loader(kinematic_h5_path, plot_path, "val", kinematics, plot=False, signal=signal)
-test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, _, _ = adj.data_loader(kinematic_h5_path, plot_path, "test", kinematics, plot=False, signal=signal)
-
-full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
-full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
-
-full_x = torch.cat((full_sig, full_bkg), dim=0).to(device)
-full_wgts = torch.cat((torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0), torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)), dim=0)#.cuda()
+logging.info('Importing signal and background files...')
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, standardisation=True)\
 
 print("numevents: ",full_x.size(0))
 

@@ -64,9 +64,8 @@ dist_path = user_config["dist_path"]
 
 signal = user_config["signal"]
 feature_dim = user_config["feature_dim"]
-assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {signal}"
+assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 
-logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("signal: "+signal)
 logging.info("variable set: "+variable)
@@ -78,17 +77,12 @@ kinematics = misc.get_kinematics(variable, feature_dim)
 # load in input files
 logging.info('Importing signal and background files...')
 if signal == "hhh": SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_sig_labels, train_truth_bkg_labels = adj.data_loader(feature_h5_path, plot_path, "train", kinematics, signal=signal, plot=True)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_sig_labels, val_truth_bkg_labels = adj.data_loader(feature_h5_path, plot_path, "val", kinematics, signal=signal)
-test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels, test_truth_bkg_labels = adj.data_loader(feature_h5_path, plot_path, "test", kinematics, signal=signal)
 
-full_sig = torch.cat((train_sig, val_sig, test_sig), dim=0)
-full_bkg = torch.cat((train_bkg, val_bkg, test_bkg), dim=0)
-sig_wgt = torch.cat((train_sig_wgts, val_sig_wgts, test_sig_wgts), dim=0)
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, standardisation=False)
 
 global_bkg_wgt = 1.0
 if signal == "hhh": global_bkg_wgt = SF_4b5b
-bkg_wgt = torch.cat((train_bkg_wgts, val_bkg_wgts, test_bkg_wgts), dim=0)*global_bkg_wgt
+bkg_wgt = bkg_wgt*global_bkg_wgt
 
 # calculate distances in batches
 logging.info('Calculating distances in batches...')
