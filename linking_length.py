@@ -44,7 +44,7 @@ def GetParser():
         "--flip",
         "-f",
         action="store_true",
-        help="Choose whether to flip the ROC curve definition, flip if the sigsig distances are mostly smaller than the bkgbkg distances",
+        help="Choose whether to flip the ROC curve definition, flip if you want to connect events that are similar",
     )
 
     parser.add_argument(
@@ -128,7 +128,6 @@ roc_name = roc_path+variable+"_"+distance+"_ROC.json"
 with open(roc_name, "w") as outfile:
     json.dump(roc_dict, outfile)
 
-# pick sig-sig efficiencies at 0.6, 0.7, 0.8, 0.9
 # TODO: finer granularity for linking length scan?
 sigsig_eff = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 eff_labels = ["20%", "30%","40%", "50%","60%", "70%", "80%", "90%"]
