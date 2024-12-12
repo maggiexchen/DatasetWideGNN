@@ -45,6 +45,7 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", 
     """
     signal_label, background_label = plotting.get_plot_labels(signal)
     bkg_types = misc.get_background_types(signal)
+    print("Loading for kinematics: ", kinematics)
     
     if len(ex) > 0:
         ex = "_"+ex
@@ -88,12 +89,12 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", 
 
     df_sig = df_sig[kinematics]
     df_bkg = df_bkg[kinematics]
-    # df_all = pd.concat([df_sig, df_bkg], axis=0)
     # set truth labels for is signal
     sig_label = [1]*len(df_sig)
     bkg_label = [0]*len(df_bkg)
     if standardisation:
         # Standardising kinematics
+        df_all = pd.concat([df_sig, df_bkg], axis=0)
         for var in kinematics:
             if plot:
                 df_sig = df_all.iloc[:len(df_sig)]
@@ -106,20 +107,11 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", 
             df_bkg = df_all.iloc[len(df_sig):]
             if plot:
                 plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=True)
-    
-    # plot kinematics
+            
     if plot:
         for var in kinematics:
-            plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=False)
-        # print(f"-----> Standardising {var}:")
-        # standardised_values = norm.standardise(df_all.loc[:, var])
-        # standardised_values = norm.standardise(df_all.loc[:, var])
-        # df_all.loc[:, var] = standardised_values  # convert to float32
-        # df_sig = df_all.iloc[:len(df_sig)]
-        # df_bkg = df_all.iloc[len(df_sig):]
-        # if plot:
-        #     plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=True)
-    
+            plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=False)\
+
     # convert pd dataframes to torch tensors
     torch_sig = torch.tensor(df_sig.values, dtype=torch.float32).to(cpu)
     torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32).to(cpu)
