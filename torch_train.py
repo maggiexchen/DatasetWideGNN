@@ -25,7 +25,7 @@ import pdb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, Subset
 import torch.optim as optim
 from torch.utils.checkpoint import checkpoint
 # from torchinfo import summary
@@ -44,7 +44,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 
 torch.cuda.empty_cache()
-torch.manual_seed(42)
+torch.manual_seed(20)
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -101,6 +101,10 @@ train_config_path = args.MLconfig
 train_config = misc.load_config(train_config_path)
 print("Using training config ",train_config)
 hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
+if len(hidden_sizes_gcn) > 0:
+    gnn = True
+else:
+    gnn = False
 hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
 patience_LR = train_config["patience_LR"]
@@ -221,7 +225,7 @@ logging.info("Time taken so far: "+str(time.time()-st))
 
 ### load edge indices if gnn layers are used
 edge_ind = None
-if len(hidden_sizes_gcn) > 0:
+if gnn:
     print("constructing sparse adjacency matrix ...")
     print("loading row indices ...")
     row_ind = torch.load(adj_path+'row_ind.pt')
@@ -309,28 +313,25 @@ try:
         all_labels = data_standardised.y[train_idx].cpu().numpy()
         all_wgts = data_standardised.wgts[train_idx].cpu().numpy()
         class_weights = binary_class_weights(all_labels, all_wgts).to(device)
-        print("class weights", class_weights)
-
-        logging.info("Graph sub-sampling for training ...")
+        print("Training class weights: signal - ", class_weights[1], ", backgrounds - ", class_weights[0])
+        
+        if gnn:
+            logging.info("Graph sub-sampling for training and validation ...")
+        else:
+            logging.info("Loading for training and validation ...")
         train_loader = NeighborLoader(
             data_standardised,
             input_nodes = train_idx,
             num_neighbors = num_nb_list,
             shuffle = True,
             batch_size = batch_size,
-            # num_workers = 6, 
-            # persistent_workers = True
         )
-
-        logging.info("Graph sub-sampling for validation ...")
         val_loader = NeighborLoader(
             data_standardised,
             input_nodes = val_idx,
             num_neighbors = num_nb_list,
             shuffle = False,
             batch_size = batch_size,
-            # num_workers = 6,
-            # persistent_workers = True
         )
 
         best_val_loss = float('inf')
@@ -345,7 +346,6 @@ try:
             train_truth_labels_fold = torch.tensor([]).to(cpu)
             train_wgts_fold = torch.tensor([]).to(cpu)
             for batch in train_loader:
-
                 optimiser.zero_grad()
                 batch = batch.to(device)
                 batch_size = batch.batch_size
@@ -414,7 +414,7 @@ try:
                 print(f"No improvement in validation loss for {patience_counter} epoch(s).")
 
             print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss}, Validation Loss: {avg_vl_loss}')
-
+        
             if patience_counter >= patience_early_stopping:
                 print(f"Early stopping after {epoch+1} epochs.")
                 break
@@ -440,11 +440,14 @@ try:
         val_outputs = torch.cat((val_outputs, val_outputs_fold))
         val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
         val_wgts = torch.cat((val_wgts, val_wgts_fold))
+        del train_loader, val_loader, model, optimiser, scheduler
+        del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
+        torch.cuda.empty_cache()
+        gc.collect()
 
         if single_fold == True:
             print("Single fold training, breaking loop ...")
-            break    
-    
+            break
 finally:
     logging.info("Training complete.")
     print("train truth labels", len(train_truth_labels))
@@ -491,15 +494,10 @@ finally:
     logging.info("Plotting training/validation losses ...")
     fig, ax = plt.subplots()
     x_epoch = numpy.arange(1,epochs+1,1)
-    loss_loop = 0
-    for train_loss, val_loss in zip(train_losses, val_losses):
-        if loss_loop == 0:
-            ax.plot(np.arange(len(train_loss)), train_loss, label="Training loss", color="b")
-            ax.plot(np.arange(len(val_loss)), val_loss, label="Validation loss", color="r")
-        else:
-            ax.plot(np.arange(len(train_loss)), train_loss, color="b")
-            ax.plot(np.arange(len(val_loss)), val_loss, color="r")
-        loss_loop += 1
+    for loss_loop, (train_loss, val_loss) in enumerate(zip(train_losses, val_losses)):
+        train_line, = ax.plot(np.arange(len(train_loss)), train_loss, label="Fold " + str(loss_loop) + " (Train)")
+        colour = train_line.get_color()
+        ax.plot(np.arange(len(val_loss)), val_loss, label="Fold " + str(loss_loop) + " (Val)", color=colour, linestyle = "-.")
     ax.legend(loc='upper right', fontsize=9)
     ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
     ax.set_xlabel("Epoch", loc="right")
