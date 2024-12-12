@@ -77,6 +77,7 @@ CUDA_LAUNCH_BLOCKING=1
 # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 # print(torch.cuda.mem_get_info())
 device = torch.device('cpu')
+cpu = torch.device('cpu')
 # set random seed for training
 torch.manual_seed(42)
 
@@ -213,7 +214,7 @@ elif linking_length is not None:
 logging.info('Importing signal and background files...')
 
 # normal loading setup
-full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal=signal)
+full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal)
 
 print("full sig size", full_sig.size())
 print("full bkg size", full_bkg.size())
@@ -448,7 +449,7 @@ try:
         val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
         val_wgts = torch.cat((val_wgts, val_wgts_fold))
         del train_loader, val_loader, model, optimiser, scheduler
-        del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
+        # del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
         torch.cuda.empty_cache()
         gc.collect()
 
@@ -511,7 +512,7 @@ finally:
     ax.set_ylabel("Loss", loc="top")
     misc.create_dirs(plot_path)
     logging.info("Saving plots to "+plot_path)
-    fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
+    fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
 
     logging.info("Plotting model outputs ...")
     fig, ax = plt.subplots()
@@ -570,7 +571,7 @@ finally:
     ax.set_ylabel("Normalised No. Events", loc="top")
     ymin, ymax = ax.get_ylim()
     ax.set_ylim((ymin, ymax*1.2))
-    fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_pred.pdf", transparent=True)
+    fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_pred.pdf", transparent=True)
 
     logging.info("Plotting ROC curves ...")
     fig, ax = plt.subplots()
@@ -580,4 +581,4 @@ finally:
     plt.xlim(0,1)
     plt.xlabel("Background Efficiency", loc="right")
     plt.ylabel("Signal Efficiency", loc="top")
-    fig.savefig(plot_path+variable+"_"+model_label+"_training_validation_ROC.pdf", transparent=True)
+    fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_ROC.pdf", transparent=True)
