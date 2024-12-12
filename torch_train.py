@@ -305,7 +305,8 @@ try:
 
         ### standardise input data to training set and move to cpu after standardisation
         means, stds = misc.get_train_mean_std(full_x[train_idx])
-        data.x = misc.torch_standardise(data.x, means, stds)
+        data_standardised = data.clone()
+        data_standardised.x = misc.torch_standardise(data_standardised.x, means, stds)
         means, stds = means.to(cpu), stds.to(cpu)
 
         model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
@@ -318,8 +319,8 @@ try:
         train_loss = []
         val_loss = []
 
-        all_labels = data.y[train_idx].cpu().numpy()
-        all_wgts = data.wgts[train_idx].cpu().numpy()
+        all_labels = data_standardised.y[train_idx].cpu().numpy()
+        all_wgts = data_standardised.wgts[train_idx].cpu().numpy()
         class_weights = binary_class_weights(all_labels, all_wgts).to(device)
         print("Training class weights: signal - ", class_weights[1], ", backgrounds - ", class_weights[0])
         
@@ -328,14 +329,14 @@ try:
         else:
             logging.info("Loading for training and validation ...")
         train_loader = NeighborLoader(
-            data,
+            data_standardised,
             input_nodes = train_idx,
             num_neighbors = num_nb_list,
             shuffle = True,
             batch_size = batch_size,
         )
         val_loader = NeighborLoader(
-            data,
+            data_standardised,
             input_nodes = val_idx,
             num_neighbors = num_nb_list,
             shuffle = False,
