@@ -66,12 +66,10 @@ embedding_dim = user_config["embedding_dim"]
 
 # load in input files
 logging.info('Importing signal and background files...')
-train_sig, train_bkg, train_x, train_sig_wgts, train_bkg_wgts, train_truth_sig_labels, train_truth_bkg_labels = adj.data_loader(h5_path, "", kinematics,  ex="train", signal=signal, plot=False, standardisation=True)
-val_sig, val_bkg, val_x, val_sig_wgts, val_bkg_wgts, val_truth_sig_labels, val_truth_bkg_labels = adj.data_loader(h5_path, "", kinematics, ex="val", signal=signal, plot=False, standardisation=True)
-test_sig, test_bkg, test_x, test_sig_wgts, test_bkg_wgts, test_truth_sig_labels, test_truth_bkg_labels = adj.data_loader(h5_path, "", kinematics, ex="test", signal=signal, plot=False, standardisation=True)
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, standardisation=True)
 
-train_pairs= PairDataset(train_sig, train_bkg, 200, 200)
-val_pairs = PairDataset(val_sig, val_bkg, 100, 100)
+train_pairs= PairDataset(full_sig, full_bkg, 200, 200)
+val_pairs = PairDataset(full_sig, full_bkg, 100, 100)
 print("training pairs", len(train_pairs))
 print("validation pairs", len(val_pairs))
 
@@ -165,10 +163,10 @@ torch.save({
 }, model_path+model_file_name)
 
 with torch.no_grad():
-    sig_sample_ind = torch.randperm(len(test_sig))[:250]
-    bkg_sample_ind = torch.randperm(len(test_bkg))[:250]
-    test_data = torch.cat((test_sig[sig_sample_ind], test_bkg[bkg_sample_ind]), dim=0)
-    test_labels = torch.cat((test_truth_sig_labels[sig_sample_ind], test_truth_bkg_labels[bkg_sample_ind]), dim=0)
+    sig_sample_ind = torch.randperm(len(full_sig))[:250]
+    bkg_sample_ind = torch.randperm(len(full_bkg))[:250]
+    test_data = torch.cat((full_sig[sig_sample_ind], full_bkg[bkg_sample_ind]), dim=0)
+    test_labels = torch.cat((sig_labels[sig_sample_ind], bkg_labels[bkg_sample_ind]), dim=0)
     test_embeddings = model(test_data)
 
 def embedded_euclidean_dist(embeddings, labels):
