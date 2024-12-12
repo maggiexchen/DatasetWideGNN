@@ -29,10 +29,10 @@ def euclidean(a, b):
     Returns:
         (float) euclidean distance
     """
-    a_expanded = torch.unsqueeze(a, dim=1).to(torch.float16)
-    b_expanded = torch.unsqueeze(b, dim=0).to(torch.float16)
+    a_expanded = torch.unsqueeze(a, dim=1).to(torch.float32)
+    b_expanded = torch.unsqueeze(b, dim=0).to(torch.float32)
 
-    return torch.sqrt(torch.sum(torch.square(a_expanded-b_expanded),dim=-1)).to(torch.float16)
+    return torch.sqrt(torch.sum(torch.square(a_expanded-b_expanded),dim=-1)).to(torch.float32)
 
 def cityblock(a, b):
     """
