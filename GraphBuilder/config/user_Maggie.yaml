@@ -5,28 +5,40 @@
 # signal model hhh, LQ, stau
 signal: LQ
 variable: LQ
-
-signal: LQ
 signal_mass: 1000
 backgrounds: ["singletop", "ttbar"]
 cuts:
   met:
-    threshold: 200
+    threshold: 0
     operation: ">"
 
 feature_dim:
 
-# input paths
+# # input paths
+# ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
+# h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large/MetCut200/
+
+# # save paths
+# model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/models/same_class_clustering/MetCut200/
+# plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/scan_plots/same_class_clustering/MetCut200/
+# embedding_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/same_class_clustering/MetCut200/
+# # training parameters
+# margin: 2.0
+# LR: 0.01
+# embedding_dim: 18
+# epoch: 30
+# penalty: 20
+
 ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
-h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large/embedding/
+h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large/
 
 # save paths
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/models/same_class_clustering/MetCut200/
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/scan_plots/same_class_clustering/MetCut200/
-embedding_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/same_class_clustering/MetCut200/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/models/same_class_clustering/LowLevelKinematics/
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/scan_plots/same_class_clustering/LowLevelKinematics/
+embedding_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/same_class_clustering/noMETcut/
 # training parameters
 margin: 2.0
 LR: 0.01
-embedding_dim: 18
+embedding_dim: 12
 epoch: 30
 penalty: 20
