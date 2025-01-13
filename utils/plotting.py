@@ -113,11 +113,11 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var, file_path, s
         add_text(ax, ["Signal - "+sig_label, "Background - "+bkg_label])
         plot_name = "/"
         binning = np.linspace(min(min(df_sig.loc[:, var]), min(df_bkg.loc[:, var])), max(max(df_sig.loc[:, var]), max(df_bkg.loc[:, var])), 50)
-        bool_density = False
-    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal", alpha=0.3, color="red", density=bool_density)
+        bool_density = True
     yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background", alpha=0.3, color="steelblue", density=bool_density)
+    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal", alpha=0.3, color="red", density=bool_density)
     ax.legend(loc='upper right')
-    ax.set_ylim([0.01, 1.2*max(max(ys),max(yb))])
+    ax.set_ylim([0, 1.2*max(max(ys),max(yb))])
     ax.set_xlabel("\n"+str(var), loc="right")
     if bool_density:
         ax.set_ylabel("Normalised Events / Bin", loc="top")
