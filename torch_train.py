@@ -44,7 +44,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 
 torch.cuda.empty_cache()
-torch.manual_seed(20)
+torch.manual_seed(42)
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -183,6 +183,8 @@ else:
             + "_e" + str(epochs)\
             + nf_str
     
+if gnn == False:
+    plot_path = plot_path + "/MLP" + model_label + "/"
 plot_path = plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
@@ -219,14 +221,14 @@ full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_
 print("full sig size", full_sig.size())
 print("full bkg size", full_bkg.size())
 
-full_x = full_x.to(device)
-full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
+full_x = full_x
+full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0)
 del full_sig, full_bkg, full_sig_labels, full_bkg_labels
 
 print("full sig wgts", full_sig_wgts.sum())
 print("full bkg wgts", full_bkg_wgts.sum())
 
-full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0).to(device)
+full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
 del full_sig_wgts, full_bkg_wgts
 
 logging.info("Loaded signal and background data.")
@@ -241,7 +243,7 @@ if gnn:
     print("loading col indices ...")
     col_ind = torch.load(adj_path+'col_ind.pt')
     print("stacking row and col indices ...")
-    edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64).to(device)
+    edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64)
     print("deleting row and col indices ...")
     del row_ind
     del col_ind
@@ -288,12 +290,12 @@ try:
     fold_no = 0
     train_losses = []
     val_losses = []
-    train_outputs = torch.tensor([]).to(cpu)
-    train_truth_labels = torch.tensor([]).to(cpu)
-    train_wgts = torch.tensor([]).to(cpu)
-    val_outputs = torch.tensor([]).to(cpu)
-    val_truth_labels = torch.tensor([]).to(cpu)
-    val_wgts = torch.tensor([]).to(cpu)
+    train_outputs = torch.tensor([])
+    train_truth_labels = torch.tensor([])
+    train_wgts = torch.tensor([])
+    val_outputs = torch.tensor([])
+    val_truth_labels = torch.tensor([])
+    val_wgts = torch.tensor([])
 
     logging.info("Starting k-fold cross validation ...")
     logging.info("Time taken so far: "+str(time.time()-st))
@@ -307,10 +309,10 @@ try:
         means, stds = misc.get_train_mean_std(full_x[train_idx])
         data_standardised = data.clone()
         data_standardised.x = misc.torch_standardise(data_standardised.x, means, stds)
-        means, stds = means.to(cpu), stds.to(cpu)
+        means, stds = means, stds
 
         model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
-        model.to(device)
+        model
 
         optimiser = torch.optim.Adam(model.parameters(), lr=LR)
         ### NOTE: patience for the scheculer is different from the early stopping patience
@@ -321,7 +323,7 @@ try:
 
         all_labels = data_standardised.y[train_idx].cpu().numpy()
         all_wgts = data_standardised.wgts[train_idx].cpu().numpy()
-        class_weights = binary_class_weights(all_labels, all_wgts).to(device)
+        class_weights = binary_class_weights(all_labels, all_wgts)
         print("Training class weights: signal - ", class_weights[1], ", backgrounds - ", class_weights[0])
         
         if gnn:
@@ -351,12 +353,12 @@ try:
             ### start training loop in the epoch
             model.train()
             total_examples = total_loss = 0
-            train_outputs_fold = torch.tensor([]).to(cpu)
-            train_truth_labels_fold = torch.tensor([]).to(cpu)
-            train_wgts_fold = torch.tensor([]).to(cpu)
+            train_outputs_fold = torch.tensor([])
+            train_truth_labels_fold = torch.tensor([])
+            train_wgts_fold = torch.tensor([])
             for batch in train_loader:
                 optimiser.zero_grad()
-                batch = batch.to(device)
+                batch = batch
                 batch_size = batch.batch_size
                 outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
                 
@@ -373,9 +375,9 @@ try:
                 torch.cuda.empty_cache()
                 total_examples += batch_size
                 total_loss += float(loss) * batch_size
-                train_outputs_fold = torch.cat((train_outputs_fold, outputs.detach().to(cpu)))
-                train_truth_labels_fold = torch.cat((train_truth_labels_fold, y.detach().to(cpu)))
-                train_wgts_fold = torch.cat((train_wgts_fold, event_wgts.detach().to(cpu)))
+                train_outputs_fold = torch.cat((train_outputs_fold, outputs.detach()))
+                train_truth_labels_fold = torch.cat((train_truth_labels_fold, y.detach()))
+                train_wgts_fold = torch.cat((train_wgts_fold, event_wgts.detach()))
                 
             avg_tr_loss = total_loss / total_examples
             train_loss.append(avg_tr_loss)
@@ -384,12 +386,12 @@ try:
             ### start validation loop in the epoch
             model.eval()
             total_examples = total_loss = 0
-            val_outputs_fold= torch.tensor([]).to(cpu)
-            val_truth_labels_fold = torch.tensor([]).to(cpu)
-            val_wgts_fold = torch.tensor([]).to(cpu)
+            val_outputs_fold= torch.tensor([])
+            val_truth_labels_fold = torch.tensor([])
+            val_wgts_fold = torch.tensor([])
             for batch in val_loader:
                 
-                batch = batch.to(device)
+                batch = batch
                 batch_size = batch.batch_size
                 outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
 
@@ -402,9 +404,9 @@ try:
                 
                 total_examples += batch_size
                 total_loss += float(loss) * batch_size
-                val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach().to(cpu)))
-                val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach().to(cpu)))
-                val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach().to(cpu)))
+                val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach()))
+                val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach()))
+                val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach()))
 
             avg_vl_loss = total_loss / total_examples
             val_loss.append(avg_vl_loss)
@@ -513,7 +515,7 @@ finally:
     ax.set_ylabel("Loss", loc="top")
     misc.create_dirs(plot_path)
     logging.info("Saving plots to "+plot_path)
-    fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_loss.pdf", transparent=True)
+    fig.savefig(plot_path+"training_validation_loss.pdf", transparent=True)
 
     logging.info("Plotting model outputs ...")
     fig, ax = plt.subplots()
@@ -550,21 +552,28 @@ finally:
     np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().cpu().numpy())
     np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().cpu().numpy())
 
+    if gnn:
+        if eff is not None:
+            linking_length_label = "Linking length at sig-sig efficiency "+str(eff)
+        elif linking_length is not None:
+             linking_length_label = "Linking length "+str(linking_length)
+    else:
+        linking_length_label = ""
     if signal == "hhh":
         if eff is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length at sig-sig efficiency "+str(eff)]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", linking_length_label]
         elif linking_length is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", "Linking length "+str(linking_length)]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", linking_length_label]
     elif signal == "stau":
         if eff is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", "Linking length at sig-sig efficiency "+str(eff)]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", linking_length_label]
         elif linking_length is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", "Linking length "+str(linking_length)]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", linking_length_label]
     elif signal == "LQ":
         if eff is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", "Linking length at sig-sig efficiency "+str(eff)]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", linking_length_label]
         elif linking_length is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", "Linking length "+str(linking_length)]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", linking_length_label]
 
     plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
     ax.legend(loc='upper right', fontsize=9)
@@ -572,7 +581,7 @@ finally:
     ax.set_ylabel("Normalised No. Events", loc="top")
     ymin, ymax = ax.get_ylim()
     ax.set_ylim((ymin, ymax*1.2))
-    fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_pred.pdf", transparent=True)
+    fig.savefig(plot_path+"training_validation_pred.pdf", transparent=True)
 
     logging.info("Plotting ROC curves ...")
     fig, ax = plt.subplots()
@@ -582,4 +591,16 @@ finally:
     plt.xlim(0,1)
     plt.xlabel("Background Efficiency", loc="right")
     plt.ylabel("Signal Efficiency", loc="top")
-    fig.savefig(plot_path+kinematic_variable+"_"+model_label+"_training_validation_ROC.pdf", transparent=True)
+    fig.savefig(plot_path+"training_validation_ROC.pdf", transparent=True)
+
+    logging.info("Saving ROC curves to json files ...")
+    roc_json_path = plot_path+"roc.json"
+    roc_dict = {"train_fpr": train_fpr.tolist(),
+                "train_tpr": train_tpr.tolist(),
+                "val_fpr": val_fpr.tolist(),
+                "val_trp": val_tpr.tolist(),
+                "train_auc": [train_auc],
+                "val_auc": [val_auc]
+               }
+    with open(roc_json_path, 'w') as json_file:
+        json.dump(roc_dict, json_file)
