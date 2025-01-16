@@ -40,12 +40,22 @@ def GetParser():
         help="Specify the config for the user e.g. paths to store all the input/output data and results, signal model to look at",
     )
 
+    parser.add_argument(
+        "--model",
+        "-m",
+        type=str,
+        required=False,
+        help="Specify the path of the model to load",
+    )
+
+
     args = parser.parse_args()
     return args
 
 
 device = torch.device('cpu')
 args = GetParser()
+
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
 ntuple_path = user_config["ntuple_path"]
@@ -76,10 +86,15 @@ radius = margin/2
 radius_name = margin/2
 print("Connecting at radius ", radius, "with a training margin of ", margin)
 
+if args.model:
+    model_name = args.model
+else:
+    model_name = model_save_path + "embedding_"+str(embedding_dim)+"feats/EmbeddingNet_m"+str(margin)+"_r"+str(radius_name)+"_Lambda"+str(penalty)+"_model.pth"
+
 # load the chosen model
 logging.info("Loading trained model ...")
 model = EmbeddingNet(input_dim=len(kinematics), embedding_dim=embedding_dim)
-model.load_state_dict(torch.load(model_save_path + "embedding_"+str(embedding_dim)+"feats/EmbeddingNet_m"+str(margin)+"_r"+str(radius_name)+"_Lambda"+str(penalty)+"_model.pth")['model_state'])
+model.load_state_dict(torch.load(model_name)['model_state'])
 
 # load the ntuples by signal/background type
 # load in input files
