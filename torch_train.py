@@ -119,6 +119,7 @@ gnn_type = train_config["gnn_type"]
 patience_early_stopping = train_config["patience_early_stopping"]
 num_folds = train_config["num_folds"]
 single_fold = train_config["single_fold"]
+plot_conv_kins = train_config["plot_conv_kinematics"]
 ### LR scheduler patience should be less than early stopping patience, so that the LR can be reduced before training stops
 assert patience_LR < patience_early_stopping, "LR scheduler patience should be less than early stopping patience"
 
@@ -184,7 +185,7 @@ else:
             + nf_str
     
 if gnn == False:
-    plot_path = plot_path + "/MLP" + model_label + "/"
+    plot_path = plot_path + "/MLP/" + model_label + "/"
 plot_path = plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
@@ -204,7 +205,7 @@ logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
 logging.info("adj matrix storage path: "+adj_path)
 logging.info("model storage path: "+model_path)
-model_path = model_path + model_label + "/"
+model_path = model_path + model_label + "/" + gnn_type + "/"
 
 logging.info("distance metric: "+distance)
 if eff is not None:    
@@ -217,16 +218,16 @@ logging.info('Importing signal and background files...')
 
 # normal loading setup
 full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal)
+len_sig = len(full_sig)
+len_bkg = len(full_bkg)
+print("full sig size ", full_sig.size())
+print("full bkg size ", full_bkg.size())
 
-print("full sig size", full_sig.size())
-print("full bkg size", full_bkg.size())
-
-full_x = full_x
 full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0)
 del full_sig, full_bkg, full_sig_labels, full_bkg_labels
 
-print("full sig wgts", full_sig_wgts.sum())
-print("full bkg wgts", full_bkg_wgts.sum())
+print("full sig wgts ", full_sig_wgts.sum())
+print("full bkg wgts ", full_bkg_wgts.sum())
 
 full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
 del full_sig_wgts, full_bkg_wgts
@@ -247,9 +248,19 @@ if gnn:
     print("deleting row and col indices ...")
     del row_ind
     del col_ind
+    print("Edge fraciton: ", edge_ind.shape[1] / (len(full_y)* (len(full_y)-1))/2) 
     # print("loading edge weights ...")
     # edge_wgts = full_wgts[row_ind]
 
+if plot_conv_kins:
+    edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
+    sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edges, size=(len(full_y), len(full_y)))
+    adj_mat = sparse_adj_matrix.to_dense()
+    del sparse_adj_matrix
+    print(adj_mat)
+    for nconv in range(3):
+        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, len_bkg, kinematics, signal, eff, plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv)
+    del edges, adj_mat
 misc.print_mem_info()
 
 ### define loss function and optimiser
@@ -266,8 +277,6 @@ def weighted_bce_loss(output, target, class_weights, event_weights):
 def binary_class_weights(labels, event_weights):
     num_sig = np.sum(event_weights[labels == 1])
     num_bkg = np.sum(event_weights[labels == 0])
-    # bkg_weight = num_sig/num_bkg
-    # sig_weight = 1
     bkg_weight = 1
     sig_weight = num_bkg/num_sig
     return torch.tensor([bkg_weight, sig_weight], dtype=torch.float)
@@ -520,18 +529,6 @@ finally:
     logging.info("Plotting model outputs ...")
     fig, ax = plt.subplots()
     binning = np.linspace(0,1,51)
-
-    # ### save histograms values
-    # train_sig_pred_hist, bin_edges = np.histogram(train_sig_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
-    # train_bkg_pred_hist, _ = np.histogram(train_bkg_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
-    # val_sig_pred_hist, _ = np.histogram(val_sig_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
-    # val_bkg_pred_hist, _ = np.histogram(val_bkg_pred.detach().cpu().numpy(), bins=binning, density=True, range = (0,1))
-    # np.save(plot_path+"bin_edges.npy", bin_edges)
-    # np.save(plot_path+"train_sig_pred_hist.npy", train_sig_pred_hist)
-    # np.save(plot_path+"train_bkg_pred_hist.npy", train_bkg_pred_hist)
-    # np.save(plot_path+"val_sig_pred_hist.npy", val_sig_pred_hist)
-    # np.save(plot_path+"val_bkg_pred_hist.npy", val_bkg_pred_hist)
-
     ax.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange", weights=train_sig_wgts.detach().cpu().numpy())
     ax.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue", weights=train_bkg_wgts.detach().cpu().numpy())
     ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange", weights=val_sig_wgts.detach().cpu().numpy())
@@ -554,26 +551,27 @@ finally:
 
     if gnn:
         if eff is not None:
-            linking_length_label = "Linking length at sig-sig efficiency "+str(eff)
+            linking_length_label = "Linking length at "+str(eff)+" sig-sig efficiency"
         elif linking_length is not None:
              linking_length_label = "Linking length "+str(linking_length)
     else:
         linking_length_label = ""
+    signal_label, background_label = plotting.get_plot_labels(signal)
     if signal == "hhh":
         if eff is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", linking_length_label]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
         elif linking_length is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "6b Resonant TRSM signal, 5b data", linking_length_label]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
     elif signal == "stau":
         if eff is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", linking_length_label]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
         elif linking_length is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "stau stau signal", linking_length_label]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
     elif signal == "LQ":
         if eff is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", linking_length_label]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
         elif linking_length is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), "LQ signal", linking_length_label]
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
 
     plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
     ax.legend(loc='upper right', fontsize=9)

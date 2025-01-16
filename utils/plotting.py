@@ -20,14 +20,14 @@ def get_plot_labels(signal_type):
         background = "Data-driven QCD background estimate (5b data)"
     elif signal_type == "LQ":
         signal = "Leptoquark signal"
-        background = r"$t\bar{t}$ and Single top"
+        background = r"$t\bar{t}$ and Single top backgrounds"
     elif signal_type == "stau":
         signal = "StauStau signal"
         background = r"$W$ jets, $Z\rightarrow ll$ jets, Diboson (0$l$, 1$l$, 2$l$, 3$l$, 4$l$), Triboson, Higgs, Single top, $t\bar{t}V$, $t\bar{t}$"
     return signal, background
 
 
-def add_text(ax, text, doATLAS=True, startx=0.04, starty=0.93):
+def add_text(ax, text, doATLAS=False, startx=0.04, starty=0.93):
     """
     Function to add text to figures
     
@@ -132,13 +132,12 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var, file_path, s
         fig.savefig(save_path+plot_name+var+ext, transparent=True)
     return 0
 
-def plot_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, normalisation, standardise=True, nconv=1):
+def plot_conv_kinematics(adj_mat, x, len_sig, len_bkg, kinematics, signal_type, eff, file_path, normalisation, standardise=True, nconv=1):
     """
     Function to plot the histograms of a list of kinematics variable for signal and background on one figure, after a set number of convolutions.
 
     Args:
         adj_mat (torch.tensor(float32)): the adjacency matrix.
-        D (torch.tensor(float32)): the Degree matrix to normalise to.
         sig (torch.tensor): kinematics for set of signal events 
         bkg (torch.tensor): kinematics for set of background events 
         kinematics (list[str]): list of names of kinematic variables to plot
@@ -152,27 +151,28 @@ def plot_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, norma
         void
     """
     if normalisation == "D_inv":
-        D_inv = torch.inverse(torch.diag(D))
+        D_inv = torch.inverse(torch.diag(torch.sum(adj_mat, dim=1)))
         adj_mat = torch.matmul(D_inv, adj_mat)
         diagonal = adj_mat.diagonal()
         diagonal.fill_(1)
     elif normalisation == "D_half_inv":
-        D_half_inv = torch.diag(torch.rsqrt(D))
+        D_half_inv = torch.diag(torch.rsqrt(torch.sum(adj_mat, dim=1)))
+        print("Half inv degree matrix ", D_half_inv)
         adj_mat = torch.matmul(D_half_inv, torch.matmul(adj_mat, D_half_inv))
+        print("Degree normed adj mat ", adj_mat)
         diagonal = adj_mat.diagonal()
         diagonal.fill_(1)
     else: 
         print("Please specify a normalisation that is either D_inv or D_half_inv")
 
-    x = torch.cat((sig, bkg), dim=0).cuda()
     convcount = 0
     post_conv_x = x
     label = ""
     while convcount < nconv:
         #conv_conv_x = torch.matmul(adj_mat, torch.matmul(adj_mat, x))
         post_conv_x = torch.matmul(adj_mat, post_conv_x)
-        label = label + "conv_"
         convcount += 1
+    label = label + "conv"+str(nconv)+"_"
     post_conv_x_numpy = post_conv_x.detach().cpu().numpy()
     
     if standardise:
@@ -181,27 +181,30 @@ def plot_conv_kinematics(adj_mat, D, sig, bkg, kinematics, eff, file_path, norma
         plot_name = "/standardised_"+label
     else:
         plot_name = "/"+label
-    post_conv_sig = post_conv_x_numpy[: len(sig)]
-    post_conv_bkg = post_conv_x_numpy[len(sig):]
+    post_conv_sig = post_conv_x_numpy[: len_sig]
+    post_conv_bkg = post_conv_x_numpy[len_sig:]
     
     # plot standardised convoluted kinematics
-    misc.create_dirs(file_path+"/")
+    misc.create_dirs(file_path+"/conv_kinematics/")
+    print("Saving to ", file_path+"/conv_kinematics/")
+    signal_label, background_label = get_plot_labels(signal_type)
+
     for v, var in enumerate(kinematics):
         fig, ax = plt.subplots()
         binning = numpy.linspace(min(post_conv_bkg[:,v]),max(post_conv_bkg[:,v]), 50)
         ax.hist(post_conv_sig[:,v], bins=binning, label="Signal", alpha=0.3, density=True, color="red")
         ax.hist(post_conv_bkg[:,v], bins=binning, label="Background", alpha=0.3, density=True, color="steelblue")
-        # add_text(ax, [r"$\sqrt{s}=13$ TeV, ", r"LQ signals", r"Linking length at sig-sig eff "+str(eff), "After "+nconv+" convolutions"])
-        add_text(ad, [r"LQ signal"])
         if standardise:
-            ax.text(0.04, 0.68, r"Standardised to (mean, std) = (0, 1)", verticalalignment="bottom", size=10, transform=ax.transAxes)
+            add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", signal_label, background_label, r"$E_T^{miss}$ > 200 GeV ", r"Linking length at "+str(eff)+" sig-sig efficiency", "After "+str(nconv)+" convolutions", r"Standardised to (mean, std) = (0, 1)"])
+        else:
+            add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", signal_label, background_label, r"$E_T^{miss}$ > 200 GeV ", r"Linking length at "+str(eff)+" sig-sig efficiency", "After "+str(nconv)+" convolutions"])
         ax.legend(loc='upper right')
         ymin, ymax = ax.get_ylim()
         ax.set_ylim((ymin, ymax*1.4))
         ax.set_xlabel("\n"+str(var), loc="right")
         ax.set_ylabel("Normalised No. Events", loc="top")
         fig.tight_layout()
-        fig.savefig(file_path+plot_name+var+".pdf", transparent=True)
+        fig.savefig(file_path+"/conv_kinematics/"+plot_name+var+".pdf", transparent=True)
 
 
 def plot_centrality(centrality, sig, bkg, file_path, eff):
@@ -232,6 +235,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
         # save
         save_path = file_path+"/"+plot
         misc.create_dirs(save_path)
+        print("Saving to ", save_path+"/"+plot)
         fig.savefig(save_path+"/"+plot+"_sigsig_eff_"+str(eff)+".pdf", transparent=True)
 
 def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, ss_thresholds, sig_label, bkg_label, plot_path, variable, distance, sigsig_eff):
