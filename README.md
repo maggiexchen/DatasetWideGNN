@@ -55,3 +55,30 @@ The model can be specified in the config file, including number of gcn and regul
 - `GCN`: The GCNConv layer applies the normalisation scheme $`D^{-1/2} A D^{-1/2}`$ used in the "Semi-supervised Classification with Graph Convolutional Networks" paper (https://arxiv.org/pdf/1609.02907.pdf).
 - `GAT`: The GATConv layer applies the graph attention operator used in the "Graph Attention Networks" paper (https://arxiv.org/abs/1710.10903).
 - `Graph`: The GraphConv  layer applies the graph neural network operator from the “Weisfeiler and Leman Go Neural: Higher-order Graph Neural Networks” paper (https://arxiv.org/abs/1810.02244).
+
+
+## Workflow of EmbeddingNet
+To train EmbeddingNet, go to `GraphBuilder`. First you need to construct a config file `config/`, take `embedding.yaml` as an example.
+
+To train an EmbeddingNet, run
+```
+python train.py -u <config_file_path>
+```
+This will train an EmbeddingNet on a subset of the events specified in the config file
+
+To apply a trained EmbeddingNet to the full or an orthoganol dataset, run
+```
+python apply.py -u <config_file_path> -m <model_file_path>
+```
+
+if `<model_file_path>` is empty, the script will take the model configuration specified in the config file, but if `<model_file_path>` is specified, it will evaluated that model. This will evaluate the model and save the per-event outputs (embedding features) to h5 files, saved in the `embedding_path` directory specified in the config file.
+
+To calculate the distances in the latent space built from the EmbeddingNet, exit the `GraphBuilder` directory. Use a user config file similar to the `config/user_Maggie_embedding.yaml` file, where
+    - `feature_h5_path` should have the same direcotry  as the one in `embedding_path` in `GraphBuilder/config/embedding.yaml`. 
+    - `kinematic_h5_path` should be the directory to your h5 files that contains the raw kinematic variables for sig and bakcgrounds.
+    - `feature_dim` specifies the dimension of the latent space your chosen EmbeddingNet outputs.
+To calculate distances in the latent space, run
+```
+python calc_distance.py -v embedding -d <distance> -u <config_file_path>
+```
+Once you have this you can construct the linking length, adjacency matrix and run the training using the same steps as above.
