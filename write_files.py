@@ -64,9 +64,10 @@ df_sig[signal] = signal_file.arrays(library="pd")
 df_sig[signal]["target"] = [1]*len(df_sig[signal])
 sig_initialWeights_arr = misc.get_histInitialWeights(signal_file_path)
 df_sig[signal]["eventWeight"] = misc.calc_eventWeight(df_sig[signal], sig_initialWeights_arr, lumi_Run3)
+print(signal, " event weights: ", df_sig[signal]["eventWeight"])
 if cuts is not None:
     df_sig[signal] = misc.cut_operation(df_sig[signal], cuts)
-df_sig[signal].to_hdf(h5_path + str(signal)+".h5", key=str(signal), mode="w")
+df_sig[signal].to_hdf(h5_path + str(signal)+"_"+signal_mass+".h5", key=str(signal), mode="w")
 
 logging.info('Importing and writing background ')
 df_bkgs = {}
@@ -83,3 +84,14 @@ for background in backgrounds:
     if cuts is not None:
         df_bkgs[background] = misc.cut_operation(df_bkgs[background], cuts)
     df_bkgs[background].to_hdf(h5_path + str(background)+".h5", key=str(background), mode="w")
+
+logging.info("Plotting eventWeights ...")
+fig, ax = plt.subplots()
+binning = numpy.linspace(0,40,51)
+ax.hist(df_sig[signal]["eventWeight"], bins=binning, label=signal)
+for background in backgrounds:
+    ax.hist(df_bkgs[background]["eventWeight"], bins=binning, label=background)
+ax.legend(loc='upper right', fontsize=9)
+ax.set_xlabel("Event weight", loc="right")
+ax.set_ylabel("No. Events", loc="top")
+fig.savefig("eventweight_check_LQ1000.pdf", transparent=True)
