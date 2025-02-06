@@ -21,6 +21,6 @@ dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embeddin
 score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Scan/plots/
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts/plots/
 adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Scan/models/ 
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts/models/ 

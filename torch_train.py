@@ -120,6 +120,7 @@ patience_early_stopping = train_config["patience_early_stopping"]
 num_folds = train_config["num_folds"]
 single_fold = train_config["single_fold"]
 plot_conv_kins = train_config["plot_conv_kinematics"]
+bool_edge_wgt = train_config["edge_weights"]
 ### LR scheduler patience should be less than early stopping patience, so that the LR can be reduced before training stops
 assert patience_LR < patience_early_stopping, "LR scheduler patience should be less than early stopping patience"
 
@@ -141,8 +142,8 @@ eff = train_config["sigsig_eff"]
 if linking_length is None:
     if eff is None:
         raise Exception("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
-    elif eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
-        raise Exception("not given a supported efficiency, (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)")
+    elif eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
+        raise Exception("not given a supported efficiency, (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)")
     else:
         ll_str = "_LLEff" + str(eff).replace(".", "p")
         adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
@@ -224,11 +225,11 @@ print("full sig size ", full_sig.size())
 print("full bkg size ", full_bkg.size())
 
 full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0)
+len_full = len(full_y)
 del full_sig, full_bkg, full_sig_labels, full_bkg_labels
 
-print("full sig wgts ", full_sig_wgts.sum())
-print("full bkg wgts ", full_bkg_wgts.sum())
-
+print("full sig yields ", full_sig_wgts.sum())
+print("full bkg yields ", full_bkg_wgts.sum())
 full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
 del full_sig_wgts, full_bkg_wgts
 
@@ -248,10 +249,18 @@ if gnn:
     print("deleting row and col indices ...")
     del row_ind
     del col_ind
-    print("Edge fraciton: ", edge_ind.shape[1] / (len(full_y)* (len(full_y)-1))/2) 
-    # print("loading edge weights ...")
-    # edge_wgts = full_wgts[row_ind]
-
+    print("Edge fraciton: ", edge_ind.shape[1] / (len(full_y)* (len(full_y)-1))/2)
+    if bool_edge_wgt:
+        print("loading edge weights ...")
+        edge_wgts = torch.load(adj_path+'edge_wgts.pt')
+    """
+    rows_sig, cols_sig = torch.meshgrid(torch.arange(len_sig), torch.arange(len_sig), indexing='ij')
+    rows_bkg, cols_bkg = torch.meshgrid(torch.arange(len_sig, len_full), torch.arange(len_sig, len_full), indexing='ij')
+    edge_ind = torch.cat([
+        torch.stack([rows_sig.flatten(), cols_sig.flatten()]),
+        torch.stack([rows_bkg.flatten(), cols_bkg.flatten()])
+    ], dim=1)
+    """
 if plot_conv_kins:
     edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
     sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edges, size=(len(full_y), len(full_y)))
@@ -291,8 +300,12 @@ gc.collect()
 torch.cuda.empty_cache()
 
 ### create data object, train and val loaders
-data = Data(x = full_x, y = full_y, edge_index = edge_ind, wgts = full_wgts)#, edge_weight = edge_wgts)
-del edge_ind
+if bool_edge_wgt:
+    data = Data(x = full_x, y = full_y, edge_index = edge_ind, node_weight = full_wgts, edge_weight = edge_wgts)
+    del edge_ind, edge_wgts
+else:
+    data = Data(x = full_x, y = full_y, edge_index = edge_ind, node_weight = full_wgts)
+    del edge_ind
 
 try: 
     kfold = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=42)
@@ -319,9 +332,7 @@ try:
         data_standardised = data.clone()
         data_standardised.x = misc.torch_standardise(data_standardised.x, means, stds)
         means, stds = means, stds
-
         model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
-        model
 
         optimiser = torch.optim.Adam(model.parameters(), lr=LR)
         ### NOTE: patience for the scheculer is different from the early stopping patience
@@ -331,8 +342,8 @@ try:
         val_loss = []
 
         all_labels = data_standardised.y[train_idx].cpu().numpy()
-        all_wgts = data_standardised.wgts[train_idx].cpu().numpy()
-        class_weights = binary_class_weights(all_labels, all_wgts)
+        all_node_weights = data_standardised.node_weight[train_idx].cpu().numpy()
+        class_weights = binary_class_weights(all_labels, all_node_weights)
         print("Training class weights: signal - ", class_weights[1], ", backgrounds - ", class_weights[0])
         
         if gnn:
@@ -369,12 +380,17 @@ try:
                 optimiser.zero_grad()
                 batch = batch
                 batch_size = batch.batch_size
-                outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
+                if bool_edge_wgt:
+                    if torch.any(torch.isnan(batch.edge_weight)):
+                        print("Edge weights contain NaN values!")
+                    outputs = model(batch.x, batch.edge_index, batch.edge_weight)
+                else:
+                    outputs = model(batch.x, batch.edge_index)
                 
                 ### NOTE only consider predictions and labels of seed nodes
                 y = batch.y[:batch_size]
                 outputs = outputs[:batch_size]
-                event_wgts = batch.wgts[:batch_size]
+                event_wgts = batch.node_weight[:batch_size]
 
                 loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts) 
                 loss.backward()
@@ -402,12 +418,15 @@ try:
                 
                 batch = batch
                 batch_size = batch.batch_size
-                outputs = model(batch.x, batch.edge_index) #, batch.edge_weight)
+                if bool_edge_wgt:
+                    outputs = model(batch.x, batch.edge_index, batch.edge_weight)
+                else:
+                    outputs = model(batch.x, batch.edge_index)
 
                 ### NOTE only consider predictions and labels of seed nodes
                 y = batch.y[:batch_size]
                 outputs = outputs[:batch_size]
-                event_wgts = batch.wgts[:batch_size]
+                event_wgts = batch.node_weight[:batch_size]
 
                 loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
                 

@@ -52,7 +52,7 @@ class GCNClassifier(nn.Module):
         # self.output_layer = GCNConv(input_size, output_size)
         self.output_layer = nn.Linear(input_size, output_size)
             
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, gnn_type, edge_weights=None):
         """
         Function for forward propogation of the network layer
         Args:
@@ -61,20 +61,27 @@ class GCNClassifier(nn.Module):
         Returns:
             (torch.tensor) 
         """
-        def gcn_forward(x, edge_index):
+        def gcn_forward(x, edge_index, gnn_type, edge_weights=None):
             for layer, batch_norm, dropout in zip(self.layers_gcn, self.batch_norms_gcn, self.dropout_gcn):
                 # when using sparse tensor object, edge_weight is not used
                 # Weights are the edge values in the sparse tensor object
                 # for GATConv, use edge_attr instead of edge_weight
-                # x = F.relu(dropout(batch_norm(layer(x, edge_index, edge_weight=edge_weights)))) 
-                x = F.relu(dropout(batch_norm(layer(x, edge_index))))
+                if edge_weights == None:
+                    x = F.relu(dropout(batch_norm(layer(x, edge_index))))
+                else:
+                    if gnn_type == "GAT":
+                        x = F.relu(dropout(batch_norm(layer(x, edge_index, edge_attr=edge_weights))))
+                    else:
+                        x = F.relu(dropout(batch_norm(layer(x, edge_index, edge_weight=edge_weights)))) 
             return x
-        x = checkpoint(gcn_forward, x, edge_index, use_reentrant=False)
+        x = checkpoint(gcn_forward, x, edge_index, gnn_type, edge_weights, use_reentrant=False)
+        # x = gcn_forward(x, edge_index, gnn_type, edge_weights)
         
         def mlp_forward(x):
             for layer, batch_norm, dropout in zip(self.layers_mlp, self.batch_norms_mlp, self.dropout_mlp):
                 x = F.relu(dropout(batch_norm(layer(x))))
             return x
+        # x = mlp_forward(x)
         x = checkpoint(mlp_forward, x, use_reentrant=False)
 
         output = torch.sigmoid(self.output_layer(x))
