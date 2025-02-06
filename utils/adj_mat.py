@@ -200,7 +200,7 @@ def generate_adj_mat_from_batch(distance, linking_length):
     return adj_mat
 
 
-def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_length, flip=False):
+def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_length, flip=False, edge_wgt=False):
     """
     Function that loads in the distances in batches, within each batch, apply the linking length,
     and returns non-zero indices within that batch
@@ -222,7 +222,10 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
     print(len(files), " files found for "+t+" distances")
     # apply linking length within each batch, and pull out non-zero indices
     indices = torch.empty(0, dtype=torch.int32)#.to("cuda")
-    batch_size = 30000 
+    if edge_wgt:
+        edge_wgts = torch.empty(0, dtype=torch.float32)
+        inf_mask = torch.empty(0, dtype=torch.bool)
+    batch_size = 30000
     print("Loading batch size ", batch_size)
     for f in files:
         # get the i and j batch numbers
@@ -236,22 +239,36 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
 
                 # apply the linking length to the distances in that batch
                 if flip:
-                    ind = (distance <= linking_length).nonzero().to(torch.int32)
+                    mask = distance <= linking_length
                 else:
-                    ind = (distance >= linking_length).nonzero().to(torch.int32)
-
+                    mask = distance >= linking_length
+                ind = mask.nonzero().to(torch.int32)
+                if edge_wgt:
+                    edge_wgts_tmp = (1 / distance[mask])
+                    inf_mask_tmp = torch.isinf(edge_wgts_tmp)
+                    edge_wgts_tmp[inf_mask_tmp] = 0.
                 print(f"CPU allocated before {process.memory_info().rss/(1024 ** 3):.2f}, GB")
-                del distance
+                del distance, mask
                 
                 # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
                 ind[:,0] += i_ind*batch_size
                 ind[:,1] += j_ind*batch_size
 
                 indices = torch.cat((indices, ind))
+                if edge_wgt:
+                    edge_wgts = torch.cat((edge_wgts, edge_wgts_tmp))
+                    inf_mask = torch.cat((inf_mask, inf_mask_tmp))
                 if i_ind != j_ind:
-                    ind_lowerleft = ind[:,torch.tensor([0, 1])][:, torch.tensor([1, 0])]
+                    # swapping the columns for the opposite corner of a symmetric adjacency matrix 
+                    ind_lowerleft = ind[:, torch.tensor([0, 1])][:, torch.tensor([1, 0])]
                     indices = torch.cat((indices, ind_lowerleft))
+                    del ind_lowerleft
+                    if edge_wgt:
+                        edge_wgts = torch.cat((edge_wgts, edge_wgts_tmp))
+                        inf_mask = torch.cat((inf_mask, inf_mask_tmp))
                 del ind
+                if edge_wgt:
+                    del edge_wgts_tmp
                 print(f"CPU allocated after {process.memory_info().rss/(1024 ** 3):.2f}, GB")
         
         else:
@@ -260,21 +277,35 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
 
             # apply the linking length to the distances in that batch
             if flip:
-                ind = (distance <= linking_length).nonzero().to(torch.int32)
+                mask = distance <= linking_length
             else:
-                ind = (distance >= linking_length).nonzero().to(torch.int32)
+                mask = distance >= linking_length
+            ind = mask.nonzero().to(torch.int32)
+            if edge_wgt:
+                edge_wgts_tmp = 1 / distance[mask]
+                inf_mask_tmp = torch.isinf(edge_wgts_tmp)
+                edge_wgts_tmp[inf_mask_tmp] = 0.
+                inf_mask = torch.cat((inf_mask, inf_mask_tmp))
 
             print(f"CPU allocated before {process.memory_info().rss/(1024 ** 3):.2f}, GB")
-            del distance
+            del distance, mask
 
             # add to the row and column indices according to the i and j indices of that file (this hurts my brain)
             ind[:,0] += i_ind*batch_size
             ind[:,1] += j_ind*batch_size
             indices = torch.cat((indices, ind))
+            if edge_wgt:
+                edge_wgts = torch.cat((edge_wgts, edge_wgts_tmp))
+                del edge_wgts_tmp
             del ind
-            
             print(f"CPU allocated after {process.memory_info().rss/(1024 ** 3):.2f}, GB")
-    return indices
+    if edge_wgt:
+        edge_wgts = norm.minmax(edge_wgts, torch.min(edge_wgts), torch.max(edge_wgts))
+        edge_wgts[inf_mask] = 1.
+        return indices, edge_wgts
+    else:
+        return indices
+
 
 def generate_sparse_adj_mat(sigsig, sigbkg, bkgsig, bkgbkg, N):
     """
