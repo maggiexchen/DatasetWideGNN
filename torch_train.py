@@ -253,14 +253,7 @@ if gnn:
     if bool_edge_wgt:
         print("loading edge weights ...")
         edge_wgts = torch.load(adj_path+'edge_wgts.pt')
-    """
-    rows_sig, cols_sig = torch.meshgrid(torch.arange(len_sig), torch.arange(len_sig), indexing='ij')
-    rows_bkg, cols_bkg = torch.meshgrid(torch.arange(len_sig, len_full), torch.arange(len_sig, len_full), indexing='ij')
-    edge_ind = torch.cat([
-        torch.stack([rows_sig.flatten(), cols_sig.flatten()]),
-        torch.stack([rows_bkg.flatten(), cols_bkg.flatten()])
-    ], dim=1)
-    """
+
 if plot_conv_kins:
     edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
     sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edges, size=(len(full_y), len(full_y)))
@@ -463,7 +456,7 @@ try:
         logging.info("Time taken so far: "+str(time.time()-st))
         logging.info("Saving trained model and performance...")
         model_file_name = f"model_fold_{fold_no}.pth"
-        # model_path= model_path+model_label+"/"
+
         misc.create_dirs(model_path)
         torch.save({
             'model_state': model.state_dict(),
