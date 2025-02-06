@@ -305,7 +305,8 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
         non_inf_edge_wgts = norm.minmax(non_inf_edge_wgts, torch.min(non_inf_edge_wgts), torch.max(non_inf_edge_wgts))
         normed_edge_wgts[~inf_mask] = non_inf_edge_wgts
         normed_edge_wgts[inf_mask] = 1.
-        return indices, edge_wgts
+        del inf_mask, edge_wgts
+        return indices, normed_edge_wgts
     else:
         return indices
 
