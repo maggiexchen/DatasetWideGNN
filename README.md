@@ -21,7 +21,7 @@ These can be specified when running
 python calc_distance.py -v <type of variables> -d <distance> -u config/user_<name>.yaml
 ```
 where the variables are separated into types mass, `angular`, `shape`, `mass_and_angular`, `mass_and_shape` for HHH signal, `LQ` for LQ signal, `all` and `distance` for stau signal.
-The types of distances calculated are `euclidean`, `cityblock` and `cosine`, the functions that calculate them can be found in `utils/distances.py`.
+The types of distances calculated are `euclidean`, `cityblock`, `cosine`, and `emd`, the functions that calculate them can be found in `utils/distances.py`.
 The distances and the pair-wise event weights are saved in `.pt` files in your 'dist_path'.
 
 ## Linking lengths
