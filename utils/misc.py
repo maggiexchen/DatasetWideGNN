@@ -472,7 +472,7 @@ def GetEventWeight(df, lumi, sumInitWeights):
 # Convert dataframe into EMD-compatible event representations
 def get_event_vectors(df):
     events = []
-    weights = []
+    # weights = []
     for _, row in df.iterrows():
         event = np.array([
             [row['bjet1pt'], row['bjet1eta'], row['bjet1phi']],
@@ -481,8 +481,8 @@ def get_event_vectors(df):
             [row['lep2pt'], row['lep2eta'], row['lep2phi']],
         ])
         events.append(event)
-        weights.append(row['eventWeight'])
-    return events, np.array(weights)
+        # weights.append(row['eventWeight'])
+    return events #, np.array(weights)
 
 def get_event_vectors_torch(batch_tensor, kinematics):
     # Define indices for each particle's features
