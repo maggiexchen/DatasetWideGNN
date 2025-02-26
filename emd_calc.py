@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import energyflow as ef
-import pdb
+# import pdb
 
 df = pd.read_hdf('/home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/LQ_1.h5')
 df_ttbar = pd.read_hdf('/home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/ttbar_1.h5')
@@ -17,8 +17,7 @@ def get_event_vectors(df):
             [row['bjet2pt'], row['bjet2eta'], row['bjet2phi']],
             [row['lep1pt'], row['lep1eta'], row['lep1phi']],
             [row['lep2pt'], row['lep2eta'], row['lep2phi']],
-            #### include met but with 0 for eta. meteta show be np.zeros but same length as met
-            [row['met'], 0.0, row['metphi']]
+            [row['met'], 0.0, row['metphi']] ### treat met as pseudo particle with eta=0
         ])
         events.append(event)
         weights.append(row['eventWeight'])
@@ -29,9 +28,8 @@ events, weights_LQ = get_event_vectors(df)
 events_ttbar, weights_ttbar = get_event_vectors(df_ttbar)
 events_singletop, weights_singletop = get_event_vectors(df_singletop)
 weights_bkg = np.concatenate([weights_ttbar, weights_singletop])
-# pdb.set_trace()
+
 # Compute pairwise EMDs
-# emd_matrix = ef.emd.emds(events, R=1.0, gdim=2, n_jobs=-1)
 emd_sigsig = ef.emd.emds(events, R=1.0, gdim=2, n_jobs=-1)
 emd_sigbkg = ef.emd.emds(events, events_ttbar + events_singletop, R=1.0, gdim=2, n_jobs=-1)
 emd_bkgbkg = ef.emd.emds(events_ttbar + events_singletop, R=1.0, gdim=2, n_jobs=-1)
@@ -40,9 +38,6 @@ emd_bkgbkg = ef.emd.emds(events_ttbar + events_singletop, R=1.0, gdim=2, n_jobs=
 emd_sigsig = emd_sigsig.flatten()
 emd_sigbkg = emd_sigbkg.flatten()
 emd_bkgbkg = emd_bkgbkg.flatten()
-
-
-
 
 # Compute histogram weights as the product of event weights
 weights_LQ_LQ_hist = np.outer(weights_LQ, weights_LQ).flatten()
@@ -61,8 +56,6 @@ plt.xlabel('EMD')
 plt.ylabel('Density')
 plt.show()
 
-
-# pdb.set_trace()
 # Print or store the result
 # print(emd_matrix)
 
