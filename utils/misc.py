@@ -6,6 +6,7 @@ import math
 import pandas as pd
 import pdb
 import uproot
+import numpy as np
 torch.manual_seed(42)
 
 cpu = torch.device('cpu')
@@ -467,3 +468,37 @@ def GetEventWeight(df, lumi, sumInitWeights):
         sumInitWeights (float): The sum of the initial generator weights of all of the generated samples (before some cuts are placed when producing ntuples) = the effective number of events generated initially.
     """
     df["eventWeight"] = df["xsec"] * df["genWeight"] * lumi / sumInitWeights
+
+# Convert dataframe into EMD-compatible event representations
+def get_event_vectors(df):
+    events = []
+    weights = []
+    for _, row in df.iterrows():
+        event = np.array([
+            [row['bjet1pt'], row['bjet1eta'], row['bjet1phi']],
+            [row['bjet2pt'], row['bjet2eta'], row['bjet2phi']],
+            [row['lep1pt'], row['lep1eta'], row['lep1phi']],
+            [row['lep2pt'], row['lep2eta'], row['lep2phi']],
+        ])
+        events.append(event)
+        weights.append(row['eventWeight'])
+    return events, np.array(weights)
+
+def get_event_vectors_torch(batch_tensor, kinematics):
+    # Define indices for each particle's features
+    indices = {
+        'bjet1': [kinematics.index('bjet1pt'), kinematics.index('bjet1eta'), kinematics.index('bjet1phi')],
+        'bjet2': [kinematics.index('bjet2pt'), kinematics.index('bjet2eta'), kinematics.index('bjet2phi')],
+        'lep1':  [kinematics.index('lep1pt'), kinematics.index('lep1eta'), kinematics.index('lep1phi')],
+        'lep2':  [kinematics.index('lep2pt'), kinematics.index('lep2eta'), kinematics.index('lep2phi')]
+    }
+    
+    # Stack the selected values into a (batch_size, 4, 3) tensor
+    events = torch.stack([
+        batch_tensor[:, indices['bjet1']],
+        batch_tensor[:, indices['bjet2']],
+        batch_tensor[:, indices['lep1']],
+        batch_tensor[:, indices['lep2']]
+    ], dim=1)  # Stacking along the 2nd dimension to get shape (batch_size, 4, 3)
+
+    return events  # Shape: (1233, 4, 3)
