@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
 import torch
+import utils.misc as misc
+import energyflow as ef
+import pdb
 
 def cosine(a, b):
     """
@@ -49,3 +52,9 @@ def cityblock(a, b):
     b_expanded = torch.unsqueeze(b, dim=0).to(torch.float16)
 
     return torch.sum(torch.abs(a_expanded-b_expanded),dim=-1).to(torch.float16)
+
+def torch_emd(a, b, kinematics):
+    a = misc.get_event_vectors_torch(a, kinematics)
+    b = misc.get_event_vectors_torch(b, kinematics)
+    d = ef.emd.emds(a,b, R=1.0, gdim=2, n_jobs=-1)
+    return  torch.from_numpy(d)

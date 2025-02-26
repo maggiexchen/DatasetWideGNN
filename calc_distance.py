@@ -16,6 +16,7 @@ import utils.misc as misc
 import utils.plotting as plotting
 import utils.adj_mat as adj
 import torch
+import pdb
 torch.manual_seed(42)
 
 def GetParser():
@@ -63,8 +64,17 @@ plot_path = user_config["plot_path"]
 dist_path = user_config["dist_path"]
 
 signal = user_config["signal"]
+# signal_mass = user_config["signal_mass"]
+half = user_config["half"]
+if half != "":
+    half_str = "_half"+str(half)
+else:
+    half_str = ""
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
+
+### rename signal to include mass
+# signal = signal + "_" + str(signal_mass)
 
 logging.info("distance metric: "+distance)
 logging.info("signal: "+signal)
@@ -78,7 +88,7 @@ kinematics = misc.get_kinematics(variable, feature_dim)
 logging.info('Importing signal and background files...')
 if signal == "hhh": SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
 
-full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, standardisation=False)
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, ex=str(half), plot=False, signal=signal, standardisation=False)
 
 global_bkg_wgt = 1.0
 if signal == "hhh": global_bkg_wgt = SF_4b5b
@@ -94,6 +104,8 @@ def distance_calc(a, b, metric):
         d = dis.cityblock(a,b)
     elif metric == "cosine":
         d = dis.cosine(a,b)
+    elif metric == "emd":
+        d = dis.torch_emd(a,b, kinematics)
     else:
         d = None
         print("Please specify a valid distance metric, from euclidean, cityblock or cosine")
@@ -130,14 +142,13 @@ for i in range(num_sig_batches):
 
         batch_sig_j = full_sig[start_idx_sig_j:end_idx_sig_j]
         batch_sig_wgt_j = sig_wgt[start_idx_sig_j:end_idx_sig_j]
-
         batch_sigsig = distance_calc(batch_sig_i, batch_sig_j, distance)
         batch_sigsig_wgt = torch.ger(batch_sig_wgt_i, batch_sig_wgt_j)
 
         batch_dict = {'distance': batch_sigsig, 'weight': batch_sigsig_wgt}
 
         print("Sigsig file ", i, j)
-        torch.save(batch_dict, save_path + f'sigsig_distances_batch_{i}_{j}.pt')
+        torch.save(batch_dict, save_path + f'sigsig_distances_batch_{i}_{j}{half_str}.pt')
 
 logging.info('Calculating bkgbkg distances ...')
 for i in range(num_bkg_batches):
@@ -160,7 +171,7 @@ for i in range(num_bkg_batches):
 
         batch_dict = {'distance': batch_bkgbkg, 'weight': batch_bkgbkg_wgt}
         print("Bkgbkg file ij ", i, j)
-        torch.save(batch_dict, save_path + f'bkgbkg_distances_batch_{i}_{j}.pt')
+        torch.save(batch_dict, save_path + f'bkgbkg_distances_batch_{i}_{j}{half_str}.pt')
 
 logging.info('Calculating sigbkg distances ...')
 for i in range(num_sig_batches):
@@ -181,13 +192,13 @@ for i in range(num_sig_batches):
 
         batch_dict = {'distance': batch_sigbkg, 'weight': batch_sigbkg_wgt}
         print("Sigbkg file ", i, j)
-        torch.save(batch_dict, save_path + f'sigbkg_distances_batch_{i}_{j}.pt')
+        torch.save(batch_dict, save_path + f'sigbkg_distances_batch_{i}_{j}{half_str}.pt')
 
 # plot the MAD-normed distances from the first batch
 logging.info("Plotting ... ")
-sigsig = torch.load(save_path + 'sigsig_distances_batch_0_0.pt')
-bkgbkg = torch.load(save_path + 'bkgbkg_distances_batch_0_0.pt')
-sigbkg = torch.load(save_path + 'sigbkg_distances_batch_0_0.pt')
+sigsig = torch.load(save_path + f'sigsig_distances_batch_0_0{half_str}.pt')
+bkgbkg = torch.load(save_path + f'bkgbkg_distances_batch_0_0{half_str}.pt')
+sigbkg = torch.load(save_path + f'sigbkg_distances_batch_0_0{half_str}.pt')
 np_sigsig = sigsig['distance'].numpy().flatten()
 np_sigbkg = sigbkg['distance'].numpy().flatten()
 np_bkgbkg = bkgbkg['distance'].numpy().flatten()
@@ -197,4 +208,4 @@ np_bkgbkg_wgt = bkgbkg['weight'].numpy().flatten()
 
 plot_path = plot_path+"/"+variable+"/"
 misc.create_dirs(plot_path)
-plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path)
+plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path, label=str(half))
