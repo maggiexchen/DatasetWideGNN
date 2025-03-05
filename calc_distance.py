@@ -64,17 +64,17 @@ plot_path = user_config["plot_path"]
 dist_path = user_config["dist_path"]
 
 signal = user_config["signal"]
-# signal_mass = user_config["signal_mass"]
+signal_mass = user_config["signal_mass"]
 half = user_config["half"]
 if half != "":
-    half_str = "_half"+str(half)
+    half_str = "half"+str(half)+"_"
 else:
     half_str = ""
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 
 ### rename signal to include mass
-# signal = signal + "_" + str(signal_mass)
+signal = signal + "_" + str(signal_mass)
 
 logging.info("distance metric: "+distance)
 logging.info("signal: "+signal)
@@ -148,7 +148,7 @@ for i in range(num_sig_batches):
         batch_dict = {'distance': batch_sigsig, 'weight': batch_sigsig_wgt}
 
         print("Sigsig file ", i, j)
-        torch.save(batch_dict, save_path + f'sigsig_distances_batch_{i}_{j}{half_str}.pt')
+        torch.save(batch_dict, save_path + f'{half_str}sigsig_distances_batch_{i}_{j}.pt')
 
 logging.info('Calculating bkgbkg distances ...')
 for i in range(num_bkg_batches):
@@ -171,7 +171,7 @@ for i in range(num_bkg_batches):
 
         batch_dict = {'distance': batch_bkgbkg, 'weight': batch_bkgbkg_wgt}
         print("Bkgbkg file ij ", i, j)
-        torch.save(batch_dict, save_path + f'bkgbkg_distances_batch_{i}_{j}{half_str}.pt')
+        torch.save(batch_dict, save_path + f'{half_str}bkgbkg_distances_batch_{i}_{j}.pt')
 
 logging.info('Calculating sigbkg distances ...')
 for i in range(num_sig_batches):
@@ -192,13 +192,13 @@ for i in range(num_sig_batches):
 
         batch_dict = {'distance': batch_sigbkg, 'weight': batch_sigbkg_wgt}
         print("Sigbkg file ", i, j)
-        torch.save(batch_dict, save_path + f'sigbkg_distances_batch_{i}_{j}{half_str}.pt')
+        torch.save(batch_dict, save_path + f'{half_str}sigbkg_distances_batch_{i}_{j}.pt')
 
 # plot the MAD-normed distances from the first batch
 logging.info("Plotting ... ")
-sigsig = torch.load(save_path + f'sigsig_distances_batch_0_0{half_str}.pt')
-bkgbkg = torch.load(save_path + f'bkgbkg_distances_batch_0_0{half_str}.pt')
-sigbkg = torch.load(save_path + f'sigbkg_distances_batch_0_0{half_str}.pt')
+sigsig = torch.load(save_path + f'{half_str}sigsig_distances_batch_0_0.pt')
+bkgbkg = torch.load(save_path + f'{half_str}bkgbkg_distances_batch_0_0.pt')
+sigbkg = torch.load(save_path + f'{half_str}sigbkg_distances_batch_0_0.pt')
 np_sigsig = sigsig['distance'].numpy().flatten()
 np_sigbkg = sigbkg['distance'].numpy().flatten()
 np_bkgbkg = bkgbkg['distance'].numpy().flatten()

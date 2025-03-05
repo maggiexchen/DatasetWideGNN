@@ -85,8 +85,17 @@ bool_edge_wgt = train_config["edge_weights"]
 
 # TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
+signal_mass = user_config["signal_mass"]
+half = user_config["half"]
+if half != "":
+    half_str = "half"+str(half)+"_"
+else:
+    half_str = ""
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
+### rename signal to include mass
+signal = signal + "_" + str(signal_mass)
+
 
 kinematic_variable = train_config["kinematic_variable"]
 embedding_variable = train_config["embedding_variable"]
@@ -152,21 +161,38 @@ print("numevents: ",full_x.size(0))
 ### load distances and apply linking length to receieve indices
 logging.info("Batch applying the linking length and getting non-zero indices ...")
 logging.info("For sigsig ...")
-sigsig_ind, sigsig_edge_wgts = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigsig", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+sigsig_result = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigsig", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+if bool_edge_wgt:
+    sigsig_ind, sigsig_edge_wgts = sigsig_result
+else:
+    sigsig_ind = sigsig_result
 print("sigsig: ",sigsig_ind.shape)
+print("fraction of egdes in sigsig: ", sigsig_ind.shape[0]/(len(full_sig)**2))
 
 logging.info("For sigbkg ...")
-sigbkg_ind, sigbkg_edge_wgts = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigbkg", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+sigbkg_result = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigbkg", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+if bool_edge_wgt:
+    sigbkg_ind, sigbkg_edge_wgts = sigbkg_result
+else:
+    sigbkg_ind = sigbkg_result
+
 print("sigbg: ", sigbkg_ind.shape)
+print("fraction of egdes in sigbkg: ", sigbkg_ind.shape[0]/(len(full_sig)*len(full_bkg)))
 
 logging.info("For bkgsig ...")
 bkgsig_ind = torch.clone(sigbkg_ind)
 bkgsig_ind = bkgsig_ind[:, [1, 0]]
-bkgsig_edge_wgts = torch.clone(sigbkg_edge_wgts)
+if bool_edge_wgt:
+    bkgsig_edge_wgts = torch.clone(sigbkg_edge_wgts)
 print("bgsig: ", bkgsig_ind.shape)
+print("fraction of egdes in bkgsig: ", bkgsig_ind.shape[0]/(len(full_bkg)*len(full_sig)))
 
 logging.info("For bkgbkg ...")
-bkgbkg_ind, bkgbkg_edge_wgts = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "bkgbkg", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+bkgbkg_result = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, half_str+"bkgbkg", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+if bool_edge_wgt:
+    bkgbkg_ind, bkgbkg_edge_wgts = bkgbkg_result
+else:
+    bkgbkg_ind = bkgbkg_result
 print("bgbg: ", bkgbkg_ind.shape)
 
 # adding to the indices to form the full matrix indices
@@ -177,8 +203,9 @@ bkgbkg_ind += len(full_sig)
 
 logging.info("Concatenating the indices ...")
 full_ind = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind)).round().to(torch.int32)
-full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
-del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
+if bool_edge_wgt:
+    full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
+    del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
 #### generate the adjacency matrix as a sparse tensor object (currently not needed, using edge index instead)
 # logging.info("Rounding the indices to int32 ...")
 # full_ind = full_ind.to(torch.int32)
@@ -212,7 +239,8 @@ misc.create_dirs(adj_path)
 ### saving the adjaceny matrix indices as edge indices
 torch.save(full_ind[:,0], adj_path+'row_ind.pt')
 torch.save(full_ind[:,1], adj_path+'col_ind.pt')
-torch.save(full_edge_wgts, adj_path+'edge_wgts.pt')
+if bool_edge_wgt:
+    torch.save(full_edge_wgts, adj_path+'edge_wgts.pt')
 
 
 
