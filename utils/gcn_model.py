@@ -27,7 +27,7 @@ class GCNClassifier(nn.Module):
                 self.layers_gcn.append(GCNConv(input_size, hidden_sizes_gcn[i]))
             elif gnn_type == "GAT":
                 self.layers_gcn.append(GATConv(input_size, hidden_sizes_gcn[i]))
-            elif gnn_type == "Graph":
+            elif gnn_type == "GraphConv":
                 self.layers_gcn.append(GraphConv(input_size, hidden_sizes_gcn[i]))
             else:
                 raise ValueError("Invalid GNN type, please choose from 'GCN', 'GAT', 'GraphConv'")
@@ -48,8 +48,9 @@ class GCNClassifier(nn.Module):
             input_size = hidden_sizes_mlp[j]
 
         self.output_layer = nn.Linear(input_size, output_size)
+        self.gnn_type = gnn_type
             
-    def forward(self, x, edge_index, gnn_type, edge_weights=None):
+    def forward(self, x, edge_index, edge_weights=None):
         """
         Function for forward propogation of the network layer
         Args:
@@ -58,6 +59,7 @@ class GCNClassifier(nn.Module):
         Returns:
             (torch.tensor) 
         """
+        gnn_type = self.gnn_type
         def gcn_forward(x, edge_index, gnn_type, edge_weights=None):
             for layer, batch_norm, dropout in zip(self.layers_gcn, self.batch_norms_gcn, self.dropout_gcn):
                 # Weights are the edge values in the sparse tensor object
