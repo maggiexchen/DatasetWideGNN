@@ -95,8 +95,13 @@ model_path = user_config["model_path"]
 score_path = user_config["score_path"]
 
 signal = user_config["signal"]
+signal_mass = user_config["signal_mass"]
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {signal}"
+
+### rename signal to include mass
+signal = signal + "_" + str(signal_mass)
+
 signal_label, background_label = plotting.get_plot_labels(signal)
 
 ### load training config 
@@ -343,6 +348,7 @@ try:
             logging.info("Graph sub-sampling for training and validation ...")
         else:
             logging.info("Loading for training and validation ...")
+
         train_loader = NeighborLoader(
             data_standardised,
             input_nodes = train_idx,
@@ -579,7 +585,7 @@ finally:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
         elif linking_length is not None:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-    elif signal == "LQ":
+    elif "LQ" in signal:
         if eff is not None:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
         elif linking_length is not None:

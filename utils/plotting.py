@@ -18,8 +18,12 @@ def get_plot_labels(signal_type):
     if signal_type == "hhh":
         signal = "6b resonant TRSM HHH signal"
         background = "Data-driven QCD background estimate (5b data)"
-    elif signal_type == "LQ":
+    elif "LQ" in signal_type:
         signal = "Leptoquark signal"
+        split_string = signal_type.split("_")
+        if len(split_string) == 2:
+            number = split_string[1]
+            signal += f" ({number} GeV)"
         background = r"$t\bar{t}$ and Single top backgrounds"
     elif signal_type == "stau":
         signal = "StauStau signal"

@@ -60,7 +60,7 @@ def get_background_types(signal_type):
     """
     if signal_type == "hhh":
         background_type = ["bkg"]
-    elif signal_type == "LQ":
+    elif "LQ" in signal_type:
         background_type = ["singletop", "ttbar"]
     elif signal_type == "stau":
         background_type = [
