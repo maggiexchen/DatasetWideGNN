@@ -283,7 +283,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
             if edge_wgt:
                 edge_wgts_tmp = 1 / distance[mask]
                 inf_mask_tmp = torch.isinf(edge_wgts_tmp)
-                edge_wgts_tmp[inf_mask_tmp] = 0.
+                edge_wgts_tmp[inf_mask_tmp] = 1.
                 inf_mask = torch.cat((inf_mask, inf_mask_tmp))
 
             print(f"CPU allocated before {process.memory_info().rss/(1024 ** 3):.2f}, GB")
@@ -305,8 +305,8 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
         non_inf_edge_wgts = norm.minmax(non_inf_edge_wgts, torch.min(non_inf_edge_wgts), torch.max(non_inf_edge_wgts))
         normed_edge_wgts[~inf_mask] = non_inf_edge_wgts
         normed_edge_wgts[inf_mask] = 1.
-        del inf_mask, edge_wgts
-        return indices, normed_edge_wgts
+        del edge_wgts
+        return indices, normed_edge_wgts, inf_mask
     else:
         return indices
 

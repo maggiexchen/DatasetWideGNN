@@ -108,11 +108,13 @@ elif eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
 
 linking_length = train_config["linking_length"]
 # read in linking length calculated from sampled training data, if not given in config
-sigsig_eff = None
+# sigsig_eff = None
+print("janky", ll_path)
+os.makedirs(ll_path, exist_ok=True)
 if linking_length is None:
     sigsig_eff = eff
     ll_path = ll_path+str(embedding_variable)+"_"+str(distance)+"_linking_length.json"
-    print(ll_path)
+    print("Saving linking length to ", ll_path)
     with open(ll_path, 'r') as lfile:
         length_dict = json.load(lfile)
         lengths = length_dict["length"]
@@ -146,27 +148,39 @@ logging.info('Importing signal and background files...')
 # normalised signal and background kinematics
 logging.info('Importing signal and background files...')
 full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, standardisation=True)
-
-print("numevents: ",full_x.size(0))
+full_event_weights = torch.cat((sig_wgt, bkg_wgt))
+print("Number of total events: ",full_x.size(0))
+del sig_wgt, bkg_wgt, full_x
 
 ### load distances and apply linking length to receieve indices
 logging.info("Batch applying the linking length and getting non-zero indices ...")
 logging.info("For sigsig ...")
-sigsig_ind, sigsig_edge_wgts = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigsig", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+if bool_edge_wgt:
+    sigsig_ind, sigsig_edge_wgts, sigsig_mask = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigsig", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+else:
+    sigsig_ind = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigsig", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
 print("sigsig: ",sigsig_ind.shape)
 
 logging.info("For sigbkg ...")
-sigbkg_ind, sigbkg_edge_wgts = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigbkg", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+if bool_edge_wgt:
+    sigbkg_ind, sigbkg_edge_wgts, sigbkg_mask = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigbkg", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+else:
+    sigbkg_ind = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "sigbkg", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
 print("sigbg: ", sigbkg_ind.shape)
 
 logging.info("For bkgsig ...")
 bkgsig_ind = torch.clone(sigbkg_ind)
 bkgsig_ind = bkgsig_ind[:, [1, 0]]
-bkgsig_edge_wgts = torch.clone(sigbkg_edge_wgts)
+if bool_edge_wgt:
+    bkgsig_edge_wgts = torch.clone(sigbkg_edge_wgts)
+    bkgsig_mask = torch.clone(sigbkg_mask)
 print("bgsig: ", bkgsig_ind.shape)
 
 logging.info("For bkgbkg ...")
-bkgbkg_ind, bkgbkg_edge_wgts = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "bkgbkg", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+if bool_edge_wgt:
+    bkgbkg_ind, bkgbkg_edge_wgts, bkgbkg_mask = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "bkgbkg", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
+else:
+    bkgbkg_ind = adj.generate_batched_nonzero_ind(dist_path, embedding_variable, distance, "bkgbkg", linking_length, flip=flip, edge_wgt=bool_edge_wgt)
 print("bgbg: ", bkgbkg_ind.shape)
 
 # adding to the indices to form the full matrix indices
@@ -177,8 +191,22 @@ bkgbkg_ind += len(full_sig)
 
 logging.info("Concatenating the indices ...")
 full_ind = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind)).round().to(torch.int32)
-full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
-del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
+
+if bool_edge_wgt:
+    logging.info("Calculating edge weights ...")
+    full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
+    full_mask = torch.cat((sigsig_mask, sigbkg_mask, bkgsig_mask, bkgbkg_mask))
+    full_event_weights = full_event_weights[full_ind[:, 1]]
+    full_edge_wgts[full_mask] = 1.
+    plot_ind = torch.randperm(len(full_edge_wgts))[:5000]
+    full_edge_wgts *= full_event_weights
+    # full_edge_wgts /= sum(full_edge_wgts)
+    del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
+    normed_full_edge_wgts = torch.clone(full_edge_wgts)
+    # non_self_edge_wgts = normed_full_edge_wgts[~full_mask]
+    # normed_full_edge_wgts[~full_mask] = norm.minmax(non_self_edge_wgts, torch.min(non_self_edge_wgts), torch.max(non_self_edge_wgts))
+    # normed_full_edge_wgts[full_mask] = 1.
+
 #### generate the adjacency matrix as a sparse tensor object (currently not needed, using edge index instead)
 # logging.info("Rounding the indices to int32 ...")
 # full_ind = full_ind.to(torch.int32)
@@ -212,7 +240,9 @@ misc.create_dirs(adj_path)
 ### saving the adjaceny matrix indices as edge indices
 torch.save(full_ind[:,0], adj_path+'row_ind.pt')
 torch.save(full_ind[:,1], adj_path+'col_ind.pt')
-torch.save(full_edge_wgts, adj_path+'edge_wgts.pt')
+if bool_edge_wgt:
+    # torch.save(full_edge_wgts, adj_path+'edge_wgts.pt')
+    torch.save(normed_full_edge_wgts, adj_path+'edge_wgts.pt')
 
 
 

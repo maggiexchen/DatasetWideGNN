@@ -314,6 +314,8 @@ try:
 
     logging.info("Starting k-fold cross validation ...")
     logging.info("Time taken so far: "+str(time.time()-st))
+    train_x = {}
+    val_x = {}
     for train_idx, val_idx in kfold.split(np.zeros(len(full_y)), full_y.cpu().numpy()):
         fold_no += 1
         print(f"Starting fold {fold_no}/{num_folds}")
@@ -369,21 +371,20 @@ try:
             train_outputs_fold = torch.tensor([])
             train_truth_labels_fold = torch.tensor([])
             train_wgts_fold = torch.tensor([])
+            train_x_fold = torch.tensor([])
             for batch in train_loader:
                 optimiser.zero_grad()
                 batch = batch
-                batch_size = batch.batch_size
+                batch_batchsize = batch.batch_size
                 if bool_edge_wgt:
-                    if torch.any(torch.isnan(batch.edge_weight)):
-                        print("Edge weights contain NaN values!")
-                    outputs = model(batch.x, batch.edge_index, batch.edge_weight)
+                    outputs = model(batch.x, batch.edge_index, gnn_type, batch.edge_weight)
                 else:
-                    outputs = model(batch.x, batch.edge_index)
+                    outputs = model(batch.x, batch.edge_index, gnn_type)
                 
                 ### NOTE only consider predictions and labels of seed nodes
-                y = batch.y[:batch_size]
-                outputs = outputs[:batch_size]
-                event_wgts = batch.node_weight[:batch_size]
+                y = batch.y[:batch_batchsize]
+                outputs = outputs[:batch_batchsize]
+                event_wgts = batch.node_weight[:batch_batchsize]
 
                 loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts) 
                 loss.backward()
@@ -391,12 +392,13 @@ try:
                 optimiser.step()
 
                 torch.cuda.empty_cache()
-                total_examples += batch_size
-                total_loss += float(loss) * batch_size
+                total_examples += batch_batchsize
+                total_loss += float(loss) * batch_batchsize
                 train_outputs_fold = torch.cat((train_outputs_fold, outputs.detach()))
                 train_truth_labels_fold = torch.cat((train_truth_labels_fold, y.detach()))
                 train_wgts_fold = torch.cat((train_wgts_fold, event_wgts.detach()))
-                
+                train_x_fold = torch.cat((train_x_fold, batch.x.detach()))
+
             avg_tr_loss = total_loss / total_examples
             train_loss.append(avg_tr_loss)
 
@@ -407,30 +409,50 @@ try:
             val_outputs_fold= torch.tensor([])
             val_truth_labels_fold = torch.tensor([])
             val_wgts_fold = torch.tensor([])
+            val_x_fold = torch.tensor([])
             for batch in val_loader:
                 
                 batch = batch
-                batch_size = batch.batch_size
+                batch_batchsize = batch.batch_size
                 if bool_edge_wgt:
-                    outputs = model(batch.x, batch.edge_index, batch.edge_weight)
+                    outputs = model(batch.x, batch.edge_index, gnn_type, batch.edge_weight)
                 else:
-                    outputs = model(batch.x, batch.edge_index)
+                    outputs = model(batch.x, batch.edge_index, gnn_type)
 
                 ### NOTE only consider predictions and labels of seed nodes
-                y = batch.y[:batch_size]
-                outputs = outputs[:batch_size]
-                event_wgts = batch.node_weight[:batch_size]
+                y = batch.y[:batch_batchsize]
+                outputs = outputs[:batch_batchsize]
+                event_wgts = batch.node_weight[:batch_batchsize]
 
                 loss = weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
                 
-                total_examples += batch_size
-                total_loss += float(loss) * batch_size
+                total_examples += batch_batchsize
+                total_loss += float(loss) * batch_batchsize
                 val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach()))
                 val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach()))
                 val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach()))
+                val_x_fold = torch.cat((val_x_fold, batch.x.detach()))
 
             avg_vl_loss = total_loss / total_examples
             val_loss.append(avg_vl_loss)
+            
+            # # Plotting edge weights
+            # fig, ax = plt.subplots()
+            # ax.hist(train_wgts_fold, bins=50, label="Training", histtype='step', density=True, color="darkorange")
+            # ax.hist(val_wgts_fold, bins=50, label="Validation", histtype='step', density=True, color="steelblue")
+            # ax.legend(loc='upper right', fontsize=9)
+            # ax.set_xlabel("Edge weights", loc="right")
+            # ax.set_ylabel("No. Events", loc="top")
+            # fig.savefig(plot_path+"fold_"+str(fold_no)+"_edge_weights.pdf", transparent=True)
+            # for i in range(train_x_fold.shape[1]):
+            #     fig, ax = plt.subplots()
+            #     ax.hist(train_x_fold[:, i], bins=50, label="Train fold "+str(fold_no), histtype='step', color="darkorange", density=True)
+            #     ax.hist(val_x_fold[:, i], bins=50, label="Val fold "+str(fold_no), histtype='step', color="steelblue", density=True)
+            #     ax.legend(loc='upper right', fontsize=9)
+            #     ax.set_xlabel("Feature " + str(i), loc="right")
+            #     ax.set_ylabel("Normalised Events", loc="top")
+            #     fig.savefig(plot_path+"fold_"+str(fold_no)+"_feature_"+str(i)+".pdf", transparent=True)
+
 
             current_lr = optimiser.param_groups[0]['lr']
             scheduler.step(avg_vl_loss)
@@ -450,6 +472,11 @@ try:
             if patience_counter >= patience_early_stopping:
                 print(f"Early stopping after {epoch+1} epochs.")
                 break
+            
+        print("FOLD ", fold_no, "TRAIN X ", train_x_fold)
+        train_x["fold_"+str(fold_no)+"_x"] = train_x_fold
+        print("FOLD ", fold_no, "VAL X ", val_x_fold)
+        val_x["fold_"+str(fold_no)+"_x"] = val_x_fold
 
         logging.info(f"Finished fold {fold_no}/{num_folds}")
         logging.info(f"Number of epochs: {epoch+1}/{epochs}, Final train Loss: {avg_tr_loss}, final validation Loss: {avg_vl_loss}")
@@ -458,11 +485,11 @@ try:
         model_file_name = f"model_fold_{fold_no}.pth"
 
         misc.create_dirs(model_path)
-        torch.save({
-            'model_state': model.state_dict(),
-            'optimiser_state': optimiser.state_dict(),
-            'normalisation_params': {"means": means, "stds": stds}
-        }, model_path+model_file_name)
+        # torch.save({
+        #     'model_state': model.state_dict(),
+        #     'optimiser_state': optimiser.state_dict(),
+        #     'normalisation_params': {"means": means, "stds": stds}
+        # }, model_path+model_file_name)
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
@@ -480,11 +507,21 @@ try:
         if single_fold == True:
             print("Single fold training, breaking loop ...")
             break
+    for j in range(train_x_fold.shape[1]):
+        fig, ax = plt.subplots()
+        for k in range(fold_no):
+            print("fold ", k)
+            print("fold_"+str(k+1)+"_x", train_x["fold_"+str(k+1)+"_x"][:, 0])
+            ax.hist(train_x["fold_"+str(k+1)+"_x"][:, j], bins=50, label="Train fold "+str(k), histtype='step', density=False)
+            ax.hist(val_x["fold_"+str(k+1)+"_x"][:, j], bins=50, label="Val fold "+str(k), histtype='step', linestyle="--", density=False)
+            ax.legend(loc='upper right', fontsize=9)
+            ax.set_xlabel("Feature " + str(j), loc="right")
+            ax.set_ylabel("Events", loc="top")
+        fig.savefig(plot_path+"feature_"+str(j)+".pdf", transparent=True)
 finally:
     logging.info("Training complete.")
     print("train truth labels", len(train_truth_labels))
     print("val truth labels", len(val_truth_labels))
-
 
 
     ### compute ROC curve and AUC
@@ -524,43 +561,27 @@ finally:
     perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), num_folds, hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
 
     logging.info("Plotting training/validation losses ...")
-    fig, ax = plt.subplots()
+    fig_loss, ax_loss = plt.subplots()
     x_epoch = numpy.arange(1,epochs+1,1)
     for loss_loop, (train_loss, val_loss) in enumerate(zip(train_losses, val_losses)):
-        train_line, = ax.plot(np.arange(len(train_loss)), train_loss, label="Fold " + str(loss_loop) + " (Train)")
+        train_line, = ax_loss.plot(np.arange(len(train_loss)), train_loss, label="Fold " + str(loss_loop) + " (Train)")
         colour = train_line.get_color()
-        ax.plot(np.arange(len(val_loss)), val_loss, label="Fold " + str(loss_loop) + " (Val)", color=colour, linestyle = "-.")
-    ax.legend(loc='upper right', fontsize=9)
-    ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
-    ax.set_xlabel("Epoch", loc="right")
-    ax.set_ylabel("Loss", loc="top")
+        ax_loss.plot(np.arange(len(val_loss)), val_loss, label="Fold " + str(loss_loop) + " (Val)", color=colour, linestyle = "-.")
+    ax_loss.legend(loc='upper right', fontsize=9)
+    if gnn:
+        model_text = [str(gnn_type)+" model", "GNN layers "+ str(hidden_sizes_gcn), "MLP layers "+ str(hidden_sizes_mlp), "Batchsize " + str(batch_size) + ", neighbour sampling " + str(num_nb_list)]
+    else:
+        model_text = [str(gnn_type) + " model", "MLP layers "+ str(hidden_sizes_mlp), "Batchsize " + str(batch_size)]
+    plotting.add_text(ax_loss, model_text, doATLAS=False, startx=0.02, starty=0.95)
+    ax_loss.set_xlabel("Epoch", loc="right")
+    ax_loss.set_ylabel("Loss", loc="top")
+    ymin, ymax = ax_loss.get_ylim()
+    ax_loss.set_ylim(ymin, ymax*1.2)
     misc.create_dirs(plot_path)
     logging.info("Saving plots to "+plot_path)
-    fig.savefig(plot_path+"training_validation_loss.pdf", transparent=True)
+    fig_loss.savefig(plot_path+"training_validation_loss.pdf", transparent=True)
 
     logging.info("Plotting model outputs ...")
-    fig, ax = plt.subplots()
-    binning = np.linspace(0,1,51)
-    ax.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange", weights=train_sig_wgts.detach().cpu().numpy())
-    ax.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue", weights=train_bkg_wgts.detach().cpu().numpy())
-    ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange", weights=val_sig_wgts.detach().cpu().numpy())
-    ax.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue", weights=val_bkg_wgts.detach().cpu().numpy())
-
-    score_path = score_path + model_label + "/"
-    misc.create_dirs(score_path)
-
-    np.save(score_path+"train_sig_pred.npy", train_sig_pred.detach().cpu().numpy())
-    np.save(score_path+"train_sig_wgts.npy", train_sig_wgts.detach().cpu().numpy())
-
-    np.save(score_path+"train_bkg_pred.npy", train_bkg_pred.detach().cpu().numpy())
-    np.save(score_path+"train_bkg_wgts.npy", train_bkg_wgts.detach().cpu().numpy())
-
-    np.save(score_path+"val_sig_pred.npy", val_sig_pred.detach().cpu().numpy())
-    np.save(score_path+"val_sig_wgts.npy", val_sig_wgts.detach().cpu().numpy())
-
-    np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().cpu().numpy())
-    np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().cpu().numpy())
-
     if gnn:
         if eff is not None:
             linking_length_label = "Linking length at "+str(eff)+" sig-sig efficiency"
@@ -584,24 +605,49 @@ finally:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
         elif linking_length is not None:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+    
+    fig_pred, ax_pred = plt.subplots()
+    binning = np.linspace(0,1,51)
+    ax_pred.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange", weights=train_sig_wgts.detach().cpu().numpy())
+    ax_pred.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue", weights=train_bkg_wgts.detach().cpu().numpy())
+    ax_pred.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange", weights=val_sig_wgts.detach().cpu().numpy())
+    ax_pred.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue", weights=val_bkg_wgts.detach().cpu().numpy())
+    plotting.add_text(ax_pred, text, doATLAS=False, startx=0.02, starty=0.95)
+    ax_pred.legend(loc='upper right', fontsize=9)
+    ax_pred.set_xlabel("Output score", loc="right")
+    ax_pred.set_ylabel("Normalised No. Events", loc="top")
+    ymin, ymax = ax_pred.get_ylim()
+    ax_pred.set_yscale('log')
+    ax_pred.set_ylim((ymin, ymax*5))
+    fig_pred.savefig(plot_path+"training_validation_pred.pdf", transparent=True)
 
-    plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
-    ax.legend(loc='upper right', fontsize=9)
-    ax.set_xlabel("Output score", loc="right")
-    ax.set_ylabel("Normalised No. Events", loc="top")
-    ymin, ymax = ax.get_ylim()
-    ax.set_ylim((ymin, ymax*1.2))
-    fig.savefig(plot_path+"training_validation_pred.pdf", transparent=True)
+    score_path = score_path + model_label + "/"
+    misc.create_dirs(score_path)
+
+    np.save(score_path+"train_sig_pred.npy", train_sig_pred.detach().cpu().numpy())
+    np.save(score_path+"train_sig_wgts.npy", train_sig_wgts.detach().cpu().numpy())
+
+    np.save(score_path+"train_bkg_pred.npy", train_bkg_pred.detach().cpu().numpy())
+    np.save(score_path+"train_bkg_wgts.npy", train_bkg_wgts.detach().cpu().numpy())
+
+    np.save(score_path+"val_sig_pred.npy", val_sig_pred.detach().cpu().numpy())
+    np.save(score_path+"val_sig_wgts.npy", val_sig_wgts.detach().cpu().numpy())
+
+    np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().cpu().numpy())
+    np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().cpu().numpy())
 
     logging.info("Plotting ROC curves ...")
-    fig, ax = plt.subplots()
+    fig_roc, ax_roc = plt.subplots()
     plt.plot(train_fpr, train_tpr, label='Training ROC curve (AUC = {:.3f})'.format(train_auc))
     plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
     plt.legend(loc="upper left", fontsize=9)
     plt.xlim(0,1)
+    plt.ylim(0,1.2)
+    # plt.yscale('log')
+    plotting.add_text(ax_roc, model_text, doATLAS=False, startx=0.02, starty=0.2)
     plt.xlabel("Background Efficiency", loc="right")
     plt.ylabel("Signal Efficiency", loc="top")
-    fig.savefig(plot_path+"training_validation_ROC.pdf", transparent=True)
+    fig_roc.savefig(plot_path+"training_validation_ROC.pdf", transparent=True)
 
     logging.info("Saving ROC curves to json files ...")
     roc_json_path = plot_path+"roc.json"
