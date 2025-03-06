@@ -78,7 +78,7 @@ kinematics = misc.get_kinematics(variable, feature_dim)
 logging.info('Importing signal and background files...')
 if signal == "hhh": SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
 
-full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, standardisation=False)
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, ex="", plot=True, signal=signal, standardisation=False)
 
 global_bkg_wgt = 1.0
 if signal == "hhh": global_bkg_wgt = SF_4b5b
