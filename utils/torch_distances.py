@@ -13,10 +13,11 @@ def cosine(a, b):
     Returns:
         (float) cosine distance
     """
-    numerator = torch.matmul(a, torch.transpose(b, 0, 1)).to(torch.float16)
-    denominator = torch.sqrt(torch.tensordot(torch.sum(torch.square(a),dim=1), torch.sum(torch.square(b),dim=1))).to(torch.float16)
+    numerator = torch.matmul(a, torch.transpose(b, 0, 1)).to(torch.float32)
+    denominator = torch.matmul(torch.unsqueeze(torch.norm(a, dim=1), 1), torch.unsqueeze(torch.norm(b, dim=1), 0)).to(torch.float32)
 
-    return (1 - numerator / denominator).to(torch.float16)
+    return (1 - numerator/denominator).to(torch.float16)
+
 
 def euclidean(a, b):
     """
