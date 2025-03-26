@@ -206,6 +206,16 @@ full_ind = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind)).round().t
 if bool_edge_wgt:
     full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
     del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
+
+### min_max normalise the edge weights
+inf_mask = torch.isinf(full_edge_wgts)
+full_edge_wgts[inf_mask] = 0
+max_wgt = torch.max(full_edge_wgts)
+min_wgt = torch.min(full_edge_wgts)
+full_edge_wgts = norm.minmax(full_edge_wgts, min_wgt, max_wgt)
+full_edge_wgts[inf_mask] = 1
+
+
 #### generate the adjacency matrix as a sparse tensor object (currently not needed, using edge index instead)
 # logging.info("Rounding the indices to int32 ...")
 # full_ind = full_ind.to(torch.int32)

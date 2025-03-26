@@ -224,7 +224,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
     indices = torch.empty(0, dtype=torch.int32)#.to("cuda")
     if edge_wgt:
         edge_wgts = torch.empty(0, dtype=torch.float32)
-        inf_mask = torch.empty(0, dtype=torch.bool)
+        # inf_mask = torch.empty(0, dtype=torch.bool)
     batch_size = 30000
     print("Loading batch size ", batch_size)
     for f in files:
@@ -245,7 +245,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
                 ind = mask.nonzero().to(torch.int32)
                 if edge_wgt:
                     edge_wgts_tmp = (1 / distance[mask])
-                    inf_mask_tmp = torch.isinf(edge_wgts_tmp)
+                    # inf_mask_tmp = torch.isinf(edge_wgts_tmp)
                 print(f"CPU allocated before {process.memory_info().rss/(1024 ** 3):.2f}, GB")
                 del distance, mask
                 
@@ -256,7 +256,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
                 indices = torch.cat((indices, ind))
                 if edge_wgt:
                     edge_wgts = torch.cat((edge_wgts, edge_wgts_tmp))
-                    inf_mask = torch.cat((inf_mask, inf_mask_tmp))
+                    # inf_mask = torch.cat((inf_mask, inf_mask_tmp))
                 if i_ind != j_ind:
                     # swapping the columns for the opposite corner of a symmetric adjacency matrix 
                     ind_lowerleft = ind[:, torch.tensor([0, 1])][:, torch.tensor([1, 0])]
@@ -264,7 +264,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
                     del ind_lowerleft
                     if edge_wgt:
                         edge_wgts = torch.cat((edge_wgts, edge_wgts_tmp))
-                        inf_mask = torch.cat((inf_mask, inf_mask_tmp))
+                        # inf_mask = torch.cat((inf_mask, inf_mask_tmp))
                 del ind
                 if edge_wgt:
                     del edge_wgts_tmp
@@ -282,9 +282,9 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
             ind = mask.nonzero().to(torch.int32)
             if edge_wgt:
                 edge_wgts_tmp = 1 / distance[mask]
-                inf_mask_tmp = torch.isinf(edge_wgts_tmp)
-                edge_wgts_tmp[inf_mask_tmp] = 0.
-                inf_mask = torch.cat((inf_mask, inf_mask_tmp))
+                # inf_mask_tmp = torch.isinf(edge_wgts_tmp)
+                # edge_wgts_tmp[inf_mask_tmp] = 0.
+                # inf_mask = torch.cat((inf_mask, inf_mask_tmp))
 
             print(f"CPU allocated before {process.memory_info().rss/(1024 ** 3):.2f}, GB")
             del distance, mask
@@ -300,13 +300,13 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
             print(f"CPU allocated after {process.memory_info().rss/(1024 ** 3):.2f}, GB")
     # Minmax normalise the edge weights
     if edge_wgt:
-        normed_edge_wgts = torch.clone(edge_wgts)
-        non_inf_edge_wgts = edge_wgts[~inf_mask]
-        non_inf_edge_wgts = norm.minmax(non_inf_edge_wgts, torch.min(non_inf_edge_wgts), torch.max(non_inf_edge_wgts))
-        normed_edge_wgts[~inf_mask] = non_inf_edge_wgts
-        normed_edge_wgts[inf_mask] = 1.
-        del inf_mask, edge_wgts
-        return indices, normed_edge_wgts
+        # normed_edge_wgts = torch.clone(edge_wgts)
+        # non_inf_edge_wgts = edge_wgts[~inf_mask]
+        # non_inf_edge_wgts = norm.minmax(non_inf_edge_wgts, torch.min(non_inf_edge_wgts), torch.max(non_inf_edge_wgts))
+        # normed_edge_wgts[~inf_mask] = non_inf_edge_wgts
+        # normed_edge_wgts[inf_mask] = 1.
+        # del inf_mask, edge_wgts
+        return indices, edge_wgts #normed_edge_wgts
     else:
         return indices
 
