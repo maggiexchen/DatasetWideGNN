@@ -1,5 +1,5 @@
 kinematic_variable: "LQ"
-embedding_variable: embedding
+embedding_variable: "LQ"
 distance: "euclidean"
 flip: True
 edge_weights: True
@@ -12,9 +12,9 @@ LR: 0.01
 patience_LR: 3
 num_nb_list: [60, 60, 60, 60, 60, 60]
 batch_size: 128
-gnn_type: "Graph"
+gnn_type: "GCN"
 epochs: 50
 patience_early_stopping: 20
-num_folds: 4
+num_folds: 3
 single_fold:
 plot_conv_kinematics: False
