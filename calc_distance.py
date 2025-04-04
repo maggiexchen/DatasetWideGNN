@@ -63,6 +63,7 @@ plot_path = user_config["plot_path"]
 dist_path = user_config["dist_path"]
 
 signal = user_config["signal"]
+signal_mass = str(user_config["signal_mass"])
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 
@@ -72,13 +73,13 @@ logging.info("variable set: "+variable)
 logging.info("input data path: "+feature_h5_path)
 logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
-kinematics = misc.get_kinematics(variable, feature_dim)
+kinematics, kinematic_labels = misc.get_kinematics(variable, feature_dim)
 
 # load in input files
 logging.info('Importing signal and background files...')
 if signal == "hhh": SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
 
-full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, ex="", plot=True, signal=signal, standardisation=False)
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=True, signal=signal, signal_mass=signal_mass, standardisation=True)
 
 global_bkg_wgt = 1.0
 if signal == "hhh": global_bkg_wgt = SF_4b5b
