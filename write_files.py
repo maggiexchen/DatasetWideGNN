@@ -73,10 +73,10 @@ df_sig = {str(signal):{}}
 df_sig[signal] = pd.concat(data_list, ignore_index=True)
 df_sig[signal]["target"] = [1]*len(df_sig[signal])
 df_sig[signal]["eventWeight"] = pd.concat(weight_list, ignore_index=True)
-print(signal, " event weights: ", df_sig[signal]["eventWeight"])
-print("Total ", signal, " events: ", len(df_sig[signal]))
+print("Total ", signal, " events before cuts: ", len(df_sig[signal]))
 if cuts is not None:
     df_sig[signal] = misc.cut_operation(df_sig[signal], cuts)
+    print("Total ", signal, " events after cuts: ", len(df_sig[signal]))
 df_sig[signal].to_hdf(h5_path + str(signal)+"_"+signal_mass+".h5", key=str(signal), mode="w")
 
 logging.info('Importing and writing background ')
@@ -98,20 +98,19 @@ for background in backgrounds:
     df_bkgs[background] = pd.concat(data_list, ignore_index=True)
     df_bkgs[background]["target"] = [0]*len(df_bkgs[background])
     df_bkgs[background]["eventWeight"] = pd.concat(weight_list, ignore_index=True)
-    print("Total ", background, " events: ", len(df_bkgs[background]))
-    print(background, " event weights: ", df_bkgs[background]["eventWeight"])
+    print("Total ", background, " events before cuts: ", len(df_bkgs[background]))
     if cuts is not None:
         df_bkgs[background] = misc.cut_operation(df_bkgs[background], cuts)
+        print("Total ", background, " events after cuts: ", len(df_bkgs[background]))
     df_bkgs[background].to_hdf(h5_path + str(background)+".h5", key=str(background), mode="w")
 
 logging.info("Plotting eventWeights ...")
 fig, ax = plt.subplots()
-binning = numpy.linspace(0,0.2,51)
-ax.hist(df_sig[signal]["eventWeight"], bins=binning, label=signal)
+_, binning, _ = ax.hist(df_sig[signal]["eventWeight"], histtype="step", bins=100, label=signal)
 for background in backgrounds:
-    ax.hist(df_bkgs[background]["eventWeight"], bins=binning, label=background)
+    ax.hist(df_bkgs[background]["eventWeight"], histtype="step", bins=100, label=background)
 ax.legend(loc='upper right', fontsize=9)
-ax.set_xlim((0, 0.2))
+ax.set_yscale("log")
 ax.set_xlabel("Event weight", loc="right")
 ax.set_ylabel("No. Events", loc="top")
 fig.savefig("eventweight_check_LQ1000_MetCut200_140325.pdf", transparent=True)
