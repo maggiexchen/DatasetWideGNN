@@ -82,9 +82,10 @@ adj_path = user_config["adj_path"]
 dist_path = user_config["dist_path"]
 flip = train_config["flip"]
 bool_edge_wgt = train_config["edge_weights"]
-
+os.makedirs(adj_path, exist_ok=True)
 # TODO: assert. This should be "hhh" "LQ" or "stau"
 signal = user_config["signal"]
+signal_mass = user_config["signal_mass"]
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 
@@ -124,7 +125,7 @@ else:
     print("linking length is given in config, IGNORING the sigsig_eff in the config!")
 
 
-kinematics = misc.get_kinematics(kinematic_variable, feature_dim)
+kinematics, kinematic_labels = misc.get_kinematics(kinematic_variable, feature_dim)
 input_size = len(kinematics)
 
 logging.info("signal: "+signal)
@@ -147,7 +148,7 @@ logging.info('Importing signal and background files...')
 
 # normalised signal and background kinematics
 logging.info('Importing signal and background files...')
-full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, standardisation=True)
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal=signal, signal_mass=signal_mass, standardisation=True)
 full_event_weights = torch.cat((sig_wgt, bkg_wgt))
 print("Number of total events: ",full_x.size(0))
 del sig_wgt, bkg_wgt, full_x
@@ -197,15 +198,54 @@ if bool_edge_wgt:
     full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
     full_mask = torch.cat((sigsig_mask, sigbkg_mask, bkgsig_mask, bkgbkg_mask))
     full_event_weights = full_event_weights[full_ind[:, 1]]
-    full_edge_wgts[full_mask] = 1.
-    plot_ind = torch.randperm(len(full_edge_wgts))[:5000]
-    full_edge_wgts *= full_event_weights
-    # full_edge_wgts /= sum(full_edge_wgts)
-    del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
-    normed_full_edge_wgts = torch.clone(full_edge_wgts)
-    # non_self_edge_wgts = normed_full_edge_wgts[~full_mask]
-    # normed_full_edge_wgts[~full_mask] = norm.minmax(non_self_edge_wgts, torch.min(non_self_edge_wgts), torch.max(non_self_edge_wgts))
-    # normed_full_edge_wgts[full_mask] = 1.
+    normed_edge_wgts = torch.clone(full_edge_wgts)
+    non_inf_edge_wgts = normed_edge_wgts[~full_mask]
+    non_inf_edge_wgts = norm.minmax(non_inf_edge_wgts, torch.min(non_inf_edge_wgts), torch.max(non_inf_edge_wgts))
+    normed_edge_wgts[~full_mask] = non_inf_edge_wgts
+    normed_edge_wgts[full_mask] = 1.
+    del non_inf_edge_wgts, full_mask
+    sigsig_plot_ind = torch.randperm(len(sigsig_edge_wgts))[:2000]
+    sigbkg_plot_ind = torch.randperm(len(sigbkg_edge_wgts))[:1000]
+    bkgsig_plot_ind = torch.randperm(len(bkgsig_edge_wgts))[:1000]
+    bkgbkg_plot_ind = torch.randperm(len(bkgbkg_edge_wgts))[:2000]
+    normed_full_edge_wgts = full_edge_wgts * full_event_weights
+    print("EVENT WEIGHTS ", full_event_weights)
+
+    fig, ax = plt.subplots()
+    _, binning, _ = ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind], bkgsig_edge_wgts[bkgsig_plot_ind])) , bins=70, color="darkorange", alpha=0.5, label="sig-bkg")
+    ax.hist(sigsig_edge_wgts[sigsig_plot_ind], bins=binning, color="steelblue", alpha=0.5, label="sig-sig")
+    ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind], bkgsig_edge_wgts[bkgsig_plot_ind])) , bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
+    ax.hist(bkgbkg_edge_wgts[bkgbkg_plot_ind], bins=binning, color="forestgreen", alpha=0.5, label="bkg-bkg")
+    ax.set_xlabel("Edge weights (excluding event weights)", loc="right")
+    ax.set_ylabel("Edges / Bin", loc="top")
+    ax.legend(loc="upper right")
+    ax.set_yscale("log")
+    fig.tight_layout()
+    fig.savefig(adj_path+"Unnormed_edge_wgts_no_EventWeights.pdf", transparent=True)
+
+    fig, ax = plt.subplots()
+    binning = numpy.linspace(0, 1, 70)
+    ax.hist(normed_edge_wgts[sigsig_plot_ind], bins=binning, color="steelblue", alpha=0.5, label="sig-sig")
+    ax.hist(torch.cat((normed_edge_wgts[sigbkg_plot_ind+len(sigsig_edge_wgts)], normed_edge_wgts[bkgsig_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)])) , bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
+    ax.hist(normed_edge_wgts[bkgbkg_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)+len(bkgsig_edge_wgts)], bins=binning, color="forestgreen", alpha=0.5, label="bkg-bkg")
+    ax.set_xlabel("Edge weights (including event weights)", loc="right")
+    ax.set_ylabel("Edges / Bin", loc="top")
+    ax.legend(loc="upper right")
+    ax.set_yscale("log")
+    fig.tight_layout()
+    fig.savefig(adj_path+"Normed_edge_wgts_no_EventWeights.pdf", transparent=True)
+
+    # fig, ax = plt.subplots()
+    # _, binning, _ = ax.hist(normed_full_edge_wgts[bkgbkg_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)+len(bkgsig_edge_wgts)], bins=70, color="forestgreen", alpha=0.5, label="bkg-bkg")
+    # ax.hist(torch.cat((normed_full_edge_wgts[sigbkg_plot_ind+len(sigsig_edge_wgts)], normed_full_edge_wgts[bkgsig_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)])) , bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
+    # ax.hist(normed_full_edge_wgts[sigsig_plot_ind], bins=binning, color="steelblue", alpha=0.5, label="sig-sig")
+    # ax.set_xlabel("Edge weights (including event weights)", loc="right")
+    # ax.set_ylabel("Edges / Bin", loc="top")
+    # ax.legend(loc="upper right")
+    # ax.set_yscale("log")
+    # fig.tight_layout()
+    # fig.savefig(adj_path+"Normed_edge_wgts_with_EventWeights.pdf", transparent=True)
+    # del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
 
 #### generate the adjacency matrix as a sparse tensor object (currently not needed, using edge index instead)
 # logging.info("Rounding the indices to int32 ...")
@@ -240,9 +280,9 @@ misc.create_dirs(adj_path)
 ### saving the adjaceny matrix indices as edge indices
 torch.save(full_ind[:,0], adj_path+'row_ind.pt')
 torch.save(full_ind[:,1], adj_path+'col_ind.pt')
+del full_ind
 if bool_edge_wgt:
     # torch.save(full_edge_wgts, adj_path+'edge_wgts.pt')
     torch.save(normed_full_edge_wgts, adj_path+'edge_wgts.pt')
-
-
+    del normed_full_edge_wgts, normed_edge_wgts
 

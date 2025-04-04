@@ -95,6 +95,7 @@ model_path = user_config["model_path"]
 score_path = user_config["score_path"]
 
 signal = user_config["signal"]
+signal_mass = user_config["signal_mass"]
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {signal}"
 signal_label, background_label = plotting.get_plot_labels(signal)
@@ -184,7 +185,8 @@ else:
             + "_bs" + str(batch_size)\
             + "_e" + str(epochs)\
             + nf_str
-    
+
+kinematic_plot_path = plot_path + "/training_kinematics/"
 if gnn == False:
     plot_path = plot_path + "/MLP/" + model_label + "/"
 plot_path = plot_path + model_label + "/"
@@ -193,7 +195,7 @@ misc.create_dirs(plot_path)
 if signal == "stau":
     kinematics = misc.get_kinematics_staus(kinematic_variable, feature_dim)
 else:
-    kinematics = misc.get_kinematics(kinematic_variable, feature_dim)
+    kinematics, kinematic_labels = misc.get_kinematics(kinematic_variable, feature_dim)
 input_size = len(kinematics)
 
 logging.info("signal: "+signal)
@@ -218,7 +220,7 @@ elif linking_length is not None:
 logging.info('Importing signal and background files...')
 
 # normal loading setup
-full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal)
+full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal=signal, signal_mass=signal_mass)
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
 print("full sig size ", full_sig.size())
@@ -249,21 +251,26 @@ if gnn:
     print("deleting row and col indices ...")
     del row_ind
     del col_ind
-    print("Edge fraciton: ", edge_ind.shape[1] / (len(full_y)* (len(full_y)-1))/2)
+    print("Edge fraciton: ", edge_ind.shape[1] / len(full_y)**2)
     if bool_edge_wgt:
         print("loading edge weights ...")
         edge_wgts = torch.load(adj_path+'edge_wgts.pt')
 
 if plot_conv_kins:
-    edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
-    sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edges, size=(len(full_y), len(full_y)))
+    if bool_edge_wgt:
+        sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edge_wgts, size=(len(full_y), len(full_y)))
+    else:
+        edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
+        sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edges, size=(len(full_y), len(full_y)))
+        del edges
     adj_mat = sparse_adj_matrix.to_dense()
+    print("ADJ MAT ", adj_mat)
     del sparse_adj_matrix
-    print(adj_mat)
     for nconv in range(3):
-        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, len_bkg, kinematics, signal, eff, plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv)
-    del edges, adj_mat
+        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, len_bkg, kinematics, kinematic_labels, signal, eff, kinematic_plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv, edge_wgts=bool_edge_wgt)
+    del adj_mat
 misc.print_mem_info()
+
 
 ### define loss function and optimiser
 def weighted_bce_loss(output, target, class_weights, event_weights):
@@ -306,9 +313,11 @@ try:
     train_losses = []
     val_losses = []
     train_outputs = torch.tensor([])
+    train_outputs_per_fold = {}
     train_truth_labels = torch.tensor([])
     train_wgts = torch.tensor([])
     val_outputs = torch.tensor([])
+    val_outputs_per_fold = {}
     val_truth_labels = torch.tensor([])
     val_wgts = torch.tensor([])
 
@@ -411,7 +420,6 @@ try:
             val_wgts_fold = torch.tensor([])
             val_x_fold = torch.tensor([])
             for batch in val_loader:
-                
                 batch = batch
                 batch_batchsize = batch.batch_size
                 if bool_edge_wgt:
@@ -435,24 +443,6 @@ try:
 
             avg_vl_loss = total_loss / total_examples
             val_loss.append(avg_vl_loss)
-            
-            # # Plotting edge weights
-            # fig, ax = plt.subplots()
-            # ax.hist(train_wgts_fold, bins=50, label="Training", histtype='step', density=True, color="darkorange")
-            # ax.hist(val_wgts_fold, bins=50, label="Validation", histtype='step', density=True, color="steelblue")
-            # ax.legend(loc='upper right', fontsize=9)
-            # ax.set_xlabel("Edge weights", loc="right")
-            # ax.set_ylabel("No. Events", loc="top")
-            # fig.savefig(plot_path+"fold_"+str(fold_no)+"_edge_weights.pdf", transparent=True)
-            # for i in range(train_x_fold.shape[1]):
-            #     fig, ax = plt.subplots()
-            #     ax.hist(train_x_fold[:, i], bins=50, label="Train fold "+str(fold_no), histtype='step', color="darkorange", density=True)
-            #     ax.hist(val_x_fold[:, i], bins=50, label="Val fold "+str(fold_no), histtype='step', color="steelblue", density=True)
-            #     ax.legend(loc='upper right', fontsize=9)
-            #     ax.set_xlabel("Feature " + str(i), loc="right")
-            #     ax.set_ylabel("Normalised Events", loc="top")
-            #     fig.savefig(plot_path+"fold_"+str(fold_no)+"_feature_"+str(i)+".pdf", transparent=True)
-
 
             current_lr = optimiser.param_groups[0]['lr']
             scheduler.step(avg_vl_loss)
@@ -472,11 +462,11 @@ try:
             if patience_counter >= patience_early_stopping:
                 print(f"Early stopping after {epoch+1} epochs.")
                 break
-            
-        print("FOLD ", fold_no, "TRAIN X ", train_x_fold)
-        train_x["fold_"+str(fold_no)+"_x"] = train_x_fold
-        print("FOLD ", fold_no, "VAL X ", val_x_fold)
-        val_x["fold_"+str(fold_no)+"_x"] = val_x_fold
+
+        # train_x["fold_"+str(fold_no)+"_x"] = train_x_fold
+        # val_x["fold_"+str(fold_no)+"_x"] = val_x_fold
+        train_outputs_per_fold["fold_"+str(fold_no)+"_outputs"] = train_outputs_fold.flatten()
+        val_outputs_per_fold["fold_"+str(fold_no)+"_outputs"] = val_outputs_fold.flatten()
 
         logging.info(f"Finished fold {fold_no}/{num_folds}")
         logging.info(f"Number of epochs: {epoch+1}/{epochs}, Final train Loss: {avg_tr_loss}, final validation Loss: {avg_vl_loss}")
@@ -500,24 +490,41 @@ try:
         val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
         val_wgts = torch.cat((val_wgts, val_wgts_fold))
         del train_loader, val_loader, model, optimiser, scheduler
-        # del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
+        del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
         torch.cuda.empty_cache()
         gc.collect()
 
         if single_fold == True:
             print("Single fold training, breaking loop ...")
             break
-    for j in range(train_x_fold.shape[1]):
-        fig, ax = plt.subplots()
-        for k in range(fold_no):
-            print("fold ", k)
-            print("fold_"+str(k+1)+"_x", train_x["fold_"+str(k+1)+"_x"][:, 0])
-            ax.hist(train_x["fold_"+str(k+1)+"_x"][:, j], bins=50, label="Train fold "+str(k), histtype='step', density=False)
-            ax.hist(val_x["fold_"+str(k+1)+"_x"][:, j], bins=50, label="Val fold "+str(k), histtype='step', linestyle="--", density=False)
-            ax.legend(loc='upper right', fontsize=9)
-            ax.set_xlabel("Feature " + str(j), loc="right")
-            ax.set_ylabel("Events", loc="top")
-        fig.savefig(plot_path+"feature_"+str(j)+".pdf", transparent=True)
+    # print("plotting input features per fold")
+    # for j in range(train_x_fold.shape[1]):
+    #     fig, ax = plt.subplots()
+    #     for k in range(fold_no):
+    #         if k == 0:
+    #             hist, binning, _ = ax.hist(train_x["fold_"+str(k+1)+"_x"], bins=50, label="Train fold "+str(k), histtype='step', density=True)
+    #         else:
+    #             ax.hist(train_x["fold_"+str(k+1)+"_x"][:, j], bins=binning, label="Train fold "+str(k), histtype='step', density=True)
+    #         # ax.hist(val_x["fold_"+str(k+1)+"_x"][:, j], bins=50, label="Val fold "+str(k), histtype='step', linestyle="--", density=False)
+    #         ax.legend(loc='upper right', fontsize=9)
+    #         ax.set_xlabel(kinematic_labels[j], loc="right")
+    #         ax.set_ylabel("Normalised Events / Bin", loc="top")
+    #     fig.savefig(plot_path+"feature_"+str(j)+".pdf", transparent=True)
+    
+    print("plotting model outputs per fold")
+    fold_fig, fold_ax = plt.subplots()
+    fold_colours = ["steelblue", "darkorange", "forestgreen"]
+    for k in range(fold_no):
+        print("TRAIN FOLD ", train_outputs_per_fold["fold_"+str(k+1)+"_outputs"])
+        print("VAL FOLD ", val_outputs_per_fold["fold_"+str(k+1)+"_outputs"])
+        fold_fig, fold_ax = plt.subplots()
+        hist, binning, _ = fold_ax.hist(train_outputs_per_fold["fold_"+str(k+1)+"_outputs"], bins=40, label="Train fold "+str(k), histtype='step', linestyle='--', density=True, color=fold_colours[k])
+        fold_ax.hist(val_outputs_per_fold["fold_"+str(k+1)+"_outputs"], bins=binning, label="Val fold "+str(k), alpha=0.5, density=True, color=fold_colours[k])
+        fold_ax.legend(loc='upper right', fontsize=9)
+        fold_ax.set_xlabel("Training output score", loc="right")
+        fold_ax.set_ylabel("Normalised Events / Bin", loc="top")
+        fold_ax.set_yscale('log')
+        fold_fig.savefig(plot_path+"outputs_fold_"+str(k)+".pdf", transparent=True)
 finally:
     logging.info("Training complete.")
     print("train truth labels", len(train_truth_labels))
