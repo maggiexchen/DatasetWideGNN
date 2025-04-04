@@ -31,7 +31,6 @@ class GCNLayer(nn.Module):
         nn.init.zeros_(self.train_bias.data)
 
     def forward(self, x, adjacency_matrix):
-    #def forward(self, x):
         output = torch.matmul(torch.matmul(adjacency_matrix,x), self.train_weight)+self.train_bias
         if self.use_batch_norm:
             output = self.batch_norm(output)
