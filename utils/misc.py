@@ -85,24 +85,30 @@ def get_kinematics(variable, dim):
         variable (str): the category of variables you want the list for
 
     Returns:
-        list(str): the list of names of kinematic variables
+        lists(str): a list of kinematic variables, and a list of kinematic variables and a list of their corresponding labels for plotting
     """
     if variable == "mass":
         # mass-based kinematics
         #kinematics = ["mH1","mH2","mH3","mHHH","mHcosTheta","meanmH","rmsmH","meanmBB","rmsmBB","meanPt","rmsPt","ht","massfraceta","massfracphi","massfracraw"]
         kinematics = ["mH1","mH2","mH3","mHHH"]
+        labels = [r"$m_{H1}$ / GeV", r"$m_{H2}$ / GeV", r"$m_{H3}$ / GeV", r"$m_{HHH}$ / GeV"]
     elif variable == "angular":
         # angular kinematics
         kinematics = ["dRH1","dRH2","dRH3","meandRBB"]
+        labels = [r"$\Delta R_{H1}$", r"$\Delta R_{H2}$", r"$\Delta R_{H3}$", r"Mean $\Delta R_{dijet}$"]
     elif variable == "shape":
         # event shape kinematics
         kinematics = ["sphere3dv2b","sphere3dv2btrans","aplan3dv2b","theta3dv2b"]
+        labels = [r"Sphericity$_{6jets}$", r"Trans. Sphericity$_{6jets}$", r"Aplanarity$_{6jets}$", r"Theta$_{6jets}$"]
     elif variable == "combined":
         kinematics = ["mH1","mH2","mH3","mHHH","dRH1","dRH2","dRH3","meandRBB","sphere3dv2b","sphere3dv2btrans","aplan3dv2b","theta3dv2b"]
+        lables = [r"$m_{H1}$ / GeV", r"$m_{H2}$ / GeV", r"$m_{H3}$ / GeV", r"$m_{HHH}$ / GeV", r"$\Delta R_{H1}$", r"$\Delta R_{H2}$", r"$\Delta R_{H3}$", r"Mean $\Delta R_{dijet}$", r"Sphericity$_{6jets}$", r"Trans. Sphericity$_{6jets}$", r"Aplanarity$_{6jets}$", r"Theta$_{6jets}$"]
     elif variable == "mass_and_angular":
         kinematics = ["mH1","mH2","mH3","mHHH","dRH1","dRH2","dRH3","meandRBB"]
+        labels = [r"$m_{H1}$ / GeV", r"$m_{H2}$ / GeV", r"$m_{H3}$ / GeV", r"$m_{HHH}$ / GeV", r"$\Delta R_{H1}$", r"$\Delta R_{H2}$", r"$\Delta R_{H3}$", r"Mean $\Delta R_{dijet}$"]
     elif variable == "mass_and_shape":
         kinematics = ["mH1","mH2","mH3","mHHH","sphere3dv2b","sphere3dv2btrans","aplan3dv2b","theta3dv2b"]
+        labels = [r"$m_{H1}$ / GeV", r"$m_{H2}$ / GeV", r"$m_{H3}$ / GeV", r"$m_{HHH}$ / GeV", r"Sphericity$_{6jets}$", r"Trans. Sphericity$_{6jets}$", r"Aplanarity$_{6jets}$", r"Theta$_{6jets}$"]
     # elif variable == "LQ":
         #kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
     #     kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
@@ -111,20 +117,26 @@ def get_kinematics(variable, dim):
     #                   'met', 'metphi']
     elif variable == "LQ":
         # kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
+        # labels = [r"E$_{T}^{miss}$ / GeV", r"p$_{T, bbll}$ / GeV", r"min$\Delta \phi_{ETmiss, l}$", r"m$_{T, l1}$ / GeV", r"m$_{T, l2}$ / GeV"]
         kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
                       'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta', 'lep1flav',
                       'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi', 'lep2flav',
                       'met', 'metphi']
+        labels = [r"p$_{T, b1}$ / GeV", r"p$_{T, b2}$ / GeV", r"p$_{T, l1}$ / GeV", r"p$_{T, l2}$ / GeV",
+                  r"$\eta_{b1}$", r"$\eta_{b2}$", r"$\eta_{l1}$", r"$\eta_{l2}$", r"Flavour$_{l1}$",
+                  r"$\phi_{b1}$", r"$\phi_{b2}$", r"$\phi_{l1}$", r"$\phi_{l2}$", r"Flavour$_{l2}$",
+                  r"E$_{T}^{miss}$ / GeV", r"$\phi_{ETmiss}$"]
     elif variable == "embedding":
         if dim == None:
             raise Exception("Please specify the number of emdedded features used")
         else:
             embedding_dim = dim
             kinematics = [f'feat_{i+1:02d}' for i in range(embedding_dim)]
+            labels = [f'Feature {i+1:02d}' for i in range(embedding_dim)]
     else:
         raise Exception("bruh, pick a better variable set (mass, angular, shape, combined, mass_and_angular, mass_and_shape)")
 
-    return kinematics
+    return kinematics, labels
 
 def get_kinematics_staus(variable):
     """
@@ -135,7 +147,7 @@ def get_kinematics_staus(variable):
         variable (str): the category of variables you want the list for
 
     Returns:
-        list(str): the list of names of kinematic variables
+        list(str): a list of kinematic variables
     """
        
     kin_var_0J = [
@@ -230,7 +242,6 @@ def get_kinematics_staus(variable):
         raise Exception("bruh, pick a better variable set for staus (all, no_jets, jets, distance)")
     
     return kinematics
-
 
 def sig_mass_point(df_sig, mass_points = ['100_50']):
     """
@@ -377,7 +388,7 @@ def get_batched_distances(dist_path, variable, distance, t, sample=True):
     distance = torch.empty(0, dtype=torch.float16)
     wgt = torch.empty(0, dtype=torch.float16)
     if sample:
-        num_sample = 50000
+        num_sample = 500000
         batch_sample = math.ceil(num_sample / len(files))
         sample_count = 0
         while sample_count < num_sample:
@@ -400,7 +411,6 @@ def get_batched_distances(dist_path, variable, distance, t, sample=True):
             wgt = torch.cat((wgt, wgt_tmp))
             del distance_tmp
             del wgt_tmp
-            sample_count += batch_sample
 
     return distance, wgt
 

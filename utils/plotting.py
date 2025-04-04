@@ -19,7 +19,7 @@ def get_plot_labels(signal_type):
         signal = "6b resonant TRSM HHH signal"
         background = "Data-driven QCD background estimate (5b data)"
     elif signal_type == "LQ":
-        signal = "Leptoquark signal"
+        signal = r"Leptoquark signal ($m_{LQ}$ = 1 TeV)"
         background = r"$t\bar{t}$ and Single top backgrounds"
     elif signal_type == "stau":
         signal = "StauStau signal"
@@ -78,6 +78,7 @@ def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, labe
     ax.legend(loc='upper right')
     ax.set_xlabel(var+" "+distance +" distance", loc="right")
     ax.set_ylabel("Normalised event pairs / bin", loc="top")
+    # ax.set_xlim((0, 1650))
     # ax.set_yscale('log')
     # save
     if label!="": label = "_"+label
@@ -88,7 +89,7 @@ def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, labe
 
     return 0
 
-def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var, file_path, standardise=True):
+def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var, var_label, file_path, standardise=True):
     """
     Function to plot the histogram of a kinematic variable for signal and background on one figure.
 
@@ -105,20 +106,20 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var, file_path, s
     # plot
     fig, ax = plt.subplots()
     if standardise:
-        add_text(ax, ["Signal - "+sig_label, "Background - "+bkg_label, "Standardised to (mean, std) = (0, 1)"])
+        add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", sig_label, bkg_label, r"$E_T^{miss}$ > 200 GeV ", r"Standardised to (mean, std) = (0, 1)"])
         plot_name = "/standardised_"
         binning = np.linspace(min(min(df_sig.loc[:, var]), min(df_bkg.loc[:, var])), max(max(df_sig.loc[:, var]), max(df_bkg.loc[:, var])), 50)
         bool_density = True
     else:
-        add_text(ax, ["Signal - "+sig_label, "Background - "+bkg_label])
+        add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", sig_label, bkg_label, r"$E_T^{miss}$ > 200 GeV "])
         plot_name = "/"
         binning = np.linspace(min(min(df_sig.loc[:, var]), min(df_bkg.loc[:, var])), max(max(df_sig.loc[:, var]), max(df_bkg.loc[:, var])), 50)
         bool_density = True
-    yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background", alpha=0.3, color="steelblue", density=bool_density)
-    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal", alpha=0.3, color="red", density=bool_density)
+    yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background", alpha=0.3, color="steelblue", density=bool_density, weights=df_bkg["eventWeight"])
+    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal", alpha=0.3, color="red", density=bool_density, weights=df_sig["eventWeight"])
     ax.legend(loc='upper right')
     ax.set_ylim([0, 1.2*max(max(ys),max(yb))])
-    ax.set_xlabel("\n"+str(var), loc="right")
+    ax.set_xlabel("\n"+str(var_label), loc="right")
     if bool_density:
         ax.set_ylabel("Normalised Events / Bin", loc="top")
     else:
@@ -132,7 +133,7 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var, file_path, s
         fig.savefig(save_path+plot_name+var+ext, transparent=True)
     return 0
 
-def plot_conv_kinematics(adj_mat, x, len_sig, len_bkg, kinematics, signal_type, eff, file_path, normalisation, standardise=True, nconv=1):
+def plot_conv_kinematics(adj_mat, x, len_sig, len_bkg, kinematics, kinematic_labels, signal_type, eff, file_path, normalisation, standardise=True, nconv=1, edge_wgts=False ):
     """
     Function to plot the histograms of a list of kinematics variable for signal and background on one figure, after a set number of convolutions.
 
@@ -146,6 +147,7 @@ def plot_conv_kinematics(adj_mat, x, len_sig, len_bkg, kinematics, signal_type, 
         normalisation (str): which way to normalise the Adj. ("D_inv", or "D_half_inv")
         standardise (bool): whether or not to standardise the variable distributions.
         nconv (int): how many times you want to convolute the kinematics.
+        edge_wgts (bool): whether or not to include edge weights in convolution
 
     Returns:
         void
@@ -157,9 +159,9 @@ def plot_conv_kinematics(adj_mat, x, len_sig, len_bkg, kinematics, signal_type, 
         diagonal.fill_(1)
     elif normalisation == "D_half_inv":
         D_half_inv = torch.diag(torch.rsqrt(torch.sum(adj_mat, dim=1)))
-        print("Half inv degree matrix ", D_half_inv)
+        # print("Half inv degree matrix ", D_half_inv)
         adj_mat = torch.matmul(D_half_inv, torch.matmul(adj_mat, D_half_inv))
-        print("Degree normed adj mat ", adj_mat)
+        # print("Degree normed adj mat ", adj_mat)
         diagonal = adj_mat.diagonal()
         diagonal.fill_(1)
     else: 
@@ -185,8 +187,12 @@ def plot_conv_kinematics(adj_mat, x, len_sig, len_bkg, kinematics, signal_type, 
     post_conv_bkg = post_conv_x_numpy[len_sig:]
     
     # plot standardised convoluted kinematics
-    misc.create_dirs(file_path+"/conv_kinematics/")
-    print("Saving to ", file_path+"/conv_kinematics/")
+    if edge_wgts:
+        conv_plot_path = file_path+"/conv_kinematics_with_edge_wgts/"
+    else:
+        conv_plot_path = file_path+"/conv_kinematics"
+    misc.create_dirs(conv_plot_path)
+    print("Saving to ", conv_plot_path)
     signal_label, background_label = get_plot_labels(signal_type)
 
     for v, var in enumerate(kinematics):
@@ -201,10 +207,10 @@ def plot_conv_kinematics(adj_mat, x, len_sig, len_bkg, kinematics, signal_type, 
         ax.legend(loc='upper right')
         ymin, ymax = ax.get_ylim()
         ax.set_ylim((ymin, ymax*1.4))
-        ax.set_xlabel("\n"+str(var), loc="right")
+        ax.set_xlabel("\n"+str(kinematic_labels[v]), loc="right")
         ax.set_ylabel("Normalised No. Events", loc="top")
         fig.tight_layout()
-        fig.savefig(file_path+"/conv_kinematics/"+plot_name+var+".pdf", transparent=True)
+        fig.savefig(conv_plot_path+plot_name+var+".pdf", transparent=True)
 
 
 def plot_centrality(centrality, sig, bkg, file_path, eff):
@@ -254,7 +260,7 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
     for i, eff in enumerate(sigsig_eff):
         eff_label=str(eff*100)+"%"
         ax.axvline(x=ss_thresholds[i], ymax=0.6+i*0.02, linestyle="--", color="red")
-        ax.text(x=ss_thresholds[i], y=0.65+i*0.02, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label, ha='center', va='bottom', fontsize=7)
+        ax.text(x=ss_thresholds[i], y=0.63+i*0.022, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label, ha='center', va='bottom', fontsize=7)
     ax.legend(loc='upper right')
     ax.set_ylim(y_min, y_max*1.2)
     ax.set_xlabel(variable + " " + distance +" distance", loc="right")
