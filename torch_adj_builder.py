@@ -197,7 +197,7 @@ if bool_edge_wgt:
     logging.info("Calculating edge weights ...")
     full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
     full_mask = torch.cat((sigsig_mask, sigbkg_mask, bkgsig_mask, bkgbkg_mask))
-    full_event_weights = full_event_weights[full_ind[:, 1]]
+    full_event_weights = full_event_weights[full_ind[:, 0]]
     normed_edge_wgts = torch.clone(full_edge_wgts)
     non_inf_edge_wgts = normed_edge_wgts[~full_mask]
     non_inf_edge_wgts = norm.minmax(non_inf_edge_wgts, torch.min(non_inf_edge_wgts), torch.max(non_inf_edge_wgts))
@@ -235,17 +235,17 @@ if bool_edge_wgt:
     fig.tight_layout()
     fig.savefig(adj_path+"Normed_edge_wgts_no_EventWeights.pdf", transparent=True)
 
-    # fig, ax = plt.subplots()
-    # _, binning, _ = ax.hist(normed_full_edge_wgts[bkgbkg_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)+len(bkgsig_edge_wgts)], bins=70, color="forestgreen", alpha=0.5, label="bkg-bkg")
-    # ax.hist(torch.cat((normed_full_edge_wgts[sigbkg_plot_ind+len(sigsig_edge_wgts)], normed_full_edge_wgts[bkgsig_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)])) , bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
-    # ax.hist(normed_full_edge_wgts[sigsig_plot_ind], bins=binning, color="steelblue", alpha=0.5, label="sig-sig")
-    # ax.set_xlabel("Edge weights (including event weights)", loc="right")
-    # ax.set_ylabel("Edges / Bin", loc="top")
-    # ax.legend(loc="upper right")
-    # ax.set_yscale("log")
-    # fig.tight_layout()
-    # fig.savefig(adj_path+"Normed_edge_wgts_with_EventWeights.pdf", transparent=True)
-    # del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
+    fig, ax = plt.subplots()
+    _, binning, _ = ax.hist(normed_full_edge_wgts[bkgbkg_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)+len(bkgsig_edge_wgts)], bins=70, color="forestgreen", alpha=0.5, label="bkg-bkg")
+    ax.hist(torch.cat((normed_full_edge_wgts[sigbkg_plot_ind+len(sigsig_edge_wgts)], normed_full_edge_wgts[bkgsig_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)])) , bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
+    ax.hist(normed_full_edge_wgts[sigsig_plot_ind], bins=binning, color="steelblue", alpha=0.5, label="sig-sig")
+    ax.set_xlabel("Edge weights (including event weights)", loc="right")
+    ax.set_ylabel("Edges / Bin", loc="top")
+    ax.legend(loc="upper right")
+    ax.set_yscale("log")
+    fig.tight_layout()
+    fig.savefig(adj_path+"Normed_edge_wgts_with_EventWeights.pdf", transparent=True)
+    del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
 
 #### generate the adjacency matrix as a sparse tensor object (currently not needed, using edge index instead)
 # logging.info("Rounding the indices to int32 ...")
