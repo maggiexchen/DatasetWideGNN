@@ -81,7 +81,13 @@ kinematics, kinematic_labels = misc.get_kinematics(variable, feature_dim)
 logging.info('Importing signal and background files...')
 if signal == "hhh": SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
 
-full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=True, signal=signal, signal_mass=signal_mass, standardisation=True)
+if distance == "emd":
+    # don't standardise the kinematic variables before emd calculation
+    standardise_bool = False
+else:
+    # but standardise them for other distances
+    standardise_bool = True
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=True, signal=signal, signal_mass=signal_mass, standardisation=standardise_bool)
 
 global_bkg_wgt = 1.0
 if signal == "hhh": global_bkg_wgt = SF_4b5b
@@ -98,19 +104,16 @@ def distance_calc(a, b, metric):
     elif metric == "cosine":
         d = dis.cosine(a,b)
     elif metric == "emd":
-        a = misc.get_event_vectors_torch(a, objects, kinematics)
-        b = misc.get_event_vectors_torch(b, objects, kinematics)
-        print(a[22])
-        print([2272])
-        # d = ef.emd.emds(a,b, R=1.0, gdim=2, n_jobs=-1)
-        print(d)
-        #d = dis.torch_emd(a, b, objects, kinematics)
+        d = dis.torch_emd(a, b, objects, kinematics)
     else:
         d = None
         print("Please specify a valid distance metric, from euclidean, cityblock or cosine")
     
     if torch.sum(torch.isnan(d)).item() == 0:
         return d
+    else:
+        print("There are NaNs in your distances, please check!")
+        return None
     
 batch_size = 30000
 

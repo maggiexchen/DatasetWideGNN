@@ -492,23 +492,3 @@ def get_event_vectors_torch(batch_tensor, objects, kinematics):
     events = torch.stack([batch_tensor[:, indices[obj]] for obj in objects], dim=1)
 
     return events
-
-# def get_event_vectors_torch(batch_tensor, kinematics):
-#     # Define indices for each particle's features
-#     indices = {
-#         'bjet1': [kinematics.index('bjet1pt'), kinematics.index('bjet1eta'), kinematics.index('bjet1phi')],
-#         'bjet2': [kinematics.index('bjet2pt'), kinematics.index('bjet2eta'), kinematics.index('bjet2phi')],
-#         'lep1':  [kinematics.index('lep1pt'), kinematics.index('lep1eta'), kinematics.index('lep1phi')],
-#         'lep2':  [kinematics.index('lep2pt'), kinematics.index('lep2eta'), kinematics.index('lep2phi')]
-#     }
-    
-#     # Stack the selected values into a (batch_size, 4, 3) tensor
-#     events = torch.stack([
-#         batch_tensor[:, indices['bjet1']],
-#         batch_tensor[:, indices['bjet2']],
-#         batch_tensor[:, indices['lep1']],
-#         batch_tensor[:, indices['lep2']]
-#     ], dim=1)  # Stacking along the 2nd dimension to get shape (batch_size, 4, 3)
-
-#     return events  # Shape: (1233, 4, 3)
-
