@@ -16,6 +16,7 @@ import utils.misc as misc
 import utils.plotting as plotting
 import utils.adj_mat as adj
 import torch
+import energyflow as ef
 torch.manual_seed(42)
 
 def GetParser():
@@ -37,7 +38,7 @@ def GetParser():
         "-d",
         type=str,
         required=True,
-        help="Specify the type of distance to calculate",
+        help="Specify the type of distance to calculate (euclidean, cosine, cityblock, emd)",
     )
 
     parser.add_argument(
@@ -65,6 +66,7 @@ dist_path = user_config["dist_path"]
 signal = user_config["signal"]
 signal_mass = str(user_config["signal_mass"])
 feature_dim = user_config["feature_dim"]
+objects = user_config["objects"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 
 logging.info("distance metric: "+distance)
@@ -95,6 +97,14 @@ def distance_calc(a, b, metric):
         d = dis.cityblock(a,b)
     elif metric == "cosine":
         d = dis.cosine(a,b)
+    elif metric == "emd":
+        a = misc.get_event_vectors_torch(a, objects, kinematics)
+        b = misc.get_event_vectors_torch(b, objects, kinematics)
+        print(a[22])
+        print([2272])
+        # d = ef.emd.emds(a,b, R=1.0, gdim=2, n_jobs=-1)
+        print(d)
+        #d = dis.torch_emd(a, b, objects, kinematics)
     else:
         d = None
         print("Please specify a valid distance metric, from euclidean, cityblock or cosine")

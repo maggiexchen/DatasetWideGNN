@@ -477,3 +477,38 @@ def GetEventWeight(df, lumi, sumInitWeights):
         sumInitWeights (float): The sum of the initial generator weights of all of the generated samples (before some cuts are placed when producing ntuples) = the effective number of events generated initially.
     """
     df["eventWeight"] = df["xsec"] * df["genWeight"] * lumi / sumInitWeights
+
+def get_event_vectors_torch(batch_tensor, objects, kinematics):
+    """
+    Args:
+        batch_tensor (torch.Tensor): a small batch of tensor of event kinematics
+        objects (list(str)): a list of strings specifying the physics objects in each event
+        kinematics (list(str)):  alist of strings specifying the kinematic variables for each event
+    Returns:
+        events (torch.Tensor): a tensor of stacked pt, eta and phi variables of the physics objects
+    """
+    # Define indices for each particle's features
+    indices = {obj: [kinematics.index(str(obj)+'pt'), kinematics.index(str(obj)+'eta'), kinematics.index(str(obj)+'phi')] for obj in objects}
+    events = torch.stack([batch_tensor[:, indices[obj]] for obj in objects], dim=1)
+
+    return events
+
+# def get_event_vectors_torch(batch_tensor, kinematics):
+#     # Define indices for each particle's features
+#     indices = {
+#         'bjet1': [kinematics.index('bjet1pt'), kinematics.index('bjet1eta'), kinematics.index('bjet1phi')],
+#         'bjet2': [kinematics.index('bjet2pt'), kinematics.index('bjet2eta'), kinematics.index('bjet2phi')],
+#         'lep1':  [kinematics.index('lep1pt'), kinematics.index('lep1eta'), kinematics.index('lep1phi')],
+#         'lep2':  [kinematics.index('lep2pt'), kinematics.index('lep2eta'), kinematics.index('lep2phi')]
+#     }
+    
+#     # Stack the selected values into a (batch_size, 4, 3) tensor
+#     events = torch.stack([
+#         batch_tensor[:, indices['bjet1']],
+#         batch_tensor[:, indices['bjet2']],
+#         batch_tensor[:, indices['lep1']],
+#         batch_tensor[:, indices['lep2']]
+#     ], dim=1)  # Stacking along the 2nd dimension to get shape (batch_size, 4, 3)
+
+#     return events  # Shape: (1233, 4, 3)
+
