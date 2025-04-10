@@ -53,8 +53,9 @@ user_config = misc.load_config(user_config_path)
 
 variable = user_config["variable"]
 feature_dim = user_config["feature_dim"]
-kinematics = misc.get_kinematics(variable, feature_dim)
+kinematics, kinematic_labels = misc.get_kinematics(variable, feature_dim)
 signal = user_config["signal"]
+signal_mass = user_config["signal_mass"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 signal_label, background_label = plotting.get_plot_labels(signal)
 
@@ -63,13 +64,14 @@ model_save_path = user_config["model_path"]
 plot_path = user_config["plot_path"]
 signal = user_config["signal"]
 embedding_dim = user_config["embedding_dim"]
+os.makedirs(plot_path, exist_ok=True)
 
 # load in input files
 logging.info('Importing signal and background files...')
-full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, standardisation=True)
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal=signal, signal_mass=signal_mass, standardisation=True)
 
-train_pairs= PairDataset(full_sig, full_bkg, 200, 200)
-val_pairs = PairDataset(full_sig, full_bkg, 100, 100)
+train_pairs= PairDataset(full_sig, full_bkg, 400, 400)
+val_pairs = PairDataset(full_sig, full_bkg, 200, 200)
 print("training pairs", len(train_pairs))
 print("validation pairs", len(val_pairs))
 
