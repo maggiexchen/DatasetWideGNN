@@ -26,3 +26,5 @@ GraphBuilder/embeddings/
 config/ml_default.yaml
 data/*
 config/*
+GraphBuilder/config/*
+compare.py
