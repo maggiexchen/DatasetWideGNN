@@ -44,7 +44,6 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 
 torch.cuda.empty_cache()
-torch.manual_seed(42)
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -258,6 +257,8 @@ if gnn:
     if bool_edge_wgt:
         print("loading edge weights ...")
         edge_wgts = torch.load(adj_path+'edge_wgts.pt')
+        edge_weights_from_MC = full_wgts[edge_ind[0]] ### edge weights from MC source node
+        edge_wgts = edge_wgts * edge_weights_from_MC
 
 if plot_conv_kins:
     edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
