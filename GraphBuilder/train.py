@@ -68,16 +68,24 @@ os.makedirs(plot_path, exist_ok=True)
 
 # load in input files
 logging.info('Importing signal and background files...')
-full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal=signal, signal_mass=signal_mass, standardisation=True)
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal=signal, signal_mass=signal_mass, standardisation=False)
 
-train_pairs= PairDataset(full_sig, full_bkg, 400, 400)
-val_pairs = PairDataset(full_sig, full_bkg, 200, 200)
+train_dataset = PairDataset(full_sig, full_bkg, 400, 400)
+train_pairs = train_dataset.pairs
+train_means = train_dataset.means
+train_stds = train_dataset.stds
+
+val_dataset = PairDataset(full_sig, full_bkg, 200, 200)
+val_pairs = val_dataset.pairs
+val_means = val_dataset.means
+val_stds = val_dataset.stds
+
 print("training pairs", len(train_pairs))
 print("validation pairs", len(val_pairs))
 
 train_loader = DataLoader(train_pairs, batch_size=512, shuffle=True)
 val_loader = DataLoader(val_pairs, batch_size=128, shuffle=True)
-
+print("CHECK LENGTH OF KINEMATICS ", len(kinematics))
 model = EmbeddingNet(input_dim=len(kinematics), embedding_dim=embedding_dim)
 margin = user_config["margin"]
 LR = user_config["LR"]
@@ -162,6 +170,7 @@ os.makedirs(model_path, exist_ok=True)
 torch.save({
     'model_state': model.state_dict(),
     'optimiser_state': optimiser.state_dict(),
+    'normalisation_params': {"means": train_means, "stds": train_stds}
 }, model_path+model_file_name)
 
 with torch.no_grad():
