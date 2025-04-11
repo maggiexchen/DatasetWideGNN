@@ -22,8 +22,8 @@ process = psutil.Process()
 cpu = torch.device('cpu')
 device = torch.device('cuda:0')
 
-
-def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", standardisation=False):
+### apply fold here??
+def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", standardisation=False, num_folds = None):
     """
     Function to load our sign and bkg data into pandas dataframes
 
@@ -35,6 +35,7 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", 
         plot (bool): flag to plot raw and standardised kinematics, default is False
         signal (str): type of signal, to determine the bkgs present, default is LQ
         standardisation (bool): flag to do standardisation
+        num_folds (int): number of folds for cross-validation, default is None
     Returns:
         (torch.tensor(float32)): signal events/kinematics tensor
         (torch.tensor(float32)): background events/kinematics tensor
@@ -120,8 +121,12 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", 
     # concatenating signal and background events
     torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
 
-    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label).to(cpu), torch.tensor(bkg_label).to(cpu)
-
+    if num_folds is None:
+        return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label).to(cpu), torch.tensor(bkg_label).to(cpu)
+    else:
+        sig_folds = df_sig['metphi'].apply(lambda x: misc.assign_fold_deterministically(x, n_folds=num_folds))
+        bkg_folds = df_bkg['metphi'].apply(lambda x: misc.assign_fold_deterministically(x, n_folds=num_folds))
+        return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label).to(cpu), torch.tensor(bkg_label).to(cpu), sig_folds.to_numpy(), bkg_folds.to_numpy()
 
 def create_adj_mat(a, length):
     """

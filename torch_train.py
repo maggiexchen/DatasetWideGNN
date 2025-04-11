@@ -37,7 +37,7 @@ import time
 st = time.time()
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
 from sklearn.utils import shuffle
-from sklearn.model_selection import StratifiedKFold
+
 
 import shap
 import logging
@@ -187,7 +187,8 @@ else:
             + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
             + "_bs" + str(batch_size)\
             + "_e" + str(epochs)\
-            + nf_str
+            + nf_str\
+            + "_edge_wgt_seed_fold"
     
 if gnn == False:
     plot_path = plot_path + "/MLP/" + model_label + "/"
@@ -222,7 +223,7 @@ elif linking_length is not None:
 logging.info('Importing signal and background files...')
 
 # normal loading setup
-full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal)
+full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels, sig_fold, bkg_fold = adj.data_loader(kinematic_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, num_folds = num_folds)
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
 print("full sig size ", full_sig.size())
@@ -236,6 +237,17 @@ print("full sig yields ", full_sig_wgts.sum())
 print("full bkg yields ", full_bkg_wgts.sum())
 full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
 del full_sig_wgts, full_bkg_wgts
+
+print("sig_fold count:")
+values, counts = np.unique(sig_fold, return_counts=True)
+for val, count in zip(values, counts):
+    print(f"{val}: {count}")
+print("bkg_fold count:")
+values, counts = np.unique(bkg_fold, return_counts=True)
+for val, count in zip(values, counts):
+    print(f"{val}: {count}")
+
+fold_assignment = np.concatenate((sig_fold, bkg_fold), axis=0)
 
 logging.info("Loaded signal and background data.")
 logging.info("Time taken so far: "+str(time.time()-st))    
@@ -307,8 +319,6 @@ else:
     del edge_ind
 
 try: 
-    kfold = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=42)
-    fold_no = 0
     train_losses = []
     val_losses = []
     train_outputs = torch.tensor([])
@@ -320,8 +330,12 @@ try:
 
     logging.info("Starting k-fold cross validation ...")
     logging.info("Time taken so far: "+str(time.time()-st))
-    for train_idx, val_idx in kfold.split(np.zeros(len(full_y)), full_y.cpu().numpy()):
-        fold_no += 1
+    for fold_no in range(num_folds):
+
+        train_idx = np.where(fold_assignment != fold_no)[0]
+        val_idx = np.where(fold_assignment == fold_no)[0]
+        
+
         print(f"Starting fold {fold_no}/{num_folds}")
         print("train idx", len(train_idx))
         print("val idx", len(val_idx))

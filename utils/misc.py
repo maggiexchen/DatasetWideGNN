@@ -7,6 +7,8 @@ import pandas as pd
 import pdb
 import uproot
 import numpy as np
+import hashlib
+
 torch.manual_seed(42)
 
 cpu = torch.device('cpu')
@@ -502,3 +504,13 @@ def get_event_vectors_torch(batch_tensor, kinematics):
     ], dim=1)  # Stacking along the 2nd dimension to get shape (batch_size, 4, 3)
 
     return events  # Shape: (1233, 4, 3)
+
+
+def stable_int_from_string(s):
+    h = hashlib.md5(s.encode('utf-8')).hexdigest()
+    return int(h, 16)  # Big integer, deterministic everywhere
+
+def assign_fold_deterministically(event_id, n_folds):
+    seed = stable_int_from_string(str(event_id)) % (2**32)
+    rng = np.random.RandomState(seed)
+    return rng.randint(n_folds)
