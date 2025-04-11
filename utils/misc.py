@@ -115,9 +115,10 @@ def get_kinematics(variable, dim):
     #                   'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta', 'lep1flav',
     #                   'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi', 'lep2flav',
     #                   'met', 'metphi']
-    elif variable == "LQ":
-        # kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
-        # labels = [r"E$_{T}^{miss}$ / GeV", r"p$_{T, bbll}$ / GeV", r"min$\Delta \phi_{ETmiss, l}$", r"m$_{T, l1}$ / GeV", r"m$_{T, l2}$ / GeV"]
+    elif variable == "LQ_HighLevel":
+        kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
+        labels = [r"E$_{T}^{miss}$ / GeV", r"p$_{T, bbll}$ / GeV", r"min$\Delta \phi_{ETmiss, l}$", r"m$_{T, l1}$ / GeV", r"m$_{T, l2}$ / GeV"]
+    elif variable == "LQ_LowLevel":
         kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
                       'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta', 'lep1flav',
                       'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi', 'lep2flav',

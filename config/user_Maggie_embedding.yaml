@@ -3,7 +3,7 @@
 #######################
 
 # signal model hhh, LQ, stau
-signal: LQ
+signal: LQ_LowLevel
 signal_mass: 1000
 backgrounds: ["singletop", "ttbar"]
 cuts:

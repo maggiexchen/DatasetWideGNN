@@ -1,0 +1,26 @@
+#######################
+# user config for Maggie
+#######################
+
+# signal model hhh, LQ, stau
+signal: LQ_LowLevel
+signal_mass: 1000
+backgrounds: ["singletop", "ttbar"]
+cuts:
+  met:
+    threshold: 200
+    operation: ">"
+feature_dim:
+
+# input paths
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
+feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
+kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics/linking_lengths/ 
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics/output_scores/
+
+# output paths
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics/plots/ 
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics/models/
