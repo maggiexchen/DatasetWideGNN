@@ -57,7 +57,12 @@ os.makedirs(h5_path, exist_ok=True)
 # load in input files
 lumi_Run3 = 370
 logging.info('Importing and writing signal '+str(signal)+' ...')
-signal_file_paths = glob(ntuple_path + "GNNTree_" + str(signal) + "_mass" + str(signal_mass) + "_*.root")
+if signal_mass is not None:
+    signal_mass_str = "_*" + str(signal_mass) + "*"
+else:
+    signal_mass_str = "_*"
+signal_file_paths = glob(ntuple_path + "GNNTree_" + str(signal) + signal_mass_str + ".root")
+print(signal_file_paths)
 print(len(signal_file_paths), " signal files found ...")
 signal_features = uproot.open(signal_file_paths[0]+":tree").keys()
 data_list = []
@@ -86,7 +91,9 @@ for background in backgrounds:
     df_bkgs[str(background)] = {}
     background_file_paths = glob(ntuple_path + "GNNTree_"+str(background)+"*.root")
     background_features = uproot.open(background_file_paths[0]+":tree").keys()
-    assert background_features == signal_features, "Signal and background features must be same!"
+    feature_diff = [item for item in background_features if item not in signal_features]
+    if feature_diff and feature_diff != ["nEvents"]:
+        raise AssertionError(f"Signal and background features must be the same! Difference: {feature_diff}")
     data_list = []
     weight_list = []
     for background_root_file in background_file_paths:
@@ -113,4 +120,4 @@ ax.legend(loc='upper right', fontsize=9)
 ax.set_yscale("log")
 ax.set_xlabel("Event weight", loc="right")
 ax.set_ylabel("No. Events", loc="top")
-fig.savefig("eventweight_check_LQ1000_MetCut200_140325.pdf", transparent=True)
+fig.savefig(h5_path+"eventweight.pdf", transparent=True)
