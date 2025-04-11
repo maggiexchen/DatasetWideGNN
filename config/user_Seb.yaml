@@ -1,5 +1,5 @@
 #######################
-# user config for Maggie
+# user config for Seb
 #######################
 
 # signal model hhh, LQ, stau
@@ -12,6 +12,7 @@ cuts:
     threshold: 200
     operation: ">"
 feature_dim: 18
+run_with_cuda: True
 
 # input paths
 ntuple_path: /home/srutherford/GNN_shared/hhhgraph/ntuples/

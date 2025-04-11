@@ -44,15 +44,6 @@ def GetParser():
 parser = GetParser()
 args = parser.parse_args()
 
-print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
-CUDA_LAUNCH_BLOCKING=1
-# device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-# print(torch.cuda.mem_get_info())
-device = torch.device('cpu')
-cpu = torch.device('cpu')
-# set random seed for training
-torch.manual_seed(42)
-
 ### load user config
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
@@ -75,6 +66,15 @@ assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {sig
 signal = signal + "_" + str(signal_mass)
 
 signal_label, background_label = plotting.get_plot_labels(signal)
+
+### set up CUDA/CPU device settings
+run_with_cuda = user_config["run_with_cuda"]
+print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
+device = torch.device('cuda') if (torch.cuda.is_available() & run_with_cuda) else torch.device('cpu') 
+cpu = torch.device('cpu')
+
+# set random seed for training
+torch.manual_seed(42)
 
 ### load training config 
 train_config_path = args.MLconfig
@@ -198,13 +198,14 @@ len_bkg = len(full_bkg)
 print("full sig size ", full_sig.size())
 print("full bkg size ", full_bkg.size())
 
-full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0)
+full_x = full_x.to(device)
+full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
 len_full = len(full_y)
 del full_sig, full_bkg, full_sig_labels, full_bkg_labels
 
 print("full sig yields ", full_sig_wgts.sum())
 print("full bkg yields ", full_bkg_wgts.sum())
-full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
+full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0).to(device)
 del full_sig_wgts, full_bkg_wgts
 
 print("sig_fold count:")
@@ -231,7 +232,7 @@ if gnn:
     print("loading col indices ...")
     col_ind = torch.load(adj_path+'col_ind.pt')
     print("stacking row and col indices ...")
-    edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64)
+    edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64).to(device)
     print("deleting row and col indices ...")
     del row_ind
     del col_ind
@@ -266,9 +267,9 @@ else:
     del edge_ind
 
 
-val_outputs = torch.tensor([])
-val_truth_labels = torch.tensor([])
-val_wgts = torch.tensor([])
+val_outputs = torch.tensor([]).to(cpu)
+val_truth_labels = torch.tensor([]).to(cpu)
+val_wgts = torch.tensor([]).to(cpu)
 
 for fold_no in range(num_folds):
 
@@ -295,9 +296,9 @@ for fold_no in range(num_folds):
     model.to(device)
 
 
-    val_outputs_fold= torch.tensor([])
-    val_truth_labels_fold = torch.tensor([])
-    val_wgts_fold = torch.tensor([])
+    val_outputs_fold= torch.tensor([]).to(cpu)
+    val_truth_labels_fold = torch.tensor([]).to(cpu)
+    val_wgts_fold = torch.tensor([]).to(cpu)
     for batch in val_loader:
         batch = batch.to(device)
         batch_size = batch.batch_size
@@ -310,9 +311,9 @@ for fold_no in range(num_folds):
         outputs = outputs[:batch_size]
         event_wgts = batch.node_weight[:batch_size]
 
-        val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach()))
-        val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach()))
-        val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach()))
+        val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach().cpu()))
+        val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach().cpu()))
+        val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach().cpu()))
 
     val_outputs = torch.cat((val_outputs, val_outputs_fold))
     val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))

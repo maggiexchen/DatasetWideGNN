@@ -71,15 +71,6 @@ def GetParser():
 parser = GetParser()
 args = parser.parse_args()
 
-print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
-CUDA_LAUNCH_BLOCKING=1
-# device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-# print(torch.cuda.mem_get_info())
-device = torch.device('cpu')
-cpu = torch.device('cpu')
-# set random seed for training
-torch.manual_seed(42)
-
 ### load user config
 user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
@@ -102,6 +93,15 @@ assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {sig
 signal = signal + "_" + str(signal_mass)
 
 signal_label, background_label = plotting.get_plot_labels(signal)
+
+### set up CUDA/CPU device settings
+run_with_cuda = user_config["run_with_cuda"]
+print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
+device = torch.device('cuda') if (torch.cuda.is_available() & run_with_cuda) else torch.device('cpu') 
+cpu = torch.device('cpu')
+
+# set random seed for training
+torch.manual_seed(42)
 
 ### load training config 
 train_config_path = args.MLconfig
@@ -188,7 +188,7 @@ else:
             + "_bs" + str(batch_size)\
             + "_e" + str(epochs)\
             + nf_str\
-            + "_edge_wgt_seed_fold"
+            + "_mc_wgt_only"
     
 if gnn == False:
     plot_path = plot_path + "/MLP/" + model_label + "/"
@@ -229,13 +229,14 @@ len_bkg = len(full_bkg)
 print("full sig size ", full_sig.size())
 print("full bkg size ", full_bkg.size())
 
-full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0)
+full_x = full_x.to(device)
+full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
 len_full = len(full_y)
 del full_sig, full_bkg, full_sig_labels, full_bkg_labels
 
 print("full sig yields ", full_sig_wgts.sum())
 print("full bkg yields ", full_bkg_wgts.sum())
-full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
+full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0).to(device)
 del full_sig_wgts, full_bkg_wgts
 
 print("sig_fold count:")
@@ -261,16 +262,17 @@ if gnn:
     print("loading col indices ...")
     col_ind = torch.load(adj_path+'col_ind.pt')
     print("stacking row and col indices ...")
-    edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64)
+    edge_ind = torch.stack((row_ind, col_ind)).type(torch.int64).to(device)
     print("deleting row and col indices ...")
     del row_ind
     del col_ind
     print("Edge fraciton: ", edge_ind.shape[1] / (len(full_y)* (len(full_y)-1))/2)
     if bool_edge_wgt:
         print("loading edge weights ...")
-        edge_wgts = torch.load(adj_path+'edge_wgts.pt')
+        # edge_wgts = torch.load(adj_path+'edge_wgts.pt')
         edge_weights_from_MC = full_wgts[edge_ind[0]] ### edge weights from MC source node
-        edge_wgts = edge_wgts * edge_weights_from_MC
+        # edge_wgts = edge_wgts * edge_weights_from_MC
+        edge_wgts = edge_weights_from_MC
 
 if plot_conv_kins:
     edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
@@ -321,12 +323,12 @@ else:
 try: 
     train_losses = []
     val_losses = []
-    train_outputs = torch.tensor([])
-    train_truth_labels = torch.tensor([])
-    train_wgts = torch.tensor([])
-    val_outputs = torch.tensor([])
-    val_truth_labels = torch.tensor([])
-    val_wgts = torch.tensor([])
+    train_outputs = torch.tensor([]).to(cpu)
+    train_truth_labels = torch.tensor([]).to(cpu)
+    train_wgts = torch.tensor([]).to(cpu)
+    val_outputs = torch.tensor([]).to(cpu)
+    val_truth_labels = torch.tensor([]).to(cpu)
+    val_wgts = torch.tensor([]).to(cpu)
 
     logging.info("Starting k-fold cross validation ...")
     logging.info("Time taken so far: "+str(time.time()-st))
@@ -344,8 +346,9 @@ try:
         means, stds = misc.get_train_mean_std(full_x[train_idx])
         data_standardised = data.clone()
         data_standardised.x = misc.torch_standardise(data_standardised.x, means, stds)
-        means, stds = means, stds
+        means, stds = means.to(cpu), stds.to(cpu)
         model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
+        model = model.to(device)
 
         optimiser = torch.optim.Adam(model.parameters(), lr=LR)
         ### NOTE: patience for the scheculer is different from the early stopping patience
@@ -356,7 +359,7 @@ try:
 
         all_labels = data_standardised.y[train_idx].cpu().numpy()
         all_node_weights = data_standardised.node_weight[train_idx].cpu().numpy()
-        class_weights = binary_class_weights(all_labels, all_node_weights)
+        class_weights = binary_class_weights(all_labels, all_node_weights).to(device)
         print("Training class weights: signal - ", class_weights[1], ", backgrounds - ", class_weights[0])
         
         if gnn:
@@ -379,6 +382,9 @@ try:
             batch_size = batch_size,
         )
 
+        train_loader = train_loader.to(device)
+        val_loader = val_loader.to(device)
+
         best_val_loss = float('inf')
         patience_counter = 0
         logging.info("Starting training ...")
@@ -392,7 +398,7 @@ try:
             train_wgts_fold = torch.tensor([])
             for batch in train_loader:
                 optimiser.zero_grad()
-                batch = batch
+                batch = batch.to(device)
                 batch_size = batch.batch_size
                 if bool_edge_wgt:
                     if torch.any(torch.isnan(batch.edge_weight)):
@@ -430,7 +436,7 @@ try:
             val_wgts_fold = torch.tensor([])
             for batch in val_loader:
                 
-                batch = batch
+                batch = batch.to(device)
                 batch_size = batch.batch_size
                 if bool_edge_wgt:
                     outputs = model(batch.x, batch.edge_index, batch.edge_weight)
@@ -487,12 +493,12 @@ try:
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
-        train_outputs = torch.cat((train_outputs, train_outputs_fold))
-        train_truth_labels = torch.cat((train_truth_labels, train_truth_labels_fold))
-        train_wgts = torch.cat((train_wgts, train_wgts_fold))
-        val_outputs = torch.cat((val_outputs, val_outputs_fold))
-        val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
-        val_wgts = torch.cat((val_wgts, val_wgts_fold))
+        train_outputs = torch.cat((train_outputs, train_outputs_fold)).to(cpu)
+        train_truth_labels = torch.cat((train_truth_labels, train_truth_labels_fold)).to(cpu)
+        train_wgts = torch.cat((train_wgts, train_wgts_fold)).to(cpu)
+        val_outputs = torch.cat((val_outputs, val_outputs_fold)).to(cpu)
+        val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold)).to(cpu)
+        val_wgts = torch.cat((val_wgts, val_wgts_fold)).to(cpu)
         del train_loader, val_loader, model, optimiser, scheduler
         # del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
         torch.cuda.empty_cache()
