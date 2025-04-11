@@ -383,7 +383,6 @@ try:
             train_x_fold = torch.tensor([])
             for batch in train_loader:
                 optimiser.zero_grad()
-                batch = batch
                 batch_batchsize = batch.batch_size
                 if bool_edge_wgt:
                     outputs = model(batch.x, batch.edge_index, gnn_type, batch.edge_weight)
@@ -420,7 +419,6 @@ try:
             val_wgts_fold = torch.tensor([])
             val_x_fold = torch.tensor([])
             for batch in val_loader:
-                batch = batch
                 batch_batchsize = batch.batch_size
                 if bool_edge_wgt:
                     outputs = model(batch.x, batch.edge_index, gnn_type, batch.edge_weight)
