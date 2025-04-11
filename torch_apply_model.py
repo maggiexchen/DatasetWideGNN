@@ -1,15 +1,21 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import argparse
 import utils.misc as misc
 import utils.plotting as plotting
 import utils.adj_mat as adj
+from utils.gcn_model import GCNClassifier
+import json
 from torch_geometric.data import Data 
+from torch_geometric.loader import NeighborLoader
+import time
+st = time.time()
+from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
 import gc
-
 import logging 
-logging.getLogger().setLevel(logging.INFO)
 
+logging.getLogger().setLevel(logging.INFO)
 torch.cuda.empty_cache()
 
 def GetParser():
@@ -81,19 +87,15 @@ else:
     gnn = False
 hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
 LR = train_config["LR"]
-patience_LR = train_config["patience_LR"]
 dropout_rates = train_config["dropout_rates"]
 epochs = train_config["epochs"]
 num_nb_list = train_config["num_nb_list"] 
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
-patience_early_stopping = train_config["patience_early_stopping"]
 num_folds = train_config["num_folds"]
 single_fold = train_config["single_fold"]
 plot_conv_kins = train_config["plot_conv_kinematics"]
 bool_edge_wgt = train_config["edge_weights"]
-### LR scheduler patience should be less than early stopping patience, so that the LR can be reduced before training stops
-assert patience_LR < patience_early_stopping, "LR scheduler patience should be less than early stopping patience"
 
 
 kinematic_variable = train_config["kinematic_variable"]
@@ -155,7 +157,7 @@ else:
             + "_bs" + str(batch_size)\
             + "_e" + str(epochs)\
             + nf_str\
-            + "_edgeMCwgt" 
+            + "_edge_wgt_seed_fold" 
     
 if gnn == False:
     plot_path = plot_path + "/MLP/" + model_label + "/"
@@ -190,7 +192,7 @@ elif linking_length is not None:
 logging.info('Importing signal and background files...')
 
 # normal loading setup
-full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels = adj.data_loader(kinematic_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal)
+full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels, sig_fold, bkg_fold = adj.data_loader(kinematic_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, num_folds = num_folds)
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
 print("full sig size ", full_sig.size())
@@ -204,6 +206,18 @@ print("full sig yields ", full_sig_wgts.sum())
 print("full bkg yields ", full_bkg_wgts.sum())
 full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0)
 del full_sig_wgts, full_bkg_wgts
+
+print("sig_fold count:")
+values, counts = np.unique(sig_fold, return_counts=True)
+for val, count in zip(values, counts):
+    print(f"{val}: {count}")
+print("bkg_fold count:")
+values, counts = np.unique(bkg_fold, return_counts=True)
+for val, count in zip(values, counts):
+    print(f"{val}: {count}")
+
+fold_assignment = np.concatenate((sig_fold, bkg_fold), axis=0)
+
 
 logging.info("Loaded signal and background data.")
 logging.info("Time taken so far: "+str(time.time()-st))    
@@ -250,3 +264,139 @@ if bool_edge_wgt:
 else:
     data = Data(x = full_x, y = full_y, edge_index = edge_ind, node_weight = full_wgts)
     del edge_ind
+
+
+val_outputs = torch.tensor([])
+val_truth_labels = torch.tensor([])
+val_wgts = torch.tensor([])
+
+for fold_no in range(num_folds):
+
+    model_file_name = f"model_fold_{fold_no}.pth"
+    #### finish loading model to use mean and std from model to standardise data
+    model_state_dict = torch.load(model_path + model_file_name, weights_only=True)
+    means, stds = model_state_dict['normalisation_params']['means'], model_state_dict['normalisation_params']['stds']
+    data_standardised = data.clone()
+    data_standardised.x = misc.torch_standardise(data.x, means, stds)
+
+    val_idx = np.where(fold_assignment == fold_no)[0]
+
+    val_loader = NeighborLoader(
+        data_standardised,
+        input_nodes = val_idx,
+        num_neighbors = num_nb_list,
+        shuffle = False,
+        batch_size = batch_size,
+    )
+
+    model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
+    model.load_state_dict(model_state_dict["model_state"])
+    model.eval()
+    model.to(device)
+
+
+    val_outputs_fold= torch.tensor([])
+    val_truth_labels_fold = torch.tensor([])
+    val_wgts_fold = torch.tensor([])
+    for batch in val_loader:
+        batch = batch.to(device)
+        batch_size = batch.batch_size
+        if bool_edge_wgt:
+            outputs = model(batch.x, batch.edge_index, batch.edge_weight)
+        else:
+            outputs = model(batch.x, batch.edge_index)
+
+        y = batch.y[:batch_size]
+        outputs = outputs[:batch_size]
+        event_wgts = batch.node_weight[:batch_size]
+
+        val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach()))
+        val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach()))
+        val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach()))
+
+    val_outputs = torch.cat((val_outputs, val_outputs_fold))
+    val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
+    val_wgts = torch.cat((val_wgts, val_wgts_fold))
+
+
+val_outputs = val_outputs.view(-1)
+val_label_bool = val_truth_labels.bool()
+val_sig_pred = val_outputs[val_label_bool]
+val_sig_wgts = val_wgts[val_label_bool]
+val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
+val_bkg_wgts = val_wgts[torch.logical_not(val_label_bool)]
+
+val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
+if signal == "stau": ### stau fpr needs to be clipped and sorted due to rounding errors
+    val_fpr = np.clip(val_fpr, 0, 1)
+    val_fpr = np.sort(val_fpr)
+val_auc = auc(val_fpr, val_tpr)
+#  val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
+print("Validation AUC", val_auc)
+
+logging.info("Plotting model outputs ...")
+fig, ax = plt.subplots()
+binning = np.linspace(0,1,51)
+ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange", weights=val_sig_wgts.detach().cpu().numpy())
+ax.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue", weights=val_bkg_wgts.detach().cpu().numpy())
+
+
+
+score_path = score_path + model_label + "/"
+misc.create_dirs(score_path)
+
+np.save(score_path+"val_sig_pred_reduced_sample.npy", val_sig_pred.detach().cpu().numpy())
+np.save(score_path+"val_sig_wgts_reduced_sample.npy", val_sig_wgts.detach().cpu().numpy())
+
+np.save(score_path+"val_bkg_pred_reduced_sample.npy", val_bkg_pred.detach().cpu().numpy())
+np.save(score_path+"val_bkg_wgts_reduced_sample.npy", val_bkg_wgts.detach().cpu().numpy())
+
+if gnn:
+    if eff is not None:
+        linking_length_label = "Linking length at "+str(eff)+" sig-sig efficiency"
+    elif linking_length is not None:
+        linking_length_label = "Linking length "+str(linking_length)
+else:
+    linking_length_label = ""
+signal_label, background_label = plotting.get_plot_labels(signal)
+if signal == "hhh":
+    if eff is not None:
+        text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+    elif linking_length is not None:
+        text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+elif signal == "stau":
+    if eff is not None:
+        text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+    elif linking_length is not None:
+        text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+elif "LQ" in signal:
+    if eff is not None:
+        text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+    elif linking_length is not None:
+        text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+
+plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
+ax.legend(loc='upper right', fontsize=9)
+ax.set_xlabel("Output score", loc="right")
+ax.set_ylabel("Normalised No. Events", loc="top")
+ymin, ymax = ax.get_ylim()
+ax.set_ylim((ymin, ymax*1.2))
+fig.savefig(plot_path+"validation_pred_reduced_sample.pdf", transparent=True)
+
+logging.info("Plotting ROC curves ...")
+fig, ax = plt.subplots()
+plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
+plt.legend(loc="upper left", fontsize=9)
+plt.xlim(0,1)
+plt.xlabel("Background Efficiency", loc="right")
+plt.ylabel("Signal Efficiency", loc="top")
+fig.savefig(plot_path+"validation_ROC_reduced_sample.pdf", transparent=True)
+
+logging.info("Saving ROC curves to json files ...")
+roc_json_path = plot_path+"roc.json"
+roc_dict = {"val_fpr": val_fpr.tolist(),
+            "val_trp": val_tpr.tolist(),
+            "val_auc": [val_auc]
+        }
+with open(roc_json_path, 'w') as json_file:
+    json.dump(roc_dict, json_file)
