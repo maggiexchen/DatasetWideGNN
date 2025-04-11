@@ -124,6 +124,11 @@ if linking_length is None:
 else:
     print("linking length is given in config, IGNORING the sigsig_eff in the config!")
 
+if sigsig_eff is None:
+    adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
+else:
+    adj_path = adj_path + "/" + f"sigsig_eff_{sigsig_eff}/"
+misc.create_dirs(adj_path)
 
 kinematics, kinematic_labels = misc.get_kinematics(kinematic_variable, feature_dim)
 input_size = len(kinematics)
@@ -247,14 +252,6 @@ if bool_edge_wgt:
     fig.savefig(adj_path+"Normed_edge_wgts_with_EventWeights.pdf", transparent=True)
     del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
 
-#### generate the adjacency matrix as a sparse tensor object (currently not needed, using edge index instead)
-# logging.info("Rounding the indices to int32 ...")
-# full_ind = full_ind.to(torch.int32)
-# logging.info("Generating sparse adjacency matrix ...")
-# sparse_adj_mat, edge_ind, crow_ind, col_ind, values = adj.generate_sparse_adj_mat(sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind, len(full_sig)+len(full_bkg))
-# print("sparse adj mat: ", sparse_adj_mat.shape)
-
-
 total_edges = sigsig_ind.shape[0]+sigbkg_ind.shape[0]+bkgbkg_ind.shape[0]
 total_pairs = (len(full_sig)+len(full_bkg))**2
 print("Linking length at sig-sig efficiency ", sigsig_eff)
@@ -263,19 +260,6 @@ del sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind
 
 misc.print_mem_info()
 logging.info("Saving sparse adjacency matrix ...")
-
-if sigsig_eff is None:
-    adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
-else:
-    adj_path = adj_path + "/" + f"sigsig_eff_{sigsig_eff}/"
-misc.create_dirs(adj_path)
-
-#### saving the indices and sparse tensor object
-# torch.save(sparse_adj_mat, adj_path+'sparse_adjacency_matrix.pt')
-# torch.save(edge_ind, adj_path+'coo_row.pt')
-# torch.save(crow_ind, adj_path+'csr_row.pt')
-# torch.save(col_ind, adj_path+'csr_col.pt')
-# torch.save(values, adj_path+'csr_values.pt')
 
 ### saving the adjaceny matrix indices as edge indices
 torch.save(full_ind[:,0], adj_path+'row_ind.pt')
