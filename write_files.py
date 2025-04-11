@@ -58,7 +58,8 @@ os.makedirs(h5_path, exist_ok=True)
 lumi_Run3 = 370
 logging.info('Importing and writing signal '+str(signal)+' ...')
 if signal_mass is not None:
-    signal_mass_str = "_*" + str(signal_mass) + "*"
+    print("signal mass ", signal_mass)
+    signal_mass_str = "_mass" + str(signal_mass) + "*"
 else:
     signal_mass_str = "_*"
 signal_file_paths = glob(ntuple_path + "GNNTree_" + str(signal) + signal_mass_str + ".root")
@@ -97,6 +98,7 @@ for background in backgrounds:
     data_list = []
     weight_list = []
     for background_root_file in background_file_paths:
+        print("Reading ", background_root_file)
         background_file = uproot.open(background_root_file+":tree")
         x_pd = background_file.arrays(library="pd")
         data_list.append(x_pd)
