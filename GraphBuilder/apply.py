@@ -1,5 +1,6 @@
 import sys
 import os
+from glob import glob
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(parent_dir)
 import utils.adj_mat as adj
@@ -76,41 +77,58 @@ cuts = user_config["cuts"]
 
 variable = user_config["variable"]
 feature_dim = user_config["feature_dim"]
-kinematics = misc.get_kinematics(variable, feature_dim)
+kinematics, kinematic_labels = misc.get_kinematics(variable, feature_dim)
 
 # parameters of chosen model
 embedding_dim = user_config["embedding_dim"]
 margin = user_config["margin"]
 penalty = user_config["penalty"]
 radius = margin/2
-radius_name = margin/2
 print("Connecting at radius ", radius, "with a training margin of ", margin)
 
 if args.model:
     model_name = args.model
 else:
-    model_name = model_save_path + "embedding_"+str(embedding_dim)+"feats/EmbeddingNet_m"+str(margin)+"_r"+str(radius_name)+"_Lambda"+str(penalty)+"_model.pth"
-
+    model_name = model_save_path + "embedding_"+str(embedding_dim)+"feats/EmbeddingNet_m"+str(margin)+"_r"+str(radius)+"_Lambda"+str(penalty)+"_model.pth"
+print("Loading model ", model_name)
 # load the chosen model
 logging.info("Loading trained model ...")
 model = EmbeddingNet(input_dim=len(kinematics), embedding_dim=embedding_dim)
 model.load_state_dict(torch.load(model_name)['model_state'])
+means = torch.load(model_name)["normalisation_params"]["means"]
+stds = torch.load(model_name)["normalisation_params"]["stds"]
 
 # load the ntuples by signal/background type
 # load in input files
 lumi_Run3 = 370
 logging.info('Importing and writing signal '+str(signal)+' ...')
-signal_file_path = ntuple_path + "GNNTree_"+str(signal)+"_"+signal_mass+".root"
-signal_file = uproot.open(signal_file_path+":tree")
-features = signal_file.keys()
+if signal_mass is not None:
+    print("signal mass ", signal_mass)
+    signal_mass_str = "_mass" + str(signal_mass) + "*"
+else:
+    signal_mass_str = "_*"
+signal_file_paths = glob(ntuple_path + "GNNTree_" + str(signal) + signal_mass_str + ".root")
+print(len(signal_file_paths), " signal files found ...")
+signal_features = uproot.open(signal_file_paths[0]+":tree").keys()
+data_list = []
+weight_list = []
+for signal_root_file in signal_file_paths:
+    print("Reading ", signal_root_file)
+    signal_file = uproot.open(signal_root_file+":tree")
+    x_pd = signal_file.arrays(library="pd")
+    data_list.append(x_pd)
+    sig_initialWeights_arr = misc.get_histInitialWeights(signal_root_file)
+    weight_list.append(misc.calc_eventWeight(x_pd, sig_initialWeights_arr, lumi_Run3))
 df_sig = {str(signal):{}}
-df_sig[signal] = signal_file.arrays(library="pd")
+df_sig[signal] = pd.concat(data_list, ignore_index=True)
+df_sig[signal]["target"] = [1]*len(df_sig[signal])
+df_sig[signal]["eventWeight"] = pd.concat(weight_list, ignore_index=True)
+print("Total ", signal, " events before cuts: ", len(df_sig[signal]))
 if cuts is not None:
     df_sig[signal] = misc.cut_operation(df_sig[signal], cuts)
+    print("Total ", signal, " events after cuts: ", len(df_sig[signal]))
+
 indices = [len(df_sig[signal])]
-df_sig[signal]["target"] = [1]*len(df_sig[signal])
-sig_initialWeights_arr = misc.get_histInitialWeights(signal_file_path)
-df_sig[signal]["eventWeight"] = misc.calc_eventWeight(df_sig[signal], sig_initialWeights_arr, lumi_Run3)
 tmp_df = df_sig[signal]
 tmp_y = df_sig[signal]["target"]
 
@@ -119,27 +137,42 @@ df_bkgs = {}
 for background in backgrounds:
     logging.info(str(background)+" ...")
     df_bkgs[str(background)] = {}
-    background_file_path = ntuple_path + "GNNTree_"+str(background)+".root"
-    background_file = uproot.open(background_file_path+":tree")
-    df_bkgs[background] = background_file.arrays(library="pd")
+    background_file_paths = glob(ntuple_path + "GNNTree_"+str(background)+"*.root")
+    background_features = uproot.open(background_file_paths[0]+":tree").keys()
+    feature_diff = [item for item in background_features if item not in signal_features]
+    if feature_diff and feature_diff != ["nEvents"]:
+        raise AssertionError(f"Signal and background features must be the same! Difference: {feature_diff}")
+    data_list = []
+    weight_list = []
+    for background_root_file in background_file_paths:
+        print("Reading ", background_root_file)
+        background_file = uproot.open(background_root_file+":tree")
+        x_pd = background_file.arrays(library="pd")
+        data_list.append(x_pd)
+        bkg_initialWeights_arr = misc.get_histInitialWeights(background_root_file)
+        weight_list.append(misc.calc_eventWeight(x_pd, bkg_initialWeights_arr, lumi_Run3))
+    df_bkgs[background] = pd.concat(data_list, ignore_index=True)
+    df_bkgs[background]["target"] = [0]*len(df_bkgs[background])
+    df_bkgs[background]["eventWeight"] = pd.concat(weight_list, ignore_index=True)
+    print("Total ", background, " events before cuts: ", len(df_bkgs[background]))
     if cuts is not None:
         df_bkgs[background] = misc.cut_operation(df_bkgs[background], cuts)
-    df_bkgs[background]["target"] = [0]*len(df_bkgs[background])
-    bkgs_initialWeights_arr = misc.get_histInitialWeights(background_file_path)
-    df_bkgs[background]["eventWeight"] = misc.calc_eventWeight(df_bkgs[background], bkgs_initialWeights_arr, lumi_Run3)
-    print(background, " event weights: ", df_bkgs[background]["eventWeight"])
-    indices.append(len(df_bkgs[background]))
     
+    indices.append(len(df_bkgs[background]))
     tmp_df = pd.concat([tmp_df, df_bkgs[background]])
     tmp_y = pd.concat([tmp_y, df_bkgs[background]["target"]])
 
+# to start with, only length of the signal sample
 idx = [indices[0]]
 for i in range(1, len(indices)):
+    # accumulatively add the length of the samples
     idx.append(idx[-1]+indices[i])
 print("checking indices ", idx)
-scaler = StandardScaler()
-standardised_df = torch.tensor(scaler.fit_transform(tmp_df[kinematics], tmp_y), dtype=torch.float32)
-data_loader = DataLoader(TensorDataset(standardised_df, torch.tensor(tmp_y.to_numpy(), dtype=torch.float32)), batch_size=128, shuffle=False)
+
+# standardising the signal+background samples
+standardised_df = (tmp_df[kinematics] - means.numpy()) / stds.numpy()
+standardised_tensor = torch.tensor(standardised_df.to_numpy(), dtype=torch.float32)
+data_loader = DataLoader(TensorDataset(standardised_tensor, torch.tensor(tmp_y.to_numpy(), dtype=torch.float32)), batch_size=128, shuffle=False)
 
 outputs = []
 model.eval()
