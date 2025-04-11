@@ -63,7 +63,6 @@ if signal_mass is not None:
 else:
     signal_mass_str = "_*"
 signal_file_paths = glob(ntuple_path + "GNNTree_" + str(signal) + signal_mass_str + ".root")
-print(signal_file_paths)
 print(len(signal_file_paths), " signal files found ...")
 signal_features = uproot.open(signal_file_paths[0]+":tree").keys()
 data_list = []

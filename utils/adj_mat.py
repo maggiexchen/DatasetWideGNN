@@ -60,7 +60,6 @@ def data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=Fa
             df_sig = pd.concat([df_sig, df_sig_camp], ignore_index=True, axis=0)
     else:
         df_sig =  pd.read_hdf(h5_path+str(signal)+"_"+str(signal_mass)+str(ex)+".h5", key=str(signal)+str(ex))
-        # df_sig =  pd.read_hdf(h5_path+str(signal)+str(ex)+".h5", key="sig"+str(ex))
     
     df_bkg = pd.DataFrame()
     if signal == "stau":

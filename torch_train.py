@@ -461,8 +461,6 @@ try:
                 print(f"Early stopping after {epoch+1} epochs.")
                 break
 
-        # train_x["fold_"+str(fold_no)+"_x"] = train_x_fold
-        # val_x["fold_"+str(fold_no)+"_x"] = val_x_fold
         train_outputs_per_fold["fold_"+str(fold_no)+"_outputs"] = train_outputs_fold.flatten()
         val_outputs_per_fold["fold_"+str(fold_no)+"_outputs"] = val_outputs_fold.flatten()
 
@@ -473,11 +471,11 @@ try:
         model_file_name = f"model_fold_{fold_no}.pth"
 
         misc.create_dirs(model_path)
-        # torch.save({
-        #     'model_state': model.state_dict(),
-        #     'optimiser_state': optimiser.state_dict(),
-        #     'normalisation_params': {"means": means, "stds": stds}
-        # }, model_path+model_file_name)
+        torch.save({
+            'model_state': model.state_dict(),
+            'optimiser_state': optimiser.state_dict(),
+            'normalisation_params': {"means": means, "stds": stds}
+        }, model_path+model_file_name)
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
@@ -495,19 +493,6 @@ try:
         if single_fold == True:
             print("Single fold training, breaking loop ...")
             break
-    # print("plotting input features per fold")
-    # for j in range(train_x_fold.shape[1]):
-    #     fig, ax = plt.subplots()
-    #     for k in range(fold_no):
-    #         if k == 0:
-    #             hist, binning, _ = ax.hist(train_x["fold_"+str(k+1)+"_x"], bins=50, label="Train fold "+str(k), histtype='step', density=True)
-    #         else:
-    #             ax.hist(train_x["fold_"+str(k+1)+"_x"][:, j], bins=binning, label="Train fold "+str(k), histtype='step', density=True)
-    #         # ax.hist(val_x["fold_"+str(k+1)+"_x"][:, j], bins=50, label="Val fold "+str(k), histtype='step', linestyle="--", density=False)
-    #         ax.legend(loc='upper right', fontsize=9)
-    #         ax.set_xlabel(kinematic_labels[j], loc="right")
-    #         ax.set_ylabel("Normalised Events / Bin", loc="top")
-    #     fig.savefig(plot_path+"feature_"+str(j)+".pdf", transparent=True)
     
     print("plotting model outputs per fold")
     fold_fig, fold_ax = plt.subplots()
@@ -557,12 +542,10 @@ finally:
         val_fpr = np.clip(val_fpr, 0, 1)
         val_fpr = np.sort(val_fpr)
     val_auc = auc(val_fpr, val_tpr)
-    #  val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
     print("Validation AUC", val_auc)
 
     # save performance to json
     perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc, val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
-    # perf.save_metadata(len(train_sig), len(train_bkg), len(val_sig), len(val_bkg), hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
     perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), num_folds, hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
 
     logging.info("Plotting training/validation losses ...")
