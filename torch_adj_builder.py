@@ -124,6 +124,12 @@ if linking_length is None:
 else:
     print("linking length is given in config, IGNORING the sigsig_eff in the config!")
 
+if sigsig_eff is None:
+    adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
+else:
+    adj_path = adj_path + "/" + f"sigsig_eff_{sigsig_eff}/"
+misc.create_dirs(adj_path)
+
 
 kinematics, kinematic_labels = misc.get_kinematics(kinematic_variable, feature_dim)
 input_size = len(kinematics)
@@ -263,12 +269,6 @@ del sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind
 
 misc.print_mem_info()
 logging.info("Saving sparse adjacency matrix ...")
-
-if sigsig_eff is None:
-    adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
-else:
-    adj_path = adj_path + "/" + f"sigsig_eff_{sigsig_eff}/"
-misc.create_dirs(adj_path)
 
 #### saving the indices and sparse tensor object
 # torch.save(sparse_adj_mat, adj_path+'sparse_adjacency_matrix.pt')
