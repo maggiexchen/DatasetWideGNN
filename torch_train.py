@@ -187,9 +187,8 @@ else:
             + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
             + "_bs" + str(batch_size)\
             + "_e" + str(epochs)\
-            + nf_str\
-            + "_mc_wgt_only"
-    
+            + nf_str
+        
 if gnn == False:
     plot_path = plot_path + "/MLP/" + model_label + "/"
 plot_path = plot_path + model_label + "/"
@@ -268,11 +267,17 @@ if gnn:
     del col_ind
     print("Edge fraciton: ", edge_ind.shape[1] / (len(full_y)* (len(full_y)-1))/2)
     if bool_edge_wgt:
-        print("loading edge weights ...")
-        # edge_wgts = torch.load(adj_path+'edge_wgts.pt')
-        edge_weights_from_MC = full_wgts[edge_ind[0]] ### edge weights from MC source node
-        # edge_wgts = edge_wgts * edge_weights_from_MC
-        edge_wgts = edge_weights_from_MC
+        if gnn_type == "GAT":
+            print("loading edge weights and MC weights for GAT...")
+            edge_wgts = torch.load(adj_path+'edge_wgts.pt')
+            edge_weights_from_MC = full_wgts[edge_ind[0]]
+        else:
+            print("loading edge weights ...")
+            edge_wgts = torch.load(adj_path+'edge_wgts.pt')
+            edge_weights_from_MC = full_wgts[edge_ind[0]] ### edge weights from MC source node
+            edge_wgts = edge_wgts * edge_weights_from_MC
+            edge_weights_from_MC = None
+        
 
 if plot_conv_kins:
     edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
@@ -314,7 +319,7 @@ torch.cuda.empty_cache()
 
 ### create data object, train and val loaders
 if bool_edge_wgt:
-    data = Data(x = full_x, y = full_y, edge_index = edge_ind, node_weight = full_wgts, edge_weight = edge_wgts)
+    data = Data(x = full_x, y = full_y, edge_index = edge_ind, node_weight = full_wgts, edge_weight = edge_wgts, mc_weights = edge_weights_from_MC)
     del edge_ind, edge_wgts
 else:
     data = Data(x = full_x, y = full_y, edge_index = edge_ind, node_weight = full_wgts)
@@ -338,7 +343,7 @@ try:
         val_idx = np.where(fold_assignment == fold_no)[0]
         
 
-        print(f"Starting fold {fold_no}/{num_folds}")
+        print(f"Starting fold {fold_no+1}/{num_folds}")
         print("train idx", len(train_idx))
         print("val idx", len(val_idx))
 
@@ -382,9 +387,6 @@ try:
             batch_size = batch_size,
         )
 
-        train_loader = train_loader.to(device)
-        val_loader = val_loader.to(device)
-
         best_val_loss = float('inf')
         patience_counter = 0
         logging.info("Starting training ...")
@@ -393,9 +395,9 @@ try:
             ### start training loop in the epoch
             model.train()
             total_examples = total_loss = 0
-            train_outputs_fold = torch.tensor([])
-            train_truth_labels_fold = torch.tensor([])
-            train_wgts_fold = torch.tensor([])
+            train_outputs_fold = torch.tensor([]).to(cpu)
+            train_truth_labels_fold = torch.tensor([]).to(cpu)
+            train_wgts_fold = torch.tensor([]).to(cpu)
             for batch in train_loader:
                 optimiser.zero_grad()
                 batch = batch.to(device)
@@ -403,7 +405,7 @@ try:
                 if bool_edge_wgt:
                     if torch.any(torch.isnan(batch.edge_weight)):
                         print("Edge weights contain NaN values!")
-                    outputs = model(batch.x, batch.edge_index, batch.edge_weight)
+                    outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weights)
                 else:
                     outputs = model(batch.x, batch.edge_index)
                 
@@ -420,9 +422,9 @@ try:
                 torch.cuda.empty_cache()
                 total_examples += batch_size
                 total_loss += float(loss) * batch_size
-                train_outputs_fold = torch.cat((train_outputs_fold, outputs.detach()))
-                train_truth_labels_fold = torch.cat((train_truth_labels_fold, y.detach()))
-                train_wgts_fold = torch.cat((train_wgts_fold, event_wgts.detach()))
+                train_outputs_fold = torch.cat((train_outputs_fold, outputs.detach().to(cpu)))
+                train_truth_labels_fold = torch.cat((train_truth_labels_fold, y.detach().to(cpu)))
+                train_wgts_fold = torch.cat((train_wgts_fold, event_wgts.detach().to(cpu)))
                 
             avg_tr_loss = total_loss / total_examples
             train_loss.append(avg_tr_loss)
@@ -431,15 +433,15 @@ try:
             ### start validation loop in the epoch
             model.eval()
             total_examples = total_loss = 0
-            val_outputs_fold= torch.tensor([])
-            val_truth_labels_fold = torch.tensor([])
-            val_wgts_fold = torch.tensor([])
+            val_outputs_fold= torch.tensor([]).to(cpu)
+            val_truth_labels_fold = torch.tensor([]).to(cpu)
+            val_wgts_fold = torch.tensor([]).to(cpu)
             for batch in val_loader:
                 
                 batch = batch.to(device)
                 batch_size = batch.batch_size
                 if bool_edge_wgt:
-                    outputs = model(batch.x, batch.edge_index, batch.edge_weight)
+                    outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weights)
                 else:
                     outputs = model(batch.x, batch.edge_index)
 
@@ -452,9 +454,9 @@ try:
                 
                 total_examples += batch_size
                 total_loss += float(loss) * batch_size
-                val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach()))
-                val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach()))
-                val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach()))
+                val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach().to(cpu)))
+                val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach().to(cpu)))
+                val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach().to(cpu)))
 
             avg_vl_loss = total_loss / total_examples
             val_loss.append(avg_vl_loss)
@@ -493,12 +495,12 @@ try:
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
-        train_outputs = torch.cat((train_outputs, train_outputs_fold)).to(cpu)
-        train_truth_labels = torch.cat((train_truth_labels, train_truth_labels_fold)).to(cpu)
-        train_wgts = torch.cat((train_wgts, train_wgts_fold)).to(cpu)
-        val_outputs = torch.cat((val_outputs, val_outputs_fold)).to(cpu)
-        val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold)).to(cpu)
-        val_wgts = torch.cat((val_wgts, val_wgts_fold)).to(cpu)
+        train_outputs = torch.cat((train_outputs, train_outputs_fold))
+        train_truth_labels = torch.cat((train_truth_labels, train_truth_labels_fold))
+        train_wgts = torch.cat((train_wgts, train_wgts_fold))
+        val_outputs = torch.cat((val_outputs, val_outputs_fold))
+        val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
+        val_wgts = torch.cat((val_wgts, val_wgts_fold))
         del train_loader, val_loader, model, optimiser, scheduler
         # del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
         torch.cuda.empty_cache()

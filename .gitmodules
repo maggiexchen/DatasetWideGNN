@@ -1,0 +1,4 @@
+[submodule "external/pyg_custom"]
+	path = external/pyg_custom
+	url = https://gitlab.cern.ch/networkanalysis/pytorch_geometric_gatweighted.git
+	branch = main
