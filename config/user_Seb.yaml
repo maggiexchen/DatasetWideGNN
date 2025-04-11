@@ -4,7 +4,7 @@
 
 # signal model hhh, LQ, stau
 signal: LQ
-signal_mass: 22
+signal_mass: 1000
 half: ""
 backgrounds: ["singletop", "ttbar"]
 cuts:
@@ -18,10 +18,10 @@ ntuple_path: /home/srutherford/GNN_shared/hhhgraph/ntuples/
 feature_h5_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/
 kinematic_h5_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/
 ll_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/linking_lengths/ 
-dist_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/distances/reduced_sample/
-score_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/output_scores/reduced_sample/
+dist_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/distances/
+score_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/output_scores/
 
 # output paths
-plot_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/plots/reduced_sample/
-adj_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/graph/reduced_sample/
-model_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/models/reduced_sample/
+plot_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/plots/
+adj_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/graph/
+model_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/models/
