@@ -70,22 +70,20 @@ os.makedirs(plot_path, exist_ok=True)
 logging.info('Importing signal and background files...')
 full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal=signal, signal_mass=signal_mass, standardisation=False)
 
-train_dataset = PairDataset(full_sig, full_bkg, 400, 400)
-train_pairs = train_dataset.pairs
-train_means = train_dataset.means
-train_stds = train_dataset.stds
+dataset = PairDataset(full_sig, full_bkg, 400, 400, standardise=True)
+train_pairs = dataset.train_pairs
+val_pairs = dataset.val_pairs
+train_means = dataset.means
+train_stds = dataset.stds
 
-val_dataset = PairDataset(full_sig, full_bkg, 200, 200)
-val_pairs = val_dataset.pairs
-val_means = val_dataset.means
-val_stds = val_dataset.stds
+# val_dataset = PairDataset(full_sig, full_bkg, 200, 200, standardise=True)
+# val_pairs = val_dataset.pairs
 
 print("training pairs", len(train_pairs))
 print("validation pairs", len(val_pairs))
 
-train_loader = DataLoader(train_pairs, batch_size=512, shuffle=True)
-val_loader = DataLoader(val_pairs, batch_size=128, shuffle=True)
-print("CHECK LENGTH OF KINEMATICS ", len(kinematics))
+train_loader = DataLoader(train_pairs, batch_size=256, shuffle=True)
+val_loader = DataLoader(val_pairs, batch_size=256, shuffle=True)
 model = EmbeddingNet(input_dim=len(kinematics), embedding_dim=embedding_dim)
 margin = user_config["margin"]
 LR = user_config["LR"]
@@ -253,9 +251,11 @@ def plot_embeddings(embeddings, labels, epoch, margin, feat, radius=1.0, pen=1.0
         ax.scatter(embeddings[:,0][bkg_label], embeddings[:,1][bkg_label], c='dodgerblue', label="Background")
         ax.scatter(embeddings[:,0][sig_label], embeddings[:,1][sig_label], c='deeppink', label="Signal")
     else:
-        embeddings_2d = tsne.fit_transform(embeddings)
-        ax.scatter(embeddings_2d[:,0][bkg_label], embeddings_2d[:,1][bkg_label], c='dodgerblue', label="Background")
-        ax.scatter(embeddings_2d[:,0][sig_label], embeddings_2d[:,1][sig_label], c='deeppink', label="Signal")
+        # embeddings_2d = tsne.fit_transform(embeddings)
+        # ax.scatter(embeddings_2d[:,0][bkg_label], embeddings_2d[:,1][bkg_label], c='dodgerblue', label="Background")
+        # ax.scatter(embeddings_2d[:,0][sig_label], embeddings_2d[:,1][sig_label], c='deeppink', label="Signal")
+        ax.scatter(embeddings[:,0][bkg_label], embeddings[:,1][bkg_label], c='dodgerblue', label="Background")
+        ax.scatter(embeddings[:,0][sig_label], embeddings[:,1][sig_label], c='deeppink', label="Signal")
 
     ax.legend(loc="upper right", fontsize=16)
     ax.text(0.03, 0.95, r"\textbf{Signal} - Leptoquark, \textbf{Background} - $t\bar{t}$, Single top", size=16, transform=ax.transAxes)
