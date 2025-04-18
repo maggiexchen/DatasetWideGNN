@@ -185,7 +185,10 @@ outputs = torch.cat(outputs, dim=0)
 sig_outputs = outputs[:idx[0], :]
 for i in range(embedding_dim):
     df_sig[signal][f'feat_{i+1:02d}'] = sig_outputs.numpy()[:, i]
-    df_sig[signal].to_hdf(embedding_path + str(signal)+".h5", key=str(signal), mode="w")
+    if signal_mass is not None:
+        df_sig[signal].to_hdf(embedding_path + str(signal)+"_"+signal_mass+".h5", key=str(signal), mode="w")
+    else:
+        df_sig[signal].to_hdf(embedding_path + str(signal)+signal_mass+".h5", key=str(signal), mode="w")
 
 for b, background in enumerate(backgrounds):
     bkg_outputs = outputs[idx[b]:idx[b+1]]
