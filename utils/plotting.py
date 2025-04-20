@@ -251,16 +251,17 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
     ax.hist(sigsig, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
     ax.hist(sigbkg, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="darkorange")
     ax.hist(bkgbkg, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt, alpha=0.5, density=True, color="forestgreen")
-    ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
-    ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
-    ax.text(0.04, 0.88, "Signal - " + sig_label, verticalalignment="bottom", size=10, transform=ax.transAxes)
-    ax.text(0.04, 0.83, "Background - " + bkg_label, verticalalignment="bottom", size=10, transform=ax.transAxes)
+    # ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    # ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.04, 0.93, sig_label, verticalalignment="bottom", size=10, transform=ax.transAxes)
+    ax.text(0.04, 0.88, bkg_label, verticalalignment="bottom", size=10, transform=ax.transAxes)
     y_min, y_max = ax.get_ylim()
     x_min, x_max = ax.get_xlim()
     for i, eff in enumerate(sigsig_eff):
-        eff_label=str(eff*100)+"%"
+        # eff_label=str(eff*100)+"%"
+        eff_label = str(eff)
         ax.axvline(x=ss_thresholds[i], ymax=0.6+i*0.02, linestyle="--", color="red")
-        ax.text(x=ss_thresholds[i], y=0.63+i*0.022, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label, ha='center', va='bottom', fontsize=7)
+        ax.text(x=ss_thresholds[i], y=0.6+i*0.022, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label, ha='center', va='bottom', fontsize=7)
     ax.legend(loc='upper right')
     ax.set_ylim(y_min, y_max*1.2)
     ax.set_xlabel(variable + " " + distance +" distance", loc="right")
@@ -269,19 +270,41 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
     misc.create_dirs(ssbb_path)
     fig.savefig(ssbb_path+"/"+variable+"_"+distance+"_linking_lengths.pdf", transparent=True)
 
-def plot_ROC(fpr_ss_bb, tpr_ss_bb, fpr_ss_sb, tpr_ss_sb, roc_auc_ss_bb, roc_auc_ss_sb, ss_bb_roc_cuts, ss_sb_roc_cuts, variable, distance, plot_path):
+def plot_ROC(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_bb_sb, ss_sb_roc_cuts, bb_sb_roc_cuts, variable, distance, plot_path):
     fig, ax = plt.subplots()
     plt.style.use(hep.style.ROOT)
-    plt.plot(fpr_ss_bb, tpr_ss_bb, label='sig-sig bkg-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_bb))
     plt.plot(fpr_ss_sb, tpr_ss_sb, label='sig-sig sig-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_sb))
-    plt.scatter(np.array(ss_bb_roc_cuts)[:,1], np.array(ss_bb_roc_cuts)[:,0], marker='x', s=50, label="linking lengths",color="red")
-    plt.scatter(np.array(ss_sb_roc_cuts)[:,1], np.array(ss_sb_roc_cuts)[:,0], marker='x', s=50, color="red")
+    plt.plot(fpr_bb_sb, tpr_bb_sb, label='bkg-bkg sig-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_bb_sb))
+    plt.scatter(np.array(ss_sb_roc_cuts)[:,1], np.array(ss_sb_roc_cuts)[:,0], marker='x', s=50, label="linking lengths",color="red")
+    plt.scatter(np.array(bb_sb_roc_cuts)[:,1], np.array(bb_sb_roc_cuts)[:,0], marker='x', s=50, color="red")
     plt.legend(loc="lower right", fontsize="11")
     ymin, ymax = plt.ylim()
     plt.ylim(0.,1.)
     plt.xlim(0.,1.)
-    plt.xlabel("sig(bkg)-bkg Efficiency")
-    plt.ylabel("sig-sig Efficiency")
+    plt.xlabel("sig-bkg (efficiency")
+    plt.ylabel("sig-sig (bkg-bkg) efficiency")
+    plot_dir = plot_path+"ROC/"
+    misc.create_dirs(plot_dir)
+    fig.savefig(plot_dir+"/"+variable+"_"+distance+"_ROC.pdf", transparent=True)
+
+def plot_ROC_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_bb_sb, ss_sb_roc_cuts, bb_sb_roc_cuts, linking_lengths, variable, distance, plot_path):
+    fig, ax = plt.subplots()
+    plt.style.use(hep.style.ROOT)
+    plt.plot(fpr_ss_sb, tpr_ss_sb, label='sig-sig sig-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_ss_sb))
+    plt.plot(fpr_bb_sb, tpr_bb_sb, label='bkg-bkg sig-bkg ROC curve (AUC = {:.3f})'.format(roc_auc_bb_sb))
+    ss_sb_ind = []
+    bb_sb_ind = []
+    for l in linking_lengths:
+        ss_sb_ind.append(numpy.argmin(abs(ss_sb_roc_cuts-l)))
+        bb_sb_ind.append(numpy.argmin(abs(bb_sb_roc_cuts-l)))
+    plt.scatter(np.array(fpr_ss_sb)[ss_sb_ind], np.array(tpr_ss_sb)[ss_sb_ind], marker='x', s=50, label="linking lengths",color="red")
+    plt.scatter(np.array(fpr_bb_sb)[bb_sb_ind], np.array(tpr_bb_sb)[bb_sb_ind], marker='x', s=50, color="red")
+    plt.legend(loc="lower right", fontsize="11")
+    ymin, ymax = plt.ylim()
+    plt.ylim(0.,1.)
+    plt.xlim(0.,1.)
+    plt.xlabel("sig-bkg efficiency")
+    plt.ylabel("Same class efficiency")
     plot_dir = plot_path+"ROC/"
     misc.create_dirs(plot_dir)
     fig.savefig(plot_dir+"/"+variable+"_"+distance+"_ROC.pdf", transparent=True)

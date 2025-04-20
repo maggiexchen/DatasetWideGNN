@@ -139,22 +139,22 @@ if distance is None:
     print("Need to specify a type of distance metric for the adjacency matrix in the config")
 
 linking_length = train_config["linking_length"]
-eff = train_config["sigsig_eff"]
+frac = train_config["edge_frac"]
 if linking_length is None:
-    if eff is None:
-        raise Exception("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
-    elif eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
-        raise Exception("not given a supported efficiency, (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)")
+    if frac is None:
+        raise Exception("Need to specify a edge fraction for the adjacency matrix when training a gcn in the config")
+    elif frac not in [0.1, 0.2, 0.3, 0.4, 0.5]:
+        raise Exception("not given a supported edge fraction, (0.1, 0.2, 0.3, 0.4, 0.5)")
     else:
-        ll_str = "_LLEff" + str(eff).replace(".", "p")
-        adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
+        ll_str = "_LLFrac" + str(frac).replace(".", "p")
+        adj_path = adj_path + "/" + f"edge_frac_{frac}/"
 else:
-    if eff is not None:
-        # when both linking length and sigsig eff are specified, use the linking length at specified sigsig efficiency
-        ll_str = "_LLEff" + str(eff).replace(".", "p")
-        adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
+    if frac is not None:
+        # when both linking length and edge fraction are specified, use the linking length at specified edge fraction
+        ll_str = "_LLFrac" + str(frac).replace(".", "p")
+        adj_path = adj_path + "/" + f"edge_frac_{frac}/"
     else:
-        print("linking length is given in config, IGNORING the sigsig_eff in the config!")
+        print("linking length is given in config, IGNORING the edge fraction in the config!")
         ll_str = "_LL" + str(linking_length).replace(".", "p")
         adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
 
@@ -211,8 +211,8 @@ logging.info("model storage path: "+model_path)
 model_path = model_path + model_label + "/" + gnn_type + "/"
 
 logging.info("distance metric: "+distance)
-if eff is not None:    
-    logging.info("desired efficieny: "+str(eff))
+if frac is not None:    
+    logging.info("desired edge fraction: "+str(frac))
 elif linking_length is not None:
     logging.info("linking length: "+str(linking_length))
 
@@ -267,7 +267,7 @@ if plot_conv_kins:
     print("ADJ MAT ", adj_mat)
     del sparse_adj_matrix
     for nconv in range(3):
-        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, len_bkg, kinematics, kinematic_labels, signal, eff, kinematic_plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv, edge_wgts=bool_edge_wgt)
+        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, len_bkg, kinematics, kinematic_labels, signal, frac, kinematic_plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv, edge_wgts=bool_edge_wgt)
     del adj_mat
 misc.print_mem_info()
 
@@ -571,25 +571,25 @@ finally:
 
     logging.info("Plotting model outputs ...")
     if gnn:
-        if eff is not None:
-            linking_length_label = "Linking length at "+str(eff)+" sig-sig efficiency"
+        if frac is not None:
+            linking_length_label = "Linking length at "+str(frac)+" edge fraction"
         elif linking_length is not None:
              linking_length_label = "Linking length "+str(linking_length)
     else:
         linking_length_label = ""
     signal_label, background_label = plotting.get_plot_labels(signal)
     if signal == "hhh":
-        if eff is not None:
+        if frac is not None:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
         elif linking_length is not None:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
     elif signal == "stau":
-        if eff is not None:
+        if frac is not None:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
         elif linking_length is not None:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
     elif signal == "LQ":
-        if eff is not None:
+        if frac is not None:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
         elif linking_length is not None:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]

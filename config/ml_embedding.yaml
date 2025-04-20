@@ -1,9 +1,9 @@
-kinematic_variable: "LQ"
+kinematic_variable: "LQ_LowLevel"
 embedding_variable: "embedding"
 distance: "euclidean"
 flip: True
 edge_weights: True
-sigsig_eff: 0.3
+edge_frac: 0.1
 linking_length:
 hidden_sizes_gcn: [32, 32, 32, 32]
 hidden_sizes_mlp: [12, 12]

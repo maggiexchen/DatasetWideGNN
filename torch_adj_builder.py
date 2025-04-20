@@ -101,33 +101,29 @@ distance = train_config["distance"]
 if distance is None:
     print("Need to specify a type of distance metric for the adjacency matrix in the config")
 
-eff = train_config["sigsig_eff"]
-if eff is None:
-    print("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
-elif eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
-    raise Exception("not given a supported efficiency, (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)")
+edge_frac = train_config["edge_frac"]
+if edge_frac is None:
+    print("Need to specify a desired edge_fraction for the adjacency matrix when training a gcn in the config")
+elif edge_frac not in [0.1, 0.2, 0.3, 0.4, 0.5]:
+    raise Exception("not given a supported edge fraction, (0.1, 0.2, 0.3, 0.4, 0.5)")
 
 linking_length = train_config["linking_length"]
-# read in linking length calculated from sampled training data, if not given in config
-# sigsig_eff = None
-print("janky", ll_path)
 os.makedirs(ll_path, exist_ok=True)
 if linking_length is None:
-    sigsig_eff = eff
     ll_path = ll_path+str(embedding_variable)+"_"+str(distance)+"_linking_length.json"
     print("Saving linking length to ", ll_path)
     with open(ll_path, 'r') as lfile:
         length_dict = json.load(lfile)
         lengths = length_dict["length"]
-        linking_length = lengths[length_dict["sigsig_eff"].index(sigsig_eff)]
+        linking_length = lengths[length_dict["edge_frac"].index(edge_frac)]
         logging.info("linking length ="+str(linking_length))
 else:
-    print("linking length is given in config, IGNORING the sigsig_eff in the config!")
+    print("linking length is given in config, IGNORING the edge fraction in the config!")
 
-if sigsig_eff is None:
+if edge_frac is None:
     adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
 else:
-    adj_path = adj_path + "/" + f"sigsig_eff_{sigsig_eff}/"
+    adj_path = adj_path + "/" + f"edge_frac_{edge_frac}/"
 misc.create_dirs(adj_path)
 
 kinematics, kinematic_labels = misc.get_kinematics(kinematic_variable, feature_dim)
@@ -143,8 +139,8 @@ logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
 logging.info("adj matrix storage path: "+adj_path)
 logging.info("distance metric: "+distance)
-if sigsig_eff is not None:
-    logging.info("desired efficieny: "+str(sigsig_eff))
+if edge_frac is not None:
+    logging.info("desired edge fraction: "+str(edge_frac))
 elif linking_length is not None:
     logging.info("linking length: "+str(linking_length))
 
@@ -254,7 +250,7 @@ if bool_edge_wgt:
 
 total_edges = sigsig_ind.shape[0]+sigbkg_ind.shape[0]+bkgbkg_ind.shape[0]
 total_pairs = (len(full_sig)+len(full_bkg))**2
-print("Linking length at sig-sig efficiency ", sigsig_eff)
+print("Linking length at edge fraction ", edge_frac)
 print("The fraction of edges in graph is ", total_edges / total_pairs)
 del sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind
 

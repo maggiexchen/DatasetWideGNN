@@ -3,7 +3,7 @@ embedding_variable:
 distance: "emd"
 flip: True
 edge_weights: True
-sigsig_eff: 0.2
+edge_frac: 0.1
 linking_length:
 hidden_sizes_gcn: [32, 32, 32, 32]
 hidden_sizes_mlp: [12, 12]

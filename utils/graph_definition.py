@@ -45,10 +45,4 @@ def find_threshold_edge_frac(sigsig, sigbkg, bkgbkg, edge_frac, flip):
     for frac in edge_frac:
         k = int(torch.ceil(torch.tensor(frac * total_len)))
         linking_length.append(sorted_dist[k - 1].item())
-    # fractions = (frac_ss * len_ss + frac_sb * len_sb + frac_bb * len_bb)/total_len
-    # if flip:
-    #     ind = np.argmax(fractions <= edge_frac)
-    # else:
-    #     ind = np.argmax(fractions >= edge_frac)
     return linking_length
-
