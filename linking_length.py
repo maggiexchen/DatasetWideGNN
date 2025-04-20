@@ -136,25 +136,15 @@ with open(roc_name, "w") as outfile:
     json.dump(roc_dict, outfile)
 
 # TODO: finer granularity for linking length scan?
-sigsig_eff = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-eff_labels = ["20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%"]
-ss_sb_roc_cuts = []
-ss_sb_thresholds = []
-ss_bb_roc_cuts = []
-ss_thresholds = []
+# sigsig_eff = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+# eff_labels = ["10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%"]
+edge_frac = [0.1, 0.2, 0.3, 0.4, 0.5]
+edge_frac_label = ["10%", "20%", "30%", "40%", "50%"]
 
-# finding the tpr, fpr and distance thresholds for each efficiency, then reverse minmax the distance threshold
-# note the ss_bb and ss_sb thresholds are the same as they are just determined as the threshold for the given ss efficiency.
-for eff in sigsig_eff:
-    ss_sb_roc_cut, ss_sb_threshold = graph_def.find_threshold(tpr_ss_sb, fpr_ss_sb, eff, cut_ss_sb, flip=flip)
-    ss_sb_roc_cuts.append(ss_sb_roc_cut)
-    ss_sb_thresholds.append(norm.reverse_minmax(ss_sb_threshold, 0 ,d_max))
-    ss_bb_roc_cut, ss_bb_threshold = graph_def.find_threshold(tpr_ss_bb, fpr_ss_bb, eff, cut_ss_bb, flip=flip)
-    ss_bb_roc_cuts.append(ss_bb_roc_cut)
-    ss_thresholds.append(norm.reverse_minmax(ss_bb_threshold, 0 ,d_max).item())
+ss_thresholds = graph_def.find_threshold_edge_frac(sigsig_distance, sigbkg_distance, bkgbkg_distance, edge_frac, flip=flip)
 
 # saving linking lengths
-length_dict = {"sigsig_eff": sigsig_eff, "length": ss_thresholds}
+length_dict = {"edge_frac": edge_frac, "length": ss_thresholds}
 misc.create_dirs(ll_path)
 ll_path = ll_path+""+variable+"_"+distance+"_linking_length.json"
 with open(ll_path, "w") as lengthfile:
@@ -163,7 +153,8 @@ with open(ll_path, "w") as lengthfile:
 # plotting sig-sig and bkg-bkg distributions and the linking lengths
 # TODO: moving plotting to utils
 logging.info("Plotting linking lengths ...")
-plotting.plot_linking_length(sigsig_distance, sigbkg_distance, bkgbkg_distance, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, ss_thresholds, signal_label, background_label, plot_path, variable, distance, sigsig_eff)
+# plotting.plot_linking_length(sigsig_distance, sigbkg_distance, bkgbkg_distance, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, ss_thresholds, signal_label, background_label, plot_path, variable, distance, sigsig_eff)
+plotting.plot_linking_length(sigsig_distance, sigbkg_distance, bkgbkg_distance, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, ss_thresholds, signal_label, background_label, plot_path, variable, distance, edge_frac)
 
-logging.info("Plotting ROC curves ...")
-plotting.plot_ROC(fpr_ss_bb, tpr_ss_bb, fpr_ss_sb, tpr_ss_sb, roc_auc_ss_bb, roc_auc_ss_sb, ss_bb_roc_cuts, ss_sb_roc_cuts, variable, distance, plot_path)
+# logging.info("Plotting ROC curves ...")
+# plotting.plot_ROC(fpr_ss_bb, tpr_ss_bb, fpr_ss_sb, tpr_ss_sb, roc_auc_ss_bb, roc_auc_ss_sb, ss_bb_roc_cuts, ss_sb_roc_cuts, variable, distance, plot_path)
