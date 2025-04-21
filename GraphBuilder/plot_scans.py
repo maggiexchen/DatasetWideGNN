@@ -9,6 +9,7 @@ import json
 import utils.misc as misc
 import argparse
 from glob import glob
+import numpy
 
 def GetParser():
     """Argument parser for reading Ntuples script."""
@@ -54,9 +55,9 @@ user_config_path = args.userconfig
 user_config = misc.load_config(user_config_path)
 plot_path = user_config["plot_path"]
 model_path = user_config["model_path"]
-margins = [0.1, 0.5, 1.0, 2.0, 2.5, 3.0]
+margins = [0.1, 0.5, 1.0, 2.0]
 penalties = [1, 5, 10, 20]
-dims = [2, 4, 12, 16, 18, 20]
+dims = [2, 6, 12, 18]
 parameter_dict = {"margin": {"value": margins, "label": "Margin"}, 
                   "penalty": {"value": penalties, "label": "Penalty"},
                    "dim": {"value": dims, "label": "Dimension"}}
@@ -67,12 +68,32 @@ s_type = ["Sig-sig", "Bkg-bkg", "Sig-bkg"]
 parameters = ["margin", "penalty", "dim"]
 
 
+file_list = glob(model_path + "/*/*.json")
+data = []
+for file in file_list:
+    with open(file, 'r') as f:
+        data.append(json.load(f))
+df = pd.DataFrame(data)
+print(df.columns)
+max_pur_ind = numpy.argmax(df['same_class_purity'])
+max_eff_ind = numpy.argmax(df['same_class_eff'])
+print("Maximum same class purity ", df['same_class_purity'][max_pur_ind])
+print("=== Dim: ", df['embedding_dim'][max_pur_ind])
+print("=== Margin: ", df['loss_margin'][max_pur_ind])
+print("=== Penalty: ", df["loss_penalty"][max_pur_ind])
+
+print("Maximum same class efficiency ", df['same_class_purity'][max_eff_ind])
+print("=== Dim: ", df['embedding_dim'][max_eff_ind])
+print("=== Margin: ", df['loss_margin'][max_eff_ind])
+print("=== Penalty: ", df["loss_penalty"][max_eff_ind])
+
+
+
 def assign_variable(parameters, values, assignment):
     for i, parameter in enumerate(parameters):
         if parameter == assignment:
             variable = values[i]
     return variable
-
 
 
 if args.scan:
@@ -151,12 +172,6 @@ if args.scan:
 
 if args.corr:
     print("Plotting correlation map")
-    file_list = glob(model_path + "/*/*.json")
-    data = []
-    for file in file_list:
-        with open(file, 'r') as f:
-            data.append(json.load(f))
-    df = pd.DataFrame(data)
     tick_labels = ["Margin", "Penalty", "Radius", "Dimension", 
                    "Avg. sig-sig dist", "Avg. sig-bkg dist", "Avg. bkg-bkg dist",
                    "Edge fraction", "Same class efficiency", "Same class purity", "Sig-sig efficiency", "Sig-sig purity", "Bkg-bkg efficiency", "Bkg-bkg purity"]
