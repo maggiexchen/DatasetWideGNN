@@ -3,7 +3,7 @@
 #######################
 
 # signal model hhh, LQ, stau
-signal: LQ_HighLevel
+signal: LQ
 signal_mass: 1000
 backgrounds: ["singletop", "ttbar"]
 cuts:
@@ -11,6 +11,11 @@ cuts:
     threshold: 200
     operation: ">"
 feature_dim:
+distance:
+  euclidean:
+  cosine:
+  emd:
+    objects: ["bjet1", "bjet2", "lep1", "lep2"]
 
 # input paths
 ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/

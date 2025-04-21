@@ -65,8 +65,8 @@ dist_path = user_config["dist_path"]
 
 signal = user_config["signal"]
 signal_mass = str(user_config["signal_mass"])
+distance_items = user_config["distance"]
 feature_dim = user_config["feature_dim"]
-objects = user_config["objects"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 
 logging.info("distance metric: "+distance)
@@ -84,9 +84,11 @@ if signal == "hhh": SF_4b5b = 0.07 # placeholder value for HHH data-driven backg
 if distance == "emd":
     # don't standardise the kinematic variables before emd calculation
     standardise_bool = False
+    objects = distance_items[distance]['objects']
 else:
     # but standardise them for other distances
     standardise_bool = True
+
 full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=True, signal=signal, signal_mass=signal_mass, standardisation=standardise_bool)
 
 global_bkg_wgt = 1.0
