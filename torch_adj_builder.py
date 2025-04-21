@@ -120,11 +120,20 @@ if linking_length is None:
 else:
     print("linking length is given in config, IGNORING the edge fraction in the config!")
 
+<<<<<<< HEAD
 if edge_frac is None:
     adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
 else:
     adj_path = adj_path + "/" + f"edge_frac_{edge_frac}/"
 misc.create_dirs(adj_path)
+=======
+if sigsig_eff is None:
+    adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
+else:
+    adj_path = adj_path + "/" + f"sigsig_eff_{sigsig_eff}/"
+misc.create_dirs(adj_path)
+
+>>>>>>> 509f44fed1aab79f5ec43dedda84f4278d126db9
 
 kinematics, kinematic_labels = misc.get_kinematics(kinematic_variable, feature_dim)
 input_size = len(kinematics)
