@@ -120,20 +120,11 @@ if linking_length is None:
 else:
     print("linking length is given in config, IGNORING the edge fraction in the config!")
 
-<<<<<<< HEAD
 if edge_frac is None:
-    adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
+    adj_path = adj_path + "/" + str(distance) + "_" + f"linking_length_{linking_length}/"
 else:
-    adj_path = adj_path + "/" + f"edge_frac_{edge_frac}/"
+    adj_path = adj_path + "/" + str(distance) + "_" + f"edge_frac_{edge_frac}/"
 misc.create_dirs(adj_path)
-=======
-if sigsig_eff is None:
-    adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
-else:
-    adj_path = adj_path + "/" + f"sigsig_eff_{sigsig_eff}/"
-misc.create_dirs(adj_path)
-
->>>>>>> 509f44fed1aab79f5ec43dedda84f4278d126db9
 
 kinematics, kinematic_labels = misc.get_kinematics(kinematic_variable, feature_dim)
 input_size = len(kinematics)
@@ -219,7 +210,6 @@ if bool_edge_wgt:
     bkgsig_plot_ind = torch.randperm(len(bkgsig_edge_wgts))[:1000]
     bkgbkg_plot_ind = torch.randperm(len(bkgbkg_edge_wgts))[:2000]
     normed_full_edge_wgts = full_edge_wgts * full_event_weights
-    print("EVENT WEIGHTS ", full_event_weights)
 
     fig, ax = plt.subplots()
     _, binning, _ = ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind], bkgsig_edge_wgts[bkgsig_plot_ind])) , bins=70, color="darkorange", alpha=0.5, label="sig-bkg")

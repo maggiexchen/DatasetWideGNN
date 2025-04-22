@@ -147,7 +147,7 @@ if linking_length is None:
         raise Exception("not given a supported edge fraction, (0.1, 0.2, 0.3, 0.4, 0.5)")
     else:
         ll_str = "_LLFrac" + str(frac).replace(".", "p")
-        adj_path = adj_path + "/" + f"edge_frac_{frac}/"
+        adj_path = adj_path + "/" + str(distance) + f"_edge_frac_{frac}/"
 else:
     if frac is not None:
         # when both linking length and edge fraction are specified, use the linking length at specified edge fraction
@@ -186,10 +186,10 @@ else:
             + "_e" + str(epochs)\
             + nf_str
 
-kinematic_plot_path = plot_path + "/training_kinematics/"
+kinematic_plot_path = plot_path + "/training_kinematics/"+str(distance)+"_frac" + str(frac) + "/"
 if gnn == False:
     plot_path = plot_path + "/MLP/" + model_label + "/"
-plot_path = plot_path + model_label + "/"
+plot_path = plot_path + str(distance) + "_models/" + model_label + "/"
 misc.create_dirs(plot_path)
 
 if signal == "stau":
@@ -208,7 +208,7 @@ logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
 logging.info("adj matrix storage path: "+adj_path)
 logging.info("model storage path: "+model_path)
-model_path = model_path + model_label + "/" + gnn_type + "/"
+model_path = model_path + str(distance) + "_models/" + model_label + "/" + gnn_type + "/"
 
 logging.info("distance metric: "+distance)
 if frac is not None:    
@@ -557,7 +557,7 @@ finally:
         ax_loss.plot(np.arange(len(val_loss)), val_loss, label="Fold " + str(loss_loop) + " (Val)", color=colour, linestyle = "-.")
     ax_loss.legend(loc='upper right', fontsize=9)
     if gnn:
-        model_text = [str(gnn_type)+" model", "GNN layers "+ str(hidden_sizes_gcn), "MLP layers "+ str(hidden_sizes_mlp), "Batchsize " + str(batch_size) + ", neighbour sampling " + str(num_nb_list)]
+        model_text = [str(gnn_type)+" model", "GNN layers "+ str(hidden_sizes_gcn), "MLP layers "+ str(hidden_sizes_mlp), "Batchsize " + str(batch_size),  "Neighbour sampling " + str(num_nb_list)]
     else:
         model_text = [str(gnn_type) + " model", "MLP layers "+ str(hidden_sizes_mlp), "Batchsize " + str(batch_size)]
     plotting.add_text(ax_loss, model_text, doATLAS=False, startx=0.02, starty=0.95)
