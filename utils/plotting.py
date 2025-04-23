@@ -201,9 +201,9 @@ def plot_conv_kinematics(adj_mat, x, len_sig, len_bkg, kinematics, kinematic_lab
         ax.hist(post_conv_sig[:,v], bins=binning, label="Signal", alpha=0.3, density=True, color="red")
         ax.hist(post_conv_bkg[:,v], bins=binning, label="Background", alpha=0.3, density=True, color="steelblue")
         if standardise:
-            add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", signal_label, background_label, r"$E_T^{miss}$ > 200 GeV ", r"Linking length at "+str(eff)+" sig-sig efficiency", "After "+str(nconv)+" convolutions", r"Standardised to (mean, std) = (0, 1)"])
+            add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", signal_label, background_label, r"$E_T^{miss}$ > 200 GeV ", r"Linking length at "+str(eff)+" edge fraction", "After "+str(nconv)+" convolutions", r"Standardised to (mean, std) = (0, 1)"])
         else:
-            add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", signal_label, background_label, r"$E_T^{miss}$ > 200 GeV ", r"Linking length at "+str(eff)+" sig-sig efficiency", "After "+str(nconv)+" convolutions"])
+            add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", signal_label, background_label, r"$E_T^{miss}$ > 200 GeV ", r"Linking length at "+str(eff)+" edge fraction", "After "+str(nconv)+" convolutions"])
         ax.legend(loc='upper right')
         ymin, ymax = ax.get_ylim()
         ax.set_ylim((ymin, ymax*1.4))
@@ -230,7 +230,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
         fig, ax = plt.subplots()
         ax.hist(setup["data"][: len(sig)].detach().cpu().numpy(), bins=50, label="Signal", alpha=0.3, density=True, color="red")
         ax.hist(setup["data"][len(sig):].detach().cpu().numpy(), bins=50, label="Background", alpha=0.3, density=True, color="steelblue")
-        text = [r"$\sqrt{s}=13$ TeV, 5b data", r"6b resonant TRSM signals", r"Linking length at sig-sig eff "+str(eff)]
+        text = [r"$\sqrt{s}=13$ TeV, 5b data", r"6b resonant TRSM signals", r"Linking length at edge fraction "+str(eff)]
         if setup["extratext"] != "": text.append(setup["extratext"])
         add_text(ax, text)
         ax.legend(loc='upper right')
