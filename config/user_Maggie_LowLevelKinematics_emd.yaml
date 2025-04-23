@@ -18,8 +18,7 @@ distance:
     objects: ["bjet1", "bjet2", "lep1", "lep2"]
 
 # input paths
-ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_110425_small/
-# ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_140325/
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
 feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
 kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
 ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd/linking_lengths/ 

@@ -1,4 +1,4 @@
-kinematic_variable: "LQ"
+kinematic_variable: "LQ_LowLevel"
 embedding_variable:
 distance: "emd"
 flip: True
@@ -10,7 +10,7 @@ hidden_sizes_mlp: [12, 12]
 dropout_rates: [0, 0, 0, 0, 0, 0]
 LR: 0.01
 patience_LR: 3
-num_nb_list: [60, 60, 60, 60, 60, 60]
+num_nb_list: [120, 120, 120, 120]
 batch_size: 128
 gnn_type: "GCN"
 epochs: 50
