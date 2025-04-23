@@ -11,6 +11,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
+from scipy import stats
 import utils.normalisation as norm
 import utils.misc as misc
 import utils.plotting as plotting

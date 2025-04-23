@@ -135,9 +135,35 @@ def get_kinematics(variable, dim):
             kinematics = [f'feat_{i+1:02d}' for i in range(embedding_dim)]
             labels = [f'Feature {i+1:02d}' for i in range(embedding_dim)]
     else:
-        raise Exception("bruh, pick a better variable set (mass, angular, shape, combined, mass_and_angular, mass_and_shape)")
+        raise Exception("bruh, pick a better variable set (mass, angular, shape, combined, mass_and_angular, mass_and_shape, LQ_LowLevel, LQ_HighLevel, stau, embedding)")
 
     return kinematics, labels
+
+def get_kinematics_labels(variable):
+    if variable == "mass":
+        label = "HHH mass variables"
+    elif variable == "angular":
+        label = "HHH angular variables"
+    elif variable == "shape":
+        label = "Kinematic shape variables"
+    elif variable == "combined":
+        label = "HHH mass, angular and kinematic shape variables"
+    elif variable == "mass and angular":
+        label = "HHH mass and angular variables"
+    elif variable == "mass and shape":
+        label = "HHH mass and kinematic shape variables"
+    elif variable == "LQ_HighLevel":
+        label = "LQ High-level kinematic variables"
+    elif variable == "LQ_LowLevel":
+        label = "LQ Low-level kinematic variables"
+    elif variable == "embedding":
+        label = "Latent space variables"
+    elif variable == "stau":
+        label = "stau variables"
+    else:
+        raise Exception("bruh, pick a better variable set (mass, angular, shape, combined, mass_and_angular, mass_and_shape, LQ_LowLevel, LQ_HighLevel, stau, embedding)")
+    return label
+
 
 def get_kinematics_staus(variable):
     """
@@ -389,7 +415,7 @@ def get_batched_distances(dist_path, variable, distance, t, sample=True):
     distance = torch.empty(0, dtype=torch.float16)
     wgt = torch.empty(0, dtype=torch.float16)
     if sample:
-        num_sample = 500000
+        num_sample = 1000000
         batch_sample = math.ceil(num_sample / len(files))
         sample_count = 0
         while sample_count < num_sample:

@@ -5,6 +5,8 @@ import torch
 import utils.normalisation as norm
 import utils.misc as misc
 import numpy
+from scipy import stats
+from scipy.stats import entropy
 
 def get_plot_labels(signal_type):
     """
@@ -248,13 +250,19 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
     fig, ax = plt.subplots()
     nBins = 50
     binning = np.linspace(0, torch.max(torch.cat((sigsig, sigbkg, bkgbkg))), nBins)
-    ax.hist(sigsig, bins=binning, label="sig-sig", weights=sigsig_wgt, alpha=0.5, density=True, color="steelblue")
-    ax.hist(sigbkg, bins=binning, label="sig-bkg", weights=sigbkg_wgt, alpha=0.5, density=True, color="darkorange")
-    ax.hist(bkgbkg, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt, alpha=0.5, density=True, color="forestgreen")
-    # ax.text(0.04, 0.93, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
-    # ax.text(0.14, 0.93, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
-    ax.text(0.04, 0.93, sig_label, verticalalignment="bottom", size=10, transform=ax.transAxes)
-    ax.text(0.04, 0.88, bkg_label, verticalalignment="bottom", size=10, transform=ax.transAxes)
+    sigsig_hist, bin_edges = numpy.histogram(sigsig, bins=binning, weights=sigsig_wgt, density=True)
+    sigbkg_hist, _ = numpy.histogram(sigbkg, bins=binning, weights=sigbkg_wgt, density=True)
+    bkgbkg_hist, _ = numpy.histogram(bkgbkg, bins=binning, weights=bkgbkg_wgt, density=True)
+    bin_center = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    sigsig_mode = bin_center[numpy.argmax(sigsig_hist)]
+    sigbkg_mode = bin_center[numpy.argmax(sigbkg_hist)]
+    bkgbkg_mode = bin_center[numpy.argmax(bkgbkg_hist)]
+    KL_sigsig_sigbkg = entropy(sigsig_hist+1e-10, sigbkg_hist+1e-10)
+    KL_bkgbkg_sigbkg = entropy(bkgbkg_hist+1e-10, sigbkg_hist+1e-10)
+    ax.hist(sigsig, bin_edges, label=f"sig-sig (mode: {sigsig_mode:.3g})", color="steelblue", alpha=0.5, weights=sigbkg_wgt, density=True)
+    ax.hist(sigbkg, bin_edges, label=f"sig-bkg (mode: {sigbkg_mode:.3g})", color="darkorange", alpha=0.5, weights=sigbkg_wgt, density=True)
+    ax.hist(bkgbkg, bin_edges, label=f"bkg-bkg (mode: {bkgbkg_mode:.3g})", color="forestgreen", alpha=0.5, weights=sigbkg_wgt, density=True)
+    add_text(ax, [sig_label, bkg_label, r"$KL_{sigsig, sigbkg}$: " + f"{KL_sigsig_sigbkg:.3g}", r"$KL_{bkgbkg, sigbkg}$: " + f"{KL_bkgbkg_sigbkg:.3g}"])
     y_min, y_max = ax.get_ylim()
     x_min, x_max = ax.get_xlim()
     for i, eff in enumerate(sigsig_eff):
@@ -263,11 +271,13 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
         ax.axvline(x=ss_thresholds[i], ymax=0.6+i*0.02, linestyle="--", color="red")
         ax.text(x=ss_thresholds[i], y=0.6+i*0.022, transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label, ha='center', va='bottom', fontsize=7)
     ax.legend(loc='upper right')
-    ax.set_ylim(y_min, y_max*1.2)
-    ax.set_xlabel(variable + " " + distance +" distance", loc="right")
+    ax.set_ylim(y_min, y_max*1.3)
+    kinematic_label = misc.get_kinematics_labels(variable)
+    ax.set_xlabel(kinematic_label + " " + distance +" distance", loc="right")
     ax.set_ylabel("Normalised # event pairs / bin", loc="top")
     ssbb_path = plot_path+"linking_lengths/"
     misc.create_dirs(ssbb_path)
+    fig.tight_layout()
     fig.savefig(ssbb_path+"/"+variable+"_"+distance+"_linking_lengths.pdf", transparent=True)
 
 def plot_ROC(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_bb_sb, ss_sb_roc_cuts, bb_sb_roc_cuts, variable, distance, plot_path):
