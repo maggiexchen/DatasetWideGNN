@@ -259,10 +259,11 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
     bkgbkg_mode = bin_center[numpy.argmax(bkgbkg_hist)]
     KL_sigsig_sigbkg = entropy(sigsig_hist+1e-10, sigbkg_hist+1e-10)
     KL_bkgbkg_sigbkg = entropy(bkgbkg_hist+1e-10, sigbkg_hist+1e-10)
+    KL_sigsig_bkgbkg = entropy(sigsig_hist+1e-10, bkgbkg_hist+1e-10)
     ax.hist(sigsig, bin_edges, label=f"sig-sig (mode: {sigsig_mode:.3g})", color="steelblue", alpha=0.5, weights=sigbkg_wgt, density=True)
     ax.hist(sigbkg, bin_edges, label=f"sig-bkg (mode: {sigbkg_mode:.3g})", color="darkorange", alpha=0.5, weights=sigbkg_wgt, density=True)
     ax.hist(bkgbkg, bin_edges, label=f"bkg-bkg (mode: {bkgbkg_mode:.3g})", color="forestgreen", alpha=0.5, weights=sigbkg_wgt, density=True)
-    add_text(ax, [sig_label, bkg_label, r"$KL_{sigsig, sigbkg}$: " + f"{KL_sigsig_sigbkg:.3g}", r"$KL_{bkgbkg, sigbkg}$: " + f"{KL_bkgbkg_sigbkg:.3g}"])
+    add_text(ax, [sig_label, bkg_label, r"$KL_{sigsig, sigbkg}$: " + f"{KL_sigsig_sigbkg:.3g}", r"$KL_{bkgbkg, sigbkg}$: " + f"{KL_bkgbkg_sigbkg:.3g}", r"$KL_{sigsig, bkgbkg}$: " + f"{KL_sigsig_bkgbkg:.3g}"])
     y_min, y_max = ax.get_ylim()
     x_min, x_max = ax.get_xlim()
     for i, eff in enumerate(sigsig_eff):
