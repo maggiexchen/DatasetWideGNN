@@ -14,7 +14,7 @@ num_nb_list: [60, 60]
 batch_size: 256
 gnn_type: "GraphConv"
 epochs: 50
-patience_early_stopping: 20
+patience_early_stopping: 10
 num_folds: 3
 single_fold:
 plot_conv_kinematics: False
