@@ -537,3 +537,12 @@ def get_event_vectors(df):
         events.append(event)
         # weights.append(row['eventWeight'])
     return events #, np.array(weights)
+
+def stable_int_from_string(s):
+    h = hashlib.md5(s.encode('utf-8')).hexdigest()
+    return int(h, 16)  # Big integer, deterministic everywhere
+
+def assign_fold_deterministically(event_id, n_folds):
+    seed = stable_int_from_string(str(event_id)) % (2**32)
+    rng = np.random.RandomState(seed)
+    return rng.randint(n_folds)
