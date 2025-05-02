@@ -8,7 +8,7 @@ import numpy
 from scipy import stats
 from scipy.stats import entropy
 
-def get_plot_labels(signal_type):
+def get_plot_labels(signal_type, signal_mass = None):
     """
     Args:
     signal_type (str): the type of signal being plotted, specified in the user config (hhh, LQ or stau)
@@ -22,15 +22,18 @@ def get_plot_labels(signal_type):
         background = "Data-driven QCD background estimate (5b data)"
     elif "LQ" in signal_type:
         signal = "Leptoquark signal"
-        split_string = signal_type.split("_")
-        if len(split_string) == 2:
-            number = split_string[1]
-            signal += f" ({number} GeV)"
+        # split_string = signal_type.split("_")
+        # if len(split_string) == 2:
+        #     number = split_string[1]
+        #     signal += f" ({number} GeV)"
+        if signal_mass is not None:
+            signal += f" ({signal_mass} GeV)"
         background = r"$t\bar{t}$ and Single top backgrounds"
     elif signal_type == "stau":
         signal = "StauStau signal"
         background = r"$W$ jets, $Z\rightarrow ll$ jets, Diboson (0$l$, 1$l$, 2$l$, 3$l$, 4$l$), Triboson, Higgs, Single top, $t\bar{t}V$, $t\bar{t}$"
     return signal, background
+
 
 
 def add_text(ax, text, doATLAS=False, startx=0.04, starty=0.93):

@@ -88,8 +88,7 @@ signal = user_config["signal"]
 signal_mass = user_config["signal_mass"]
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
-### rename signal to include mass
-signal = signal + "_" + str(signal_mass)
+
 
 
 kinematic_variable = train_config["kinematic_variable"]

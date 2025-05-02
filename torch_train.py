@@ -89,11 +89,6 @@ signal_mass = user_config["signal_mass"]
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {signal}"
 
-### rename signal to include mass
-signal = signal + "_" + str(signal_mass)
-
-signal_label, background_label = plotting.get_plot_labels(signal)
-
 ### set up CUDA/CPU device settings
 run_with_cuda = user_config["run_with_cuda"]
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
@@ -536,7 +531,7 @@ try:
     print("plotting model outputs per fold")
     fold_fig, fold_ax = plt.subplots()
     fold_colours = ["steelblue", "darkorange", "forestgreen"]
-    for k in range(fold_no):
+    for k in range(num_folds):
         print("TRAIN FOLD ", train_outputs_per_fold["fold_"+str(k+1)+"_outputs"])
         print("VAL FOLD ", val_outputs_per_fold["fold_"+str(k+1)+"_outputs"])
         fold_fig, fold_ax = plt.subplots()
@@ -616,7 +611,7 @@ finally:
              linking_length_label = "Linking length "+str(linking_length)
     else:
         linking_length_label = ""
-    signal_label, background_label = plotting.get_plot_labels(signal)
+    signal_label, background_label = plotting.get_plot_labels(signal, signal_mass)
     if signal == "hhh":
         if frac is not None:
             text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
