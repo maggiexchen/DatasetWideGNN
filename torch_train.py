@@ -269,13 +269,15 @@ if gnn:
     if bool_edge_wgt:
         if gnn_type == "GAT":
             print("loading edge weights and MC weights for GAT...")
-            edge_wgts = torch.load(adj_path+'edge_wgts.pt')
+            edge_wgts = torch.load(adj_path+'edge_wgts.pt').to(device)
             edge_weights_from_MC = full_wgts[edge_ind[0]]
         else:
             print("loading edge weights ...")
-            edge_wgts = torch.load(adj_path+'edge_wgts.pt')
+            edge_wgts = torch.load(adj_path+'edge_wgts.pt').to(device)
             edge_weights_from_MC = full_wgts[edge_ind[0]] ### edge weights from MC source node
             edge_wgts = edge_wgts * edge_weights_from_MC
+            # edge_wgts_combined = edge_wgts * edge_weights_from_MC
+            # print("keeping combined separate")
             edge_weights_from_MC = None
         
 
@@ -319,7 +321,9 @@ torch.cuda.empty_cache()
 
 ### create data object, train and val loaders
 if bool_edge_wgt:
-    data = Data(x = full_x, y = full_y, edge_index = edge_ind, node_weight = full_wgts, edge_weight = edge_wgts, mc_weights = edge_weights_from_MC)
+    data = Data(x = full_x, y = full_y, edge_index = edge_ind, node_weight = full_wgts, edge_weight = edge_wgts, 
+                mc_weight=edge_weights_from_MC if gnn_type == "GAT" else torch.tensor([], device=full_wgts.device))
+    #edge_weight_combined = edge_wgts_combined)
     del edge_ind, edge_wgts
 else:
     data = Data(x = full_x, y = full_y, edge_index = edge_ind, node_weight = full_wgts)
@@ -405,7 +409,7 @@ try:
                 if bool_edge_wgt:
                     if torch.any(torch.isnan(batch.edge_weight)):
                         print("Edge weights contain NaN values!")
-                    outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weights)
+                    outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weight)
                 else:
                     outputs = model(batch.x, batch.edge_index)
                 
@@ -441,7 +445,7 @@ try:
                 batch = batch.to(device)
                 batch_size = batch.batch_size
                 if bool_edge_wgt:
-                    outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weights)
+                    outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weight)
                 else:
                     outputs = model(batch.x, batch.edge_index)
 
