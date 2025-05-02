@@ -5,13 +5,17 @@
 # signal model hhh, LQ, stau
 signal: LQ
 signal_mass: 1000
-half: ""
 backgrounds: ["singletop", "ttbar"]
 cuts:
   met:
     threshold: 200
     operation: ">"
-feature_dim: 18
+feature_dim:
+distance:
+  euclidean:
+  cosine:
+  emd:
+    objects: ["bjet1", "bjet2", "lep1", "lep2"]
 run_with_cuda: True
 
 # input paths

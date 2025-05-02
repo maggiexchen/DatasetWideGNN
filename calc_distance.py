@@ -69,9 +69,6 @@ distance_items = user_config["distance"]
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 
-### rename signal to include mass
-signal = signal + "_" + str(signal_mass)
-
 logging.info("distance metric: "+distance)
 logging.info("signal: "+signal)
 logging.info("variable set: "+variable)
@@ -155,7 +152,7 @@ for i in range(num_sig_batches):
         batch_dict = {'distance': batch_sigsig, 'weight': batch_sigsig_wgt}
 
         print("Sigsig file ", i, j)
-        torch.save(batch_dict, save_path + f'{half_str}sigsig_distances_batch_{i}_{j}.pt')
+        torch.save(batch_dict, save_path + f'sigsig_distances_batch_{i}_{j}.pt')
 
 logging.info('Calculating bkgbkg distances ...')
 for i in range(num_bkg_batches):
@@ -178,7 +175,7 @@ for i in range(num_bkg_batches):
 
         batch_dict = {'distance': batch_bkgbkg, 'weight': batch_bkgbkg_wgt}
         print("Bkgbkg file ij ", i, j)
-        torch.save(batch_dict, save_path + f'{half_str}bkgbkg_distances_batch_{i}_{j}.pt')
+        torch.save(batch_dict, save_path + f'bkgbkg_distances_batch_{i}_{j}.pt')
 
 logging.info('Calculating sigbkg distances ...')
 for i in range(num_sig_batches):
@@ -199,13 +196,13 @@ for i in range(num_sig_batches):
 
         batch_dict = {'distance': batch_sigbkg, 'weight': batch_sigbkg_wgt}
         print("Sigbkg file ", i, j)
-        torch.save(batch_dict, save_path + f'{half_str}sigbkg_distances_batch_{i}_{j}.pt')
+        torch.save(batch_dict, save_path + f'sigbkg_distances_batch_{i}_{j}.pt')
 
 # plot the MAD-normed distances from the first batch
 logging.info("Plotting ... ")
-sigsig = torch.load(save_path + f'{half_str}sigsig_distances_batch_0_0.pt')
-bkgbkg = torch.load(save_path + f'{half_str}bkgbkg_distances_batch_0_0.pt')
-sigbkg = torch.load(save_path + f'{half_str}sigbkg_distances_batch_0_0.pt')
+sigsig = torch.load(save_path + f'sigsig_distances_batch_0_0.pt')
+bkgbkg = torch.load(save_path + f'bkgbkg_distances_batch_0_0.pt')
+sigbkg = torch.load(save_path + f'sigbkg_distances_batch_0_0.pt')
 np_sigsig = sigsig['distance'].numpy().flatten()
 np_sigbkg = sigbkg['distance'].numpy().flatten()
 np_bkgbkg = bkgbkg['distance'].numpy().flatten()
@@ -215,4 +212,4 @@ np_bkgbkg_wgt = bkgbkg['weight'].numpy().flatten()
 
 plot_path = plot_path+"/"+variable+"/"
 misc.create_dirs(plot_path)
-plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path, label=str(half))
+plotting.plot_distances(np_sigsig, np_sigbkg, np_bkgbkg, np_sigsig_wgt, np_sigbkg_wgt, np_bkgbkg_wgt, variable, distance, plot_path)
