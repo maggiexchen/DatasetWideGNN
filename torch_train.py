@@ -142,22 +142,22 @@ if distance is None:
     print("Need to specify a type of distance metric for the adjacency matrix in the config")
 
 linking_length = train_config["linking_length"]
-eff = train_config["sigsig_eff"]
+frac = train_config["edge_frac"]
 if linking_length is None:
-    if eff is None:
-        raise Exception("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
-    elif eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
-        raise Exception("not given a supported efficiency, (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)")
+    if frac is None:
+        raise Exception("Need to specify a edge fraction for the adjacency matrix when training a gcn in the config")
+    elif frac not in [0.1, 0.2, 0.3, 0.4, 0.5]:
+        raise Exception("not given a supported edge fraction, (0.1, 0.2, 0.3, 0.4, 0.5)")
     else:
-        ll_str = "_LLEff" + str(eff).replace(".", "p")
-        adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
+        ll_str = "_LLFrac" + str(frac).replace(".", "p")
+        adj_path = adj_path + "/" + str(distance) + f"_edge_frac_{frac}/"
 else:
-    if eff is not None:
-        # when both linking length and sigsig eff are specified, use the linking length at specified sigsig efficiency
-        ll_str = "_LLEff" + str(eff).replace(".", "p")
-        adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
+    if frac is not None:
+        # when both linking length and edge fraction are specified, use the linking length at specified edge fraction
+        ll_str = "_LLFrac" + str(frac).replace(".", "p")
+        adj_path = adj_path + "/" + f"edge_frac_{frac}/"
     else:
-        print("linking length is given in config, IGNORING the sigsig_eff in the config!")
+        print("linking length is given in config, IGNORING the edge fraction in the config!")
         ll_str = "_LL" + str(linking_length).replace(".", "p")
         adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
 
@@ -188,16 +188,17 @@ else:
             + "_bs" + str(batch_size)\
             + "_e" + str(epochs)\
             + nf_str
-        
+
+kinematic_plot_path = plot_path + "/training_kinematics/"+str(distance)+"_frac" + str(frac) + "/"
 if gnn == False:
     plot_path = plot_path + "/MLP/" + model_label + "/"
-plot_path = plot_path + model_label + "/"
+plot_path = plot_path + str(distance) + "_models/" + model_label + "/"
 misc.create_dirs(plot_path)
 
 if signal == "stau":
     kinematics = misc.get_kinematics_staus(kinematic_variable, feature_dim)
 else:
-    kinematics = misc.get_kinematics(kinematic_variable, feature_dim)
+    kinematics, kinematic_labels = misc.get_kinematics(kinematic_variable, feature_dim)
 input_size = len(kinematics)
 
 logging.info("signal: "+signal)
@@ -210,11 +211,11 @@ logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
 logging.info("adj matrix storage path: "+adj_path)
 logging.info("model storage path: "+model_path)
-model_path = model_path + model_label + "/" + gnn_type + "/"
+model_path = model_path + str(distance) + "_models/" + model_label + "/" + gnn_type + "/"
 
 logging.info("distance metric: "+distance)
-if eff is not None:    
-    logging.info("desired efficieny: "+str(eff))
+if frac is not None:    
+    logging.info("desired edge fraction: "+str(frac))
 elif linking_length is not None:
     logging.info("linking length: "+str(linking_length))
 
@@ -222,7 +223,7 @@ elif linking_length is not None:
 logging.info('Importing signal and background files...')
 
 # normal loading setup
-full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels, sig_fold, bkg_fold = adj.data_loader(kinematic_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, num_folds = num_folds)
+full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels, sig_fold, bkg_fold = adj.data_loader(kinematic_h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal=signal, signal_mass=signal_mass, num_folds = num_folds)
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
 print("full sig size ", full_sig.size())
@@ -265,7 +266,7 @@ if gnn:
     print("deleting row and col indices ...")
     del row_ind
     del col_ind
-    print("Edge fraciton: ", edge_ind.shape[1] / (len(full_y)* (len(full_y)-1))/2)
+    print("Edge fraciton: ", edge_ind.shape[1] / len(full_y)**2)
     if bool_edge_wgt:
         if gnn_type == "GAT":
             print("loading edge weights and MC weights for GAT...")
@@ -282,15 +283,20 @@ if gnn:
         
 
 if plot_conv_kins:
-    edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
-    sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edges, size=(len(full_y), len(full_y)))
+    if bool_edge_wgt:
+        sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edge_wgts, size=(len(full_y), len(full_y)))
+    else:
+        edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
+        sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edges, size=(len(full_y), len(full_y)))
+        del edges
     adj_mat = sparse_adj_matrix.to_dense()
+    print("ADJ MAT ", adj_mat)
     del sparse_adj_matrix
-    print(adj_mat)
     for nconv in range(3):
-        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, len_bkg, kinematics, signal, eff, plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv)
-    del edges, adj_mat
+        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, len_bkg, kinematics, kinematic_labels, signal, frac, kinematic_plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv, edge_wgts=bool_edge_wgt)
+    del adj_mat
 misc.print_mem_info()
+
 
 ### define loss function and optimiser
 def weighted_bce_loss(output, target, class_weights, event_weights):
@@ -332,15 +338,20 @@ else:
 try: 
     train_losses = []
     val_losses = []
+
     train_outputs = torch.tensor([]).to(cpu)
+    train_outputs_per_fold = {}
     train_truth_labels = torch.tensor([]).to(cpu)
     train_wgts = torch.tensor([]).to(cpu)
     val_outputs = torch.tensor([]).to(cpu)
+    val_outputs_per_fold = {}
     val_truth_labels = torch.tensor([]).to(cpu)
     val_wgts = torch.tensor([]).to(cpu)
 
     logging.info("Starting k-fold cross validation ...")
     logging.info("Time taken so far: "+str(time.time()-st))
+
+
     for fold_no in range(num_folds):
 
         train_idx = np.where(fold_assignment != fold_no)[0]
@@ -402,13 +413,14 @@ try:
             train_outputs_fold = torch.tensor([]).to(cpu)
             train_truth_labels_fold = torch.tensor([]).to(cpu)
             train_wgts_fold = torch.tensor([]).to(cpu)
+            train_x_fold = torch.tensor([])
             for batch in train_loader:
                 optimiser.zero_grad()
                 batch = batch.to(device)
                 batch_size = batch.batch_size
                 if bool_edge_wgt:
-                    if torch.any(torch.isnan(batch.edge_weight)):
-                        print("Edge weights contain NaN values!")
+                    # if torch.any(torch.isnan(batch.edge_weight)):
+                    #     print("Edge weights contain NaN values!")
                     outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weight)
                 else:
                     outputs = model(batch.x, batch.edge_index)
@@ -429,6 +441,7 @@ try:
                 train_outputs_fold = torch.cat((train_outputs_fold, outputs.detach().to(cpu)))
                 train_truth_labels_fold = torch.cat((train_truth_labels_fold, y.detach().to(cpu)))
                 train_wgts_fold = torch.cat((train_wgts_fold, event_wgts.detach().to(cpu)))
+                train_x_fold = torch.cat((train_x_fold, batch.x.detach().to(cpu)))
                 
             avg_tr_loss = total_loss / total_examples
             train_loss.append(avg_tr_loss)
@@ -440,6 +453,7 @@ try:
             val_outputs_fold= torch.tensor([]).to(cpu)
             val_truth_labels_fold = torch.tensor([]).to(cpu)
             val_wgts_fold = torch.tensor([]).to(cpu)
+            val_x_fold = torch.tensor([]).to(cpu)
             for batch in val_loader:
                 
                 batch = batch.to(device)
@@ -447,7 +461,7 @@ try:
                 if bool_edge_wgt:
                     outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weight)
                 else:
-                    outputs = model(batch.x, batch.edge_index)
+                    outputs = model(batch.x, batch.edge_index, gnn_type)
 
                 ### NOTE only consider predictions and labels of seed nodes
                 y = batch.y[:batch_size]
@@ -461,6 +475,8 @@ try:
                 val_outputs_fold = torch.cat((val_outputs_fold, outputs.detach().to(cpu)))
                 val_truth_labels_fold = torch.cat((val_truth_labels_fold, y.detach().to(cpu)))
                 val_wgts_fold = torch.cat((val_wgts_fold, event_wgts.detach().to(cpu)))
+                val_x_fold = torch.cat((val_x_fold, batch.x.detach().to(cpu)))
+
 
             avg_vl_loss = total_loss / total_examples
             val_loss.append(avg_vl_loss)
@@ -484,6 +500,9 @@ try:
                 print(f"Early stopping after {epoch+1} epochs.")
                 break
 
+        train_outputs_per_fold["fold_"+str(fold_no)+"_outputs"] = train_outputs_fold.flatten()
+        val_outputs_per_fold["fold_"+str(fold_no)+"_outputs"] = val_outputs_fold.flatten()
+
         logging.info(f"Finished fold {fold_no}/{num_folds}")
         logging.info(f"Number of epochs: {epoch+1}/{epochs}, Final train Loss: {avg_tr_loss}, final validation Loss: {avg_vl_loss}")
         logging.info("Time taken so far: "+str(time.time()-st))
@@ -506,18 +525,32 @@ try:
         val_truth_labels = torch.cat((val_truth_labels, val_truth_labels_fold))
         val_wgts = torch.cat((val_wgts, val_wgts_fold))
         del train_loader, val_loader, model, optimiser, scheduler
-        # del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
+        del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
         torch.cuda.empty_cache()
         gc.collect()
 
         if single_fold == True:
             print("Single fold training, breaking loop ...")
             break
+    
+    print("plotting model outputs per fold")
+    fold_fig, fold_ax = plt.subplots()
+    fold_colours = ["steelblue", "darkorange", "forestgreen"]
+    for k in range(fold_no):
+        print("TRAIN FOLD ", train_outputs_per_fold["fold_"+str(k+1)+"_outputs"])
+        print("VAL FOLD ", val_outputs_per_fold["fold_"+str(k+1)+"_outputs"])
+        fold_fig, fold_ax = plt.subplots()
+        hist, binning, _ = fold_ax.hist(train_outputs_per_fold["fold_"+str(k+1)+"_outputs"], bins=40, label="Train fold "+str(k), histtype='step', linestyle='--', density=True, color=fold_colours[k])
+        fold_ax.hist(val_outputs_per_fold["fold_"+str(k+1)+"_outputs"], bins=binning, label="Val fold "+str(k), alpha=0.5, density=True, color=fold_colours[k])
+        fold_ax.legend(loc='upper right', fontsize=9)
+        fold_ax.set_xlabel("Training output score", loc="right")
+        fold_ax.set_ylabel("Normalised Events / Bin", loc="top")
+        fold_ax.set_yscale('log')
+        fold_fig.savefig(plot_path+"outputs_fold_"+str(k)+".pdf", transparent=True)
 finally:
     logging.info("Training complete.")
     print("train truth labels", len(train_truth_labels))
     print("val truth labels", len(val_truth_labels))
-
 
 
     ### compute ROC curve and AUC
@@ -548,36 +581,72 @@ finally:
         val_fpr = np.clip(val_fpr, 0, 1)
         val_fpr = np.sort(val_fpr)
     val_auc = auc(val_fpr, val_tpr)
-    #  val_auc = roc_auc_score(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
     print("Validation AUC", val_auc)
 
     # save performance to json
     perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc, val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
-    # perf.save_metadata(len(train_sig), len(train_bkg), len(val_sig), len(val_bkg), hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
     perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), num_folds, hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates, epochs, model_path)
 
     logging.info("Plotting training/validation losses ...")
-    fig, ax = plt.subplots()
+    fig_loss, ax_loss = plt.subplots()
     x_epoch = numpy.arange(1,epochs+1,1)
     for loss_loop, (train_loss, val_loss) in enumerate(zip(train_losses, val_losses)):
-        train_line, = ax.plot(np.arange(len(train_loss)), train_loss, label="Fold " + str(loss_loop) + " (Train)")
+        train_line, = ax_loss.plot(np.arange(len(train_loss)), train_loss, label="Fold " + str(loss_loop) + " (Train)")
         colour = train_line.get_color()
-        ax.plot(np.arange(len(val_loss)), val_loss, label="Fold " + str(loss_loop) + " (Val)", color=colour, linestyle = "-.")
-    ax.legend(loc='upper right', fontsize=9)
-    ax.text(0.02, 0.95, model_label, verticalalignment="bottom", size=9, transform=ax.transAxes)
-    ax.set_xlabel("Epoch", loc="right")
-    ax.set_ylabel("Loss", loc="top")
+        ax_loss.plot(np.arange(len(val_loss)), val_loss, label="Fold " + str(loss_loop) + " (Val)", color=colour, linestyle = "-.")
+    ax_loss.legend(loc='upper right', fontsize=9)
+    if gnn:
+        model_text = [str(gnn_type)+" model", "GNN layers "+ str(hidden_sizes_gcn), "MLP layers "+ str(hidden_sizes_mlp), "Batchsize " + str(batch_size),  "Neighbour sampling " + str(num_nb_list)]
+    else:
+        model_text = [str(gnn_type) + " model", "MLP layers "+ str(hidden_sizes_mlp), "Batchsize " + str(batch_size)]
+    plotting.add_text(ax_loss, model_text, doATLAS=False, startx=0.02, starty=0.95)
+    ax_loss.set_xlabel("Epoch", loc="right")
+    ax_loss.set_ylabel("Loss", loc="top")
+    ymin, ymax = ax_loss.get_ylim()
+    ax_loss.set_ylim(ymin, ymax*1.2)
     misc.create_dirs(plot_path)
     logging.info("Saving plots to "+plot_path)
-    fig.savefig(plot_path+"training_validation_loss.pdf", transparent=True)
+    fig_loss.savefig(plot_path+"training_validation_loss.pdf", transparent=True)
 
     logging.info("Plotting model outputs ...")
-    fig, ax = plt.subplots()
+    if gnn:
+        if frac is not None:
+            linking_length_label = "Linking length at "+str(frac)+" edge fraction"
+        elif linking_length is not None:
+             linking_length_label = "Linking length "+str(linking_length)
+    else:
+        linking_length_label = ""
+    signal_label, background_label = plotting.get_plot_labels(signal)
+    if signal == "hhh":
+        if frac is not None:
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+        elif linking_length is not None:
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+    elif signal == "stau":
+        if frac is not None:
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+        elif linking_length is not None:
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+    elif signal == "LQ":
+        if frac is not None:
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+        elif linking_length is not None:
+            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
+    
+    fig_pred, ax_pred = plt.subplots()
     binning = np.linspace(0,1,51)
-    ax.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange", weights=train_sig_wgts.detach().cpu().numpy())
-    ax.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue", weights=train_bkg_wgts.detach().cpu().numpy())
-    ax.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange", weights=val_sig_wgts.detach().cpu().numpy())
-    ax.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue", weights=val_bkg_wgts.detach().cpu().numpy())
+    ax_pred.hist(train_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (training)", histtype='step', linestyle='--', density=True, color="darkorange", weights=train_sig_wgts.detach().cpu().numpy())
+    ax_pred.hist(train_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (training)", histtype='step', linestyle='--', density=True, color="steelblue", weights=train_bkg_wgts.detach().cpu().numpy())
+    ax_pred.hist(val_sig_pred.detach().cpu().numpy(), bins=binning, label="Signal (validation)", alpha=0.5, density=True, color="darkorange", weights=val_sig_wgts.detach().cpu().numpy())
+    ax_pred.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (validation)", alpha=0.5, density=True, color="steelblue", weights=val_bkg_wgts.detach().cpu().numpy())
+    plotting.add_text(ax_pred, text, doATLAS=False, startx=0.02, starty=0.95)
+    ax_pred.legend(loc='upper right', fontsize=9)
+    ax_pred.set_xlabel("Output score", loc="right")
+    ax_pred.set_ylabel("Normalised No. Events", loc="top")
+    ymin, ymax = ax_pred.get_ylim()
+    ax_pred.set_yscale('log')
+    ax_pred.set_ylim((ymin, ymax*5))
+    fig_pred.savefig(plot_path+"training_validation_pred.pdf", transparent=True)
 
     score_path = score_path + model_label + "/"
     misc.create_dirs(score_path)
@@ -594,47 +663,18 @@ finally:
     np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().cpu().numpy())
     np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().cpu().numpy())
 
-    if gnn:
-        if eff is not None:
-            linking_length_label = "Linking length at "+str(eff)+" sig-sig efficiency"
-        elif linking_length is not None:
-             linking_length_label = "Linking length "+str(linking_length)
-    else:
-        linking_length_label = ""
-    signal_label, background_label = plotting.get_plot_labels(signal)
-    if signal == "hhh":
-        if eff is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-        elif linking_length is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-    elif signal == "stau":
-        if eff is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-        elif linking_length is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-    elif "LQ" in signal:
-        if eff is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-        elif linking_length is not None:
-            text = ["Training AUC = {:.3f}".format(train_auc), "Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-
-    plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
-    ax.legend(loc='upper right', fontsize=9)
-    ax.set_xlabel("Output score", loc="right")
-    ax.set_ylabel("Normalised No. Events", loc="top")
-    ymin, ymax = ax.get_ylim()
-    ax.set_ylim((ymin, ymax*1.2))
-    fig.savefig(plot_path+"training_validation_pred.pdf", transparent=True)
-
     logging.info("Plotting ROC curves ...")
-    fig, ax = plt.subplots()
+    fig_roc, ax_roc = plt.subplots()
     plt.plot(train_fpr, train_tpr, label='Training ROC curve (AUC = {:.3f})'.format(train_auc))
     plt.plot(val_fpr, val_tpr, label='Validation ROC curve (AUC = {:.3f})'.format(val_auc))
     plt.legend(loc="upper left", fontsize=9)
     plt.xlim(0,1)
+    plt.ylim(0,1.2)
+    # plt.yscale('log')
+    plotting.add_text(ax_roc, model_text, doATLAS=False, startx=0.02, starty=0.2)
     plt.xlabel("Background Efficiency", loc="right")
     plt.ylabel("Signal Efficiency", loc="top")
-    fig.savefig(plot_path+"training_validation_ROC.pdf", transparent=True)
+    fig_roc.savefig(plot_path+"training_validation_ROC.pdf", transparent=True)
 
     logging.info("Saving ROC curves to json files ...")
     roc_json_path = plot_path+"roc.json"

@@ -38,7 +38,7 @@ def GetParser():
         "-d",
         type=str,
         required=True,
-        help="Specify the type of distance to calculate",
+        help="Specify the type of distance to calculate (euclidean, cosine, cityblock, emd)",
     )
 
     parser.add_argument(
@@ -64,12 +64,8 @@ plot_path = user_config["plot_path"]
 dist_path = user_config["dist_path"]
 
 signal = user_config["signal"]
-signal_mass = user_config["signal_mass"]
-half = user_config["half"]
-if half != "":
-    half_str = "half"+str(half)+"_"
-else:
-    half_str = ""
+signal_mass = str(user_config["signal_mass"])
+distance_items = user_config["distance"]
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 
@@ -82,13 +78,21 @@ logging.info("variable set: "+variable)
 logging.info("input data path: "+feature_h5_path)
 logging.info("input distances path: "+dist_path)
 logging.info("output plot path: "+plot_path)
-kinematics = misc.get_kinematics(variable, feature_dim)
+kinematics, kinematic_labels = misc.get_kinematics(variable, feature_dim)
 
 # load in input files
 logging.info('Importing signal and background files...')
 if signal == "hhh": SF_4b5b = 0.07 # placeholder value for HHH data-driven background, MC backgrounds would take eventWeights instead
 
-full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, ex=str(half), plot=False, signal=signal, standardisation=False)
+if distance == "emd":
+    # don't standardise the kinematic variables before emd calculation
+    standardise_bool = False
+    objects = distance_items[distance]['objects']
+else:
+    # but standardise them for other distances
+    standardise_bool = True
+
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(feature_h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=True, signal=signal, signal_mass=signal_mass, standardisation=standardise_bool)
 
 global_bkg_wgt = 1.0
 if signal == "hhh": global_bkg_wgt = SF_4b5b
@@ -105,13 +109,16 @@ def distance_calc(a, b, metric):
     elif metric == "cosine":
         d = dis.cosine(a,b)
     elif metric == "emd":
-        d = dis.torch_emd(a,b, kinematics)
+        d = dis.torch_emd(a, b, objects, kinematics)
     else:
         d = None
         print("Please specify a valid distance metric, from euclidean, cityblock or cosine")
     
     if torch.sum(torch.isnan(d)).item() == 0:
         return d
+    else:
+        print("There are NaNs in your distances, please check!")
+        return None
     
 batch_size = 30000
 

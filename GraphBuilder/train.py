@@ -53,8 +53,9 @@ user_config = misc.load_config(user_config_path)
 
 variable = user_config["variable"]
 feature_dim = user_config["feature_dim"]
-kinematics = misc.get_kinematics(variable, feature_dim)
+kinematics, kinematic_labels = misc.get_kinematics(variable, feature_dim)
 signal = user_config["signal"]
+signal_mass = user_config["signal_mass"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 signal_label, background_label = plotting.get_plot_labels(signal)
 
@@ -63,19 +64,26 @@ model_save_path = user_config["model_path"]
 plot_path = user_config["plot_path"]
 signal = user_config["signal"]
 embedding_dim = user_config["embedding_dim"]
+os.makedirs(plot_path, exist_ok=True)
 
 # load in input files
 logging.info('Importing signal and background files...')
-full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, standardisation=True)
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels = adj.data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal=signal, signal_mass=signal_mass, standardisation=False)
 
-train_pairs= PairDataset(full_sig, full_bkg, 200, 200)
-val_pairs = PairDataset(full_sig, full_bkg, 100, 100)
+dataset = PairDataset(full_sig, full_bkg, 400, 400, standardise=True)
+train_pairs = dataset.train_pairs
+val_pairs = dataset.val_pairs
+train_means = dataset.means
+train_stds = dataset.stds
+
+# val_dataset = PairDataset(full_sig, full_bkg, 200, 200, standardise=True)
+# val_pairs = val_dataset.pairs
+
 print("training pairs", len(train_pairs))
 print("validation pairs", len(val_pairs))
 
-train_loader = DataLoader(train_pairs, batch_size=512, shuffle=True)
-val_loader = DataLoader(val_pairs, batch_size=128, shuffle=True)
-
+train_loader = DataLoader(train_pairs, batch_size=256, shuffle=True)
+val_loader = DataLoader(val_pairs, batch_size=256, shuffle=True)
 model = EmbeddingNet(input_dim=len(kinematics), embedding_dim=embedding_dim)
 margin = user_config["margin"]
 LR = user_config["LR"]
@@ -160,6 +168,7 @@ os.makedirs(model_path, exist_ok=True)
 torch.save({
     'model_state': model.state_dict(),
     'optimiser_state': optimiser.state_dict(),
+    'normalisation_params': {"means": train_means, "stds": train_stds}
 }, model_path+model_file_name)
 
 with torch.no_grad():
@@ -242,9 +251,11 @@ def plot_embeddings(embeddings, labels, epoch, margin, feat, radius=1.0, pen=1.0
         ax.scatter(embeddings[:,0][bkg_label], embeddings[:,1][bkg_label], c='dodgerblue', label="Background")
         ax.scatter(embeddings[:,0][sig_label], embeddings[:,1][sig_label], c='deeppink', label="Signal")
     else:
-        embeddings_2d = tsne.fit_transform(embeddings)
-        ax.scatter(embeddings_2d[:,0][bkg_label], embeddings_2d[:,1][bkg_label], c='dodgerblue', label="Background")
-        ax.scatter(embeddings_2d[:,0][sig_label], embeddings_2d[:,1][sig_label], c='deeppink', label="Signal")
+        # embeddings_2d = tsne.fit_transform(embeddings)
+        # ax.scatter(embeddings_2d[:,0][bkg_label], embeddings_2d[:,1][bkg_label], c='dodgerblue', label="Background")
+        # ax.scatter(embeddings_2d[:,0][sig_label], embeddings_2d[:,1][sig_label], c='deeppink', label="Signal")
+        ax.scatter(embeddings[:,0][bkg_label], embeddings[:,1][bkg_label], c='dodgerblue', label="Background")
+        ax.scatter(embeddings[:,0][sig_label], embeddings[:,1][sig_label], c='deeppink', label="Signal")
 
     ax.legend(loc="upper right", fontsize=16)
     ax.text(0.03, 0.95, r"\textbf{Signal} - Leptoquark, \textbf{Background} - $t\bar{t}$, Single top", size=16, transform=ax.transAxes)

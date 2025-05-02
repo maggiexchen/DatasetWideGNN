@@ -11,6 +11,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 import argparse
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
+from scipy import stats
 import utils.normalisation as norm
 import utils.misc as misc
 import utils.plotting as plotting
@@ -41,10 +42,11 @@ def GetParser():
     )
 
     parser.add_argument(
-        "--flip",
-        "-f",
-        action="store_true",
-        help="Choose whether to flip the ROC curve definition, flip if you want to connect events that are similar",
+        "--MLconfig",
+        "-c",
+        type=str,
+        required=True,
+        help="Specify the config file for training",
     )
 
     parser.add_argument(
@@ -54,6 +56,7 @@ def GetParser():
         required=True,
         help="Specify the config for the user e.g. paths to store all the input/output data and results, signal model to look at",
     )
+
 
     args = parser.parse_args()
     return args
@@ -74,6 +77,10 @@ signal = user_config["signal"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 signal_label, background_label = plotting.get_plot_labels(signal)
 
+train_config_path = args.MLconfig
+train_config = misc.load_config(train_config_path)
+flip = train_config["flip"]
+
 logging.info("variable set: "+variable)
 logging.info("distance metric: "+distance)
 logging.info("signal: "+signal)
@@ -82,6 +89,7 @@ logging.info("input data path: "+feature_h5_path)
 logging.info("input distances path: "+dist_path)
 logging.info("output ll json path: "+ll_path)
 logging.info("output plot path: "+plot_path)
+logging.info("making a friend graph? " + str(flip))
 
 logging.info("Loading sigsig distances in batches")
 sigsig_distance, sigsig_wgt = misc.get_batched_distances(dist_path, variable, distance, "sigsig", sample=True)
@@ -112,51 +120,37 @@ logging.info("Calculating and saving ROC to json ...")
 # the actual tpr we want is the fraction of sigsig below a certain cut: (1-fpr)
 # and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tpr)
 
-tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = perf.calc_ROC(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt, flip=args.flip)
-tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = perf.calc_ROC(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt, flip=args.flip)
+tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = perf.calc_ROC(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt, flip=flip)
+tpr_bb_sb, fpr_bb_sb, cut_bb_sb, roc_auc_bb_sb = perf.calc_ROC(norm_bkgbkg, norm_sigbkg, bkgbkg_wgt, sigbkg_wgt, flip=flip)
 
 # saving roc and auc to json file
-roc_dict = {"ss_bb_sig_cut": cut_ss_bb.tolist(),
-            "tpr_ss_bb": tpr_ss_bb.tolist(),
-            "fpr_ss_bb": fpr_ss_bb.tolist(),
-            "ss_sb_sig_cut": cut_ss_sb.tolist(),
-            "tpr_sb_bb": tpr_ss_bb.tolist(),
-            "fpr_sb_bb": fpr_ss_bb.tolist()}
+roc_dict = {"ss_sb_sig_cut": cut_ss_sb.tolist(),
+            "tpr_ss_sb": tpr_ss_sb.tolist(),
+            "fpr_ss_sb": fpr_ss_sb.tolist(),
+            "bb_sb_sig_cut": cut_bb_sb.tolist(),
+            "tpr_bb_sb": tpr_bb_sb.tolist(),
+            "fpr_bb_sb": fpr_bb_sb.tolist()}
 roc_path = plot_path+"/"+variable+"/ROC/"
 misc.create_dirs(roc_path)
 roc_name = roc_path+variable+"_"+distance+"_ROC.json"
 with open(roc_name, "w") as outfile:
     json.dump(roc_dict, outfile)
 
-# TODO: finer granularity for linking length scan?
-sigsig_eff = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-eff_labels = ["20%", "30%","40%", "50%","60%", "70%", "80%", "90%"]
-ss_sb_roc_cuts = []
-ss_sb_thresholds = []
-ss_bb_roc_cuts = []
-ss_thresholds = []
-
-# finding the tpr, fpr and distance thresholds for each efficiency, then reverse minmax the distance threshold
-# note the ss_bb and ss_sb thresholds are the same as they are just determined as the threshold for the given ss efficiency.
-for eff in sigsig_eff:
-    ss_sb_roc_cut, ss_sb_threshold = graph_def.find_threshold(tpr_ss_sb, fpr_ss_sb, eff, cut_ss_sb, flip=args.flip)
-    ss_sb_roc_cuts.append(ss_sb_roc_cut)
-    ss_sb_thresholds.append(norm.reverse_minmax(ss_sb_threshold, 0 ,d_max))
-    ss_bb_roc_cut, ss_bb_threshold = graph_def.find_threshold(tpr_ss_bb, fpr_ss_bb, eff, cut_ss_bb, flip=args.flip)
-    ss_bb_roc_cuts.append(ss_bb_roc_cut)
-    ss_thresholds.append(norm.reverse_minmax(ss_bb_threshold, 0 ,d_max).item())
+edge_frac = [0.1, 0.2, 0.3, 0.4, 0.5]
+linking_lengths = graph_def.find_threshold_edge_frac(sigsig_distance, sigbkg_distance, bkgbkg_distance, edge_frac, flip=flip)
 
 # saving linking lengths
-length_dict = {"sigsig_eff": sigsig_eff, "length": ss_thresholds}
+length_dict = {"edge_frac": edge_frac, "length": linking_lengths}
 misc.create_dirs(ll_path)
 ll_path = ll_path+""+variable+"_"+distance+"_linking_length.json"
 with open(ll_path, "w") as lengthfile:
     json.dump(length_dict, lengthfile)
 
 # plotting sig-sig and bkg-bkg distributions and the linking lengths
-# TODO: moving plotting to utils
 logging.info("Plotting linking lengths ...")
-plotting.plot_linking_length(sigsig_distance, sigbkg_distance, bkgbkg_distance, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, ss_thresholds, signal_label, background_label, plot_path, variable, distance, sigsig_eff)
+# plotting.plot_linking_length(sigsig_distance, sigbkg_distance, bkgbkg_distance, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, linking_lengths, signal_label, background_label, plot_path, variable, distance, sigsig_eff)
+plotting.plot_linking_length(sigsig_distance, sigbkg_distance, bkgbkg_distance, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, linking_lengths, signal_label, background_label, plot_path, variable, distance, edge_frac)
 
 logging.info("Plotting ROC curves ...")
-plotting.plot_ROC(fpr_ss_bb, tpr_ss_bb, fpr_ss_sb, tpr_ss_sb, roc_auc_ss_bb, roc_auc_ss_sb, ss_bb_roc_cuts, ss_sb_roc_cuts, variable, distance, plot_path)
+minmax_ll = norm.minmax(torch.tensor(linking_lengths), 0, d_max)
+plotting.plot_ROC_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_bb_sb, cut_ss_sb, cut_bb_sb, minmax_ll.numpy(), variable, distance, plot_path)

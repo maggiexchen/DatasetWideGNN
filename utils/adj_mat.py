@@ -23,7 +23,7 @@ cpu = torch.device('cpu')
 device = torch.device('cuda:0')
 
 ### apply fold here??
-def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", standardisation=False, num_folds = None):
+def data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal="LQ", signal_mass="", standardisation=False, num_folds = None):
     """
     Function to load our sign and bkg data into pandas dataframes
 
@@ -60,8 +60,7 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", 
             df_sig_camp = misc.stau_selections(df_sig_camp)
             df_sig = pd.concat([df_sig, df_sig_camp], ignore_index=True, axis=0)
     else:
-        df_sig =  pd.read_hdf(h5_path+str(signal)+str(ex)+".h5")#, key=str(signal.split("_")[0])+str(ex))
-        # df_sig =  pd.read_hdf(h5_path+str(signal)+str(ex)+".h5", key="sig"+str(ex))
+        df_sig =  pd.read_hdf(h5_path+str(signal)+"_"+str(signal_mass)+str(ex)+".h5")#, key=str(signal)+str(ex))
     
     df_bkg = pd.DataFrame()
     if signal == "stau":
@@ -88,32 +87,32 @@ def data_loader(h5_path, plot_path, kinematics, ex="", plot=False, signal="LQ", 
         df_sig_wgts = df_sig["eventWeight"]
         df_bkg_wgts = df_bkg["eventWeight"]
 
-    df_sig = df_sig[kinematics]
-    df_bkg = df_bkg[kinematics]
     # set truth labels for is signal
     sig_label = [1]*len(df_sig)
     bkg_label = [0]*len(df_bkg)
     if standardisation:
         # Standardising kinematics
         df_all = pd.concat([df_sig, df_bkg], axis=0)
-        for var in kinematics:
+        for v, var in enumerate(kinematics):
             if plot:
                 df_sig = df_all.iloc[:len(df_sig)]
                 df_bkg = df_all.iloc[len(df_sig):]
-                plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=False)
+                plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, kinematic_labels[v], plot_path, standardise=False)
             print(f"-----> Standardising {var}:")
             standardised_values = norm.standardise(df_all.loc[:, var])
             df_all.loc[:, var] = standardised_values.astype('float32')  # convert to float32
             df_sig = df_all.iloc[:len(df_sig)]
             df_bkg = df_all.iloc[len(df_sig):]
             if plot:
-                plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=True)
+                plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, kinematic_labels[v], plot_path, standardise=True)
             
     if plot:
-        for var in kinematics:
-            plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path, standardise=False)\
+        for v, var in enumerate(kinematics):
+            plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, kinematic_labels[v], plot_path, standardise=False)\
 
     # convert pd dataframes to torch tensors
+    df_sig = df_sig[kinematics]
+    df_bkg = df_bkg[kinematics]
     torch_sig = torch.tensor(df_sig.values, dtype=torch.float32).to(cpu)
     torch_bkg = torch.tensor(df_bkg.values, dtype=torch.float32).to(cpu)
     torch_sig_wgts = torch.tensor(df_sig_wgts.values, dtype=torch.float32).to(cpu)
@@ -287,9 +286,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
             ind = mask.nonzero().to(torch.int32)
             if edge_wgt:
                 edge_wgts_tmp = 1 / distance[mask]
-                # inf_mask_tmp = torch.isinf(edge_wgts_tmp)
-                # edge_wgts_tmp[inf_mask_tmp] = 0.
-                # inf_mask = torch.cat((inf_mask, inf_mask_tmp))
+
 
             print(f"CPU allocated before {process.memory_info().rss/(1024 ** 3):.2f}, GB")
             del distance, mask
@@ -305,13 +302,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
             print(f"CPU allocated after {process.memory_info().rss/(1024 ** 3):.2f}, GB")
     # Minmax normalise the edge weights
     if edge_wgt:
-        # normed_edge_wgts = torch.clone(edge_wgts)
-        # non_inf_edge_wgts = edge_wgts[~inf_mask]
-        # non_inf_edge_wgts = norm.minmax(non_inf_edge_wgts, torch.min(non_inf_edge_wgts), torch.max(non_inf_edge_wgts))
-        # normed_edge_wgts[~inf_mask] = non_inf_edge_wgts
-        # normed_edge_wgts[inf_mask] = 1.
-        # del inf_mask, edge_wgts
-        return indices, edge_wgts #normed_edge_wgts
+        return indices, edge_wgts 
     else:
         return indices
 

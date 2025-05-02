@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Define the path to the YAML file
-CONFIG_FILE="config/user_Maggie.yaml"
+CONFIG_FILE="config/embedding.yaml"
 
 # Define the ranges or lists of values you want to scan through
-MARGINS=(0.5 1.0 2.0)
-EMBEDDING_DIMS=(18)
+MARGINS=(0.1 0.5 1.0 2.0)
+EMBEDDING_DIMS=(2 6 12 18)
 PENALTY=(1 5 10 20)
 # Loop through the parameter values
 for margin in "${MARGINS[@]}"; do

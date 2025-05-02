@@ -34,10 +34,10 @@ class GCNClassifier(nn.Module):
                 self.layers_gcn.append(GCNConv(input_size, hidden_sizes_gcn[i]))
             elif gnn_type == "GAT":
                 self.layers_gcn.append(GATConv_weighted(input_size, hidden_sizes_gcn[i]))
-            elif gnn_type == "GraphConv":
+            elif gnn_type == "Graph":
                 self.layers_gcn.append(GraphConv(input_size, hidden_sizes_gcn[i]))
             else:
-                raise ValueError("Invalid GNN type, please choose from 'GCN', 'GAT', 'GraphConv'")
+                raise ValueError("Invalid GNN type, please choose from 'GCN', 'GAT', 'Graph'")
             self.batch_norms_gcn.append(nn.BatchNorm1d(hidden_sizes_gcn[i]))
             self.dropout_gcn.append(nn.Dropout(p=dropout_rates[i]))
             input_size = hidden_sizes_gcn[i]

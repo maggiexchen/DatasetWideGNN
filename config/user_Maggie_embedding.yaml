@@ -10,17 +10,18 @@ cuts:
   met:
     threshold: 200
     operation: ">"
-feature_dim: 18
+feature_dim: 12
+objects: ["bjet1", "bjet2", "lep1", "lep2"]
 
 # input paths
 ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
-feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/same_class_clustering/MetCut200/
+feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/same_class_clustering/LowLevelKinematics_MetCut200/
 kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
-ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/linking_lengths/ 
-dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/distances/
-score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/output_scores/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts/linking_lengths/ 
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts_hacka/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts/plots/
-adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/MetCut200/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts/models/ 
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts_hacka/plots/
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts_hacka/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts_hacka/models/ 

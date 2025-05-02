@@ -30,15 +30,15 @@ class EmbeddingNet(nn.Module):
         self.bn3 = nn.BatchNorm1d(embedding_dim)
 
     def forward(self, x):
-        x = checkpoint(self.fc1, x)
+        x = checkpoint(lambda x: self.fc1(x), x, use_reentrant=False)
         x = self.bn1(x)
         x = torch.relu(x)
         
-        x = checkpoint(self.fc2, x)
+        x = checkpoint(lambda x: self.fc2(x), x, use_reentrant=False)
         x = self.bn2(x)
         x = torch.relu(x)
         
-        x = checkpoint(self.fc3, x)
+        x = checkpoint(lambda x: self.fc3(x), x, use_reentrant=False)
         x = self.bn3(x)
         
         return x
