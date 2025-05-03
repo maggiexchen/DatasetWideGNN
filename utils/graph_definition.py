@@ -1,3 +1,4 @@
+"""Functions to find LL thresholds for a particular sigsig_eff/edge_frac"""
 import numpy as np
 import torch
 
@@ -21,16 +22,16 @@ def find_threshold(tpr, fpr, eff, cut, flip=False):
         tpr_index = np.argmax(tpr >= eff)
     return [tpr[tpr_index], fpr[tpr_index]], cut[tpr_index]
 
+
 def find_threshold_edge_frac(sigsig, sigbkg, bkgbkg, edge_frac, flip):
     """
     Function that finds the threshold on the distance that provides a given edge fraction
     Args:
-        frac_ss (torch.Tensor): fraction of sigsig connections
-        frac_bb (torch.Tensor): fraction of bkgbkg connections
-        frac_sb (torch.Tensor): fraction of sigbkg connections
-        cut (numpy.array): of thresholds considered
+        sigsig (torch.Tensor): all sigsig connections
+        sigbkg (torch.Tensor): all bkgbkg connections
+        bkgbkg (torch.Tensor): all sigbkg connections
         edge_frac (float): target edge fraction
-        flip (bool): friend of enemy graph?
+        flip (bool): friend or enemy graph?
     Returns:
         (list(float)): coordinates of cut point to draw on on ROC curve
         (float): cut to apply to distances

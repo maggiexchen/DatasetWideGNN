@@ -120,8 +120,8 @@ logging.info("Calculating and saving ROC to json ...")
 # the actual tpr we want is the fraction of sigsig below a certain cut: (1-fpr)
 # and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tpr)
 
-tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = perf.calc_ROC(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt, flip=flip)
-tpr_bb_sb, fpr_bb_sb, cut_bb_sb, roc_auc_bb_sb = perf.calc_ROC(norm_bkgbkg, norm_sigbkg, bkgbkg_wgt, sigbkg_wgt, flip=flip)
+tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = perf.calc_roc(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt, flip=flip)
+tpr_bb_sb, fpr_bb_sb, cut_bb_sb, roc_auc_bb_sb = perf.calc_roc(norm_bkgbkg, norm_sigbkg, bkgbkg_wgt, sigbkg_wgt, flip=flip)
 
 # saving roc and auc to json file
 roc_dict = {"ss_sb_sig_cut": cut_ss_sb.tolist(),
@@ -153,4 +153,4 @@ plotting.plot_linking_length(sigsig_distance, sigbkg_distance, bkgbkg_distance, 
 
 logging.info("Plotting ROC curves ...")
 minmax_ll = norm.minmax(torch.tensor(linking_lengths), 0, d_max)
-plotting.plot_ROC_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_bb_sb, cut_ss_sb, cut_bb_sb, minmax_ll.numpy(), variable, distance, plot_path)
+plotting.plot_roc_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_bb_sb, cut_ss_sb, cut_bb_sb, minmax_ll.numpy(), variable, distance, plot_path)

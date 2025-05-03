@@ -3,15 +3,25 @@
 #######################
 
 # signal model hhh, LQ, stau
-signal: hhh
+signal: LQ
+
+signal_mass: 1000
+backgrounds: ["singletop", "ttbar"]
+cuts:
+  met:
+    threshold: 200
+    operation: ">"
+feature_dim:
 
 # input paths
-ntuple_path: /data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/
-h5_path: /home/pacey/GNN/hhgraph_sparse/hhhgraph/data/hhh_split_files/ 
-ll_path: /home/pacey/GNN/hhgraph_sparse/hhhgraph/linking_lengths/ 
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_140325/
+feature_h5_path: /data/atlas/users/pacey/GNN/data/sliced/
+kinematic_h5_path: /data/atlas/users/pacey/GNN/data/sliced/
+ll_path: /data/atlas/users/pacey/GNN/linking_lengths/
 dist_path: /data/atlas/users/pacey/GNN/distances/
 
 # output paths
 plot_path: /data/atlas/users/pacey/GNN/plots/ 
 adj_path: /data/atlas/users/pacey/GNN/graph/
-model_path: /data/atlas/users/pacey/GNN/models/ 
+model_path: /data/atlas/users/pacey/GNN/models/
+score_path: /data/atlas/users/pacey/GNN/scores/ 

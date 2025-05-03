@@ -288,7 +288,7 @@ if plot_conv_kins:
     print("ADJ MAT ", adj_mat)
     del sparse_adj_matrix
     for nconv in range(3):
-        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, len_bkg, kinematics, kinematic_labels, signal, frac, kinematic_plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv, edge_wgts=bool_edge_wgt)
+        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, kinematics, kinematic_labels, signal, frac, kinematic_plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv, edge_wgts=bool_edge_wgt)
     del adj_mat
 misc.print_mem_info()
 
