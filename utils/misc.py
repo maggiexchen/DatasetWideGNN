@@ -1,6 +1,7 @@
 """Miscellaneous utils functions"""
 import os
 import glob
+import hashlib
 
 import yaml
 import torch
@@ -107,54 +108,33 @@ def get_kinematics(variable, dim=None):
         lists(str): a list of kinematic variables
     """
     if variable == "mass":
-        # mass-based kinematics
-        #kinematics = ["mH1","mH2","mH3","mHHH","mHcosTheta","meanmH","rmsmH","meanmBB",
-        # "rmsmBB","meanPt","rmsPt","ht","massfraceta","massfracphi","massfracraw"]
         kinematics = ["mH1","mH2","mH3","mHHH"]
-        #labels = [r"$m_{H1}$ / GeV", r"$m_{H2}$ / GeV", r"$m_{H3}$ / GeV", r"$m_{HHH}$ / GeV"]
     elif variable == "angular":
         # angular kinematics
         kinematics = ["dRH1","dRH2","dRH3","meandRBB"]
-        #labels = [r"$\Delta R_{H1}$", r"$\Delta R_{H2}$", r"$\Delta R_{H3}$", r"Mean $\Delta R_{dijet}$"]
     elif variable == "shape":
         # event shape kinematics
         kinematics = ["sphere3dv2b","sphere3dv2btrans",
                       "aplan3dv2b","theta3dv2b"]
-        #labels = [r"Sphericity$_{6jets}$", r"Trans. Sphericity$_{6jets}$", r"Aplanarity$_{6jets}$", r"Theta$_{6jets}$"]
     elif variable == "combined":
         kinematics = ["mH1","mH2","mH3","mHHH",
                       "dRH1","dRH2","dRH3","meandRBB",
                       "sphere3dv2b","sphere3dv2btrans",
                       "aplan3dv2b","theta3dv2b"]
-        #lables = [r"$m_{H1}$ / GeV", r"$m_{H2}$ / GeV", r"$m_{H3}$ / GeV", r"$m_{HHH}$ / GeV", r"$\Delta R_{H1}$", r"$\Delta R_{H2}$", r"$\Delta R_{H3}$", r"Mean $\Delta R_{dijet}$", r"Sphericity$_{6jets}$", r"Trans. Sphericity$_{6jets}$", r"Aplanarity$_{6jets}$", r"Theta$_{6jets}$"]
     elif variable == "mass_and_angular":
         kinematics = ["mH1","mH2","mH3","mHHH",
                       "dRH1","dRH2","dRH3","meandRBB"]
-        #labels = [r"$m_{H1}$ / GeV", r"$m_{H2}$ / GeV", r"$m_{H3}$ / GeV", r"$m_{HHH}$ / GeV", r"$\Delta R_{H1}$", r"$\Delta R_{H2}$", r"$\Delta R_{H3}$", r"Mean $\Delta R_{dijet}$"]
     elif variable == "mass_and_shape":
         kinematics = ["mH1","mH2","mH3","mHHH",
                       "sphere3dv2b","sphere3dv2btrans",
                       "aplan3dv2b","theta3dv2b"]
-        #labels = [r"$m_{H1}$ / GeV", r"$m_{H2}$ / GeV", r"$m_{H3}$ / GeV", r"$m_{HHH}$ / GeV", r"Sphericity$_{6jets}$", r"Trans. Sphericity$_{6jets}$", r"Aplanarity$_{6jets}$", r"Theta$_{6jets}$"]
-    # elif variable == "LQ":
-        #kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
-    #     kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
-    #                   'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta', 'lep1flav',
-    #                   'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi', 'lep2flav',
-    #                   'met', 'metphi']
     elif variable == "LQ_HighLevel":
         kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
-        #labels = [r"E$_{T}^{miss}$ / GeV", r"p$_{T, bbll}$ / GeV", r"min$\Delta \phi_{ETmiss, l}$",
-#                  r"m$_{T, l1}$ / GeV", r"m$_{T, l2}$ / GeV"]
     elif variable == "LQ_LowLevel":
         kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
-                      'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta', 'lep1flav',
-                      'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi', 'lep2flav',
+                      'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta',
+                      'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi',
                       'met', 'metphi']
-        #labels = [r"p$_{T, b1}$ / GeV", r"p$_{T, b2}$ / GeV", r"p$_{T, l1}$ / GeV", r"p$_{T, l2}$ / GeV",
-                  #r"$\eta_{b1}$", r"$\eta_{b2}$", r"$\eta_{l1}$", r"$\eta_{l2}$", r"Flavour$_{l1}$",
-                  #r"$\phi_{b1}$", r"$\phi_{b2}$", r"$\phi_{l1}$", r"$\phi_{l2}$", r"Flavour$_{l2}$",
-                  #r"E$_{T}^{miss}$ / GeV", r"$\phi_{ETmiss}$"]
     elif variable == "LQ-All":
         kinematics = ['xsec', 'genWeight', 'njets', 'nbjets',
                       'bjet1eta', 'bjet1phi', 'bjet1pt', 'bjet2eta', 'bjet2phi', 'bjet2pt',
@@ -174,11 +154,10 @@ def get_kinematics(variable, dim=None):
         else:
             embedding_dim = dim
             kinematics = [f'feat_{i + 1:02d}' for i in range(embedding_dim)]
-        #    labels = [f'Feature {i + 1:02d}' for i in range(embedding_dim)]
     else:
         raise ValueError("bruh, pick a supported variable set or define a new one")
 
-    return kinematics#, labels
+    return kinematics
 
 def get_kinematics_labels(variable):
     """
@@ -203,7 +182,7 @@ def get_kinematics_labels(variable):
         "stau": "stau variables"
     }
 
-    if variable in var_label_dict.keys():
+    if variable in var_label_dict:
         return var_label_dict[variable]
     else:
         raise KeyError("bruh, pick a better variable set (mass, angular, shape,\
@@ -282,10 +261,8 @@ def get_kinematics_staus(variable):
             ]
 
     rtaus_var_j = [
-            'dPhi_rtau1_jet',
-            'dPhi_rtau2_jet',
-            'dR_rtau1_jet',
-            'dR_rtau2_jet',
+            'dPhi_rtau1_jet', 'dPhi_rtau2_jet',
+            'dR_rtau1_jet', 'dR_rtau2_jet',
             ]
 
     kin_var_0j = kin_var_0j + rtaus_var_0j
@@ -487,7 +464,7 @@ def get_batched_distances(dist_path, variable, distance, batch_size,
     dist_dir = dist_path + "/batched_" + str(batch_size) + "_"\
                + variable + "_" + distance + cutstring + "_distances/"
     print("looking for distances in :", dist_dir)
-    files = glob.glob(dist_dir + species + '*.pt')
+    files = glob.glob(dist_dir + species + '*0_0.pt')
     distance = torch.empty(0, dtype=torch.float32)
     wgt = torch.empty(0, dtype=torch.float32)
     max_dist = 0
@@ -589,3 +566,31 @@ def calc_event_weight(df, initial_weights_arr, lumi):
 
     event_weight = xsec * gen_weight * lumi / sum_initial_weight
     return event_weight
+
+def stable_int_from_string(s):
+    """
+    Function to turn a hash string into an integer
+
+    Args:
+        s (str): input string of int
+
+    Returns:
+        (int) stable int
+    """
+    h = hashlib.md5(s.encode('utf-8')).hexdigest()
+    return int(h, 16)  # Big integer, deterministic everywhere
+
+def assign_fold_deterministically(event_id, n_folds):
+    """
+    Function to assign k-fold fold for given event.
+
+    Args:
+        event_id (float): id key for event
+        n_folds (int): number of k-folds to split between
+
+    Returns:
+        (int): fold number
+    """
+    seed = stable_int_from_string(str(event_id)) % (2**32)
+    rng = np.random.RandomState(seed)
+    return rng.randint(n_folds)

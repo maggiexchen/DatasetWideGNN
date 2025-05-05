@@ -1,0 +1,192 @@
+"""dictionary to store config for all the variables for plotting"""
+# todo add embedded features
+# todo add variable binning or limited ranges where needed.
+var_dict = {
+    'xsec': {
+        "label": "cross section [fb]",
+    },
+    'nEvents': {
+        "label": "# events",
+    },
+    'genWeight': {
+        "label": "generator weight",
+    },
+    'bjet1eta': {
+        "label": r"$\eta(b_{1})$",
+    },
+    'bjet2eta': {
+        "label": r"$\eta(b_{2})$",
+    },
+    'bjet1phi': {
+        "label": r"$\phi(b_{1})$",
+    },
+    'bjet2phi': {
+        "label": r"$\phi(b_{2})$",
+    },
+    'bjet1pt': {
+        "label": r"$p_T(b_{1})$ [GeV]",
+    },
+    'bjet2pt': {
+        "label": r"$p_T(b_{2})$ [GeV]",
+    },
+    'lep1eta': {
+        "label": r"$\eta(l_{1})$",
+    },
+    'lep2eta': {
+        "label": r"$\eta(l_{2})$",
+    },
+    'lep1phi': {
+        "label": r"$\phi(l_{1})$",
+    },
+    'lep2phi': {
+        "label": r"$\phi(l_{2})$",
+    },
+    'lep1pt': {
+        "label": r"$p_T(l_{1})$ [GeV]",
+    },
+    'lep2pt': {
+        "label": r"$p_T(l_{2})$ [GeV]",
+    },
+    'njets': {
+        "label": r"$n_{jets}$",
+    },
+    'nbjets': {
+        "label": r"$\n_{b}$",
+    },
+    'met': {
+        "label": r"$p_{T}^{miss}$ [GeV]",
+    },
+    'metphi': {
+        "label": r"$\phi^{miss}$",
+    },
+    'metsigHt': {
+        "label": r"$p_{T}^{miss}/H_{T}~[\sqrt{GeV}]$",
+    },
+    'sumptllbb': {
+        "label": r"$H_{T}$ [GeV]",
+    },
+    'sumptllbbMET': {
+        "label": r"$H_{T} + p_{T}^{miss}$ [GeV]",
+    },
+    'mt2': {
+        "label": r"$M_{T2}$ [GeV]",
+    },
+    'mindPhiMETl': {
+        "label": r"$min(\Delta\phi(p_{T}^{miss},l))$",
+    },
+    'maxdPhiMETl': {
+        "label": r"$max(\Delta\phi(p_{T}^{miss},l))$",
+    },
+    'mindPhiMETb': {
+        "label": r"$min(\Delta\phi(p_{T}^{miss},b))$",
+    },
+    'maxdPhiMETb': {
+        "label": r"$max(\Delta\phi(p_T}^{miss},b))$",
+    },
+    'avedPhiMETl': {
+        "label": r"$<(\Delta\phi(p_{T}^{miss},l))>$",
+    },
+    'avedPhiMETb': {
+        "label": r"$<(\Delta\phi(p_{T}^{miss},b))>$",
+    },
+    'mtl1': {
+        "label": r"$m_{T}(l_{1})$ [GeV]",
+    },
+    'mtl2': {
+        "label": r"$m_{T}(l_{2})$ [GeV]",
+    },
+    'mtlb1': {
+        "label": r"$m_{T}(l,b)-close$ [GeV]",
+    },
+    'mtlb2': {
+        "label": r"$m_{T}(l,b)-far$ [GeV]",
+    },
+    'mtlmin': {
+        "label": r"$min(m_{T}(l))$ [GeV]",
+    },
+    'mtlbmin': {
+        "label": r"$min(m_{T}(l,b))$ [GeV]",
+    },
+    'summtlb': {
+        "label": r"$\Sigma(m_{T}(l,b))$ [GeV]",
+    },
+    'summtl': {
+        "label": r"$\Sigma(m_{T}(p_{T}^{miss},l))$ [GeV]",
+    },
+    'dPhil1MET': {
+        "label": r"$\Delta\phi(p_{T}^{miss},l_{1})$",
+    },
+    'dPhil2MET': {
+        "label": r"$\Delta\phi(p_{T}^{miss},l_{2})",
+    },
+    'dPhib1MET': {
+        "label": r"$\Delta\phi(p_{T}^{miss},b_{1})$",
+    },
+    'dPhib2MET': {
+        "label": r"$\Delta\phi(p_{T}^{miss},b_{2})$",
+    },
+    'dRl1b1': {
+        "label": r"$\Delta R(l_{1}, b_{1})$",
+    },
+    'dRl1b2': {
+        "label": r"$\Delta R(l_{1}, b_{2})$",
+    },
+    'dRl2b1': {
+        "label": r"$\Delta R(l_{2}, b_{1})$",
+    },
+    'dRl2b2': {
+        "label": r"$\Delta R(l_{2}, b_{2})$",
+    },
+    'sumdRlb': {
+        "label": r"$\Sigma(\Delta R(l,b))$",
+    },
+    'mindRlb': {
+        "label": r"$min(\Delta R(l,b))$",
+    },
+    'invsumdRlb': {
+        "label": r"$1/Sigma(\Delta R(l,b))$",
+    },
+    'invmindRlb': {
+        "label": r"$1/min(\Delta R(l,b))",
+    },
+    'mH1': {
+        "label": r'$m(H_{1})$ [GeV]',
+    },
+    'mH2': {
+        "label": r'$m(H_{2})$ [GeV]',
+    },
+    'mH3': {
+        "label": r'$m(H_{3})$ [GeV]',
+    },
+    'mHHH': {
+        "label": r'$m(HHH)$ [GeV]',
+    },
+    'dRH1': {
+        "label": r'$\Delta R(H_{1})$',
+    },
+    'dRH2': {
+        "label": r'$\Delta R(H_{2})$',
+    },
+    'dRH3': {
+        "label": r'$\Delta R(H_{3})$',
+    },
+    'meandRBB': {
+        "label": r'$<\Delta R(jj)>$',
+    },
+    'sphere3dv2b': {
+        "label": r'Sphericity$_{6j}$',
+    },
+    'sphere3dv2btrans': {
+        "label": 'Transverse Sphericity$_{6j}$',
+    },
+    'aplan3dv2b': {
+        "label": r'Aplanarity$_{6jets}$',
+    },
+    'theta3dv2b': {
+        "label": r'$\theta_{6jets}$',
+    }
+}
+
+    #'feat_01': {
+    #    "label": 'Feature 01'
+    #}

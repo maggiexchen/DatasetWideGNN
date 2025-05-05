@@ -3,6 +3,8 @@ import math
 
 import utils.normalisation as norm
 import utils.misc as misc
+import utils.variables as var_config
+from var_config import var_dict
 
 #from scipy import stats
 #from scipy.stats import entropy
@@ -38,47 +40,55 @@ def get_x_label(var):
         (str) variable label for plot.
 
     """
-    var_dict = {'xsec': "cross section [fb]", 'nEvents': "# events",
-                'genWeight': "generator weight",
-                'bjet1eta': r"$\eta(b_{1})$", 'bjet2eta': r"$\eta(b_{2})$",
-                'bjet1phi': r"$\phi(b_{1})$", 'bjet2phi': r"$\phi(b_{2})$",
-                'bjet1pt': r"$p_T(b_{1})$ [GeV]", 'bjet2pt': r"$p_T(b_{2})$ [GeV]",
-                'lep1eta': r"$\eta(l_{1})$", 'lep2eta': r"$\eta(l_{2})$",
-                'lep1phi': r"$\phi(l_{1})$", 'lep2phi': r"$\phi(l_{2})$",
-                'lep1pt': r"$p_T(l_{1})$ [GeV]", 'lep2pt': r"$p_T(l_{2})$ [GeV]",
-                'njets': r"$n_{jets}$", 'nbjets': r"$\n_{b}$",
-                'met': r"$p_{T}^{miss}$ [GeV]", 'metphi': r"$\phi^{miss}$",
-                'metsigHt': r"$p_{T}^{miss}/H_{T}~[\sqrt{GeV}]$",
-                'sumptllbb': r"$H_{T}$ [GeV]", 'sumptllbbMET': r"$H_{T} + p_{T}^{miss}$ [GeV]",
-                'mt2': r"$M_{T2}$ [GeV]",
-                'mindPhiMETl': r"$min\Delta\phi(p_{T}^{miss},l))$",
-                'maxdPhiMETl': r"$max(\Delta\phi(p_{T}^{miss},l))$",
-                'mindPhiMETb': r"$min(\Delta\phi(p_{T}^{miss},b))$",
-                'maxdPhiMETb': r"$max(\Delta\phi(p_T}^{miss},b))$",
-                'avedPhiMETl': r"$<(\Delta\phi(p_{T}^{miss},l))>$",
-                'avedPhiMETb': r"$<(\Delta\phi(p_{T}^{miss},b))>$",
-                'mtl1': r"$m_{T}(l_{1})$ [GeV]", 'mtl2': r"$m_{T}(l_2}) [GeV]",
-                'mtlb1': r"$m_{T}(l, b)-close$ [GeV]", 'mtlb2': r"$m_{T}(l,b)-far$ [GeV]",
-                'mtlmin': r"$min(m_{T}(l))$ [GeV]", 'mtlbmin': r"$min(m_{T}(l,b))$ [GeV]",
-                'summtlb': r"$\Sigma(m_{T}(l,b))$ [GeV]",
-                'summtl': r"$\Sigma(m_{T}(p_{T}^{miss},l))$ [GeV]",
-                'dPhil1MET': r"$\Delta\phi(p_{T}^{miss},l_{1})$",
-                'dPhil2MET': r"$\Delta\phi(p_{T}^{miss},l_{2})",
-                'dPhib1MET': r"$\Delta\phi(p_{T}^{miss},b_{1})$",
-                'dPhib2MET': r"$\Delta\phi(p_{T}^{miss},b_{2})$",
-                'dRl1b1': r"$\Delta R(l_{1}, b_{1})$", 'dRl1b2': r"$\Delta R(l_{1}, b_{2})$",
-                'dRl2b1': r"$\Delta R(l_{2}, b_{1})$", 'dRl2b2': r"$\Delta R(l_{2}, b_{2})$",
-                'sumdRlb': r"$\Sigma(\Delta R(l,b))$", 'mindRlb': r"$min(\Delta R(l,b))$",
-                'invsumdRlb': r"$1/Sigma(\Delta R(l,b))$", 'invmindRlb': r"$1/min(\Delta R(l,b))",
-                'mH1': r'$m(H_{1})$ [GeV]', 'mH2': r'$m(H_{2})$ [GeV]', 'mH3': r'$m(H_{3})$ [GeV]',
-                'mHHH': r'$m(HHH)$ [GeV]',
-                'dRH1': r'$\Delta R(H_{1})$', 'dRH2': r'$\Delta R(H_{2})$',
-                'dRH3': r'$\Delta R(H_{3})$', 'meandRBB': r'$<\Delta R(jj)>$',
-                'sphere3dv2b': r'Sphericity$_{6j}$',
-                'sphere3dv2btrans': 'Transverse Sphericity$_{6j}$',
-                'aplan3dv2b': r'Aplanarity$_{6jets}$', 'theta3dv2b': r'$\theta_{6jets}$'}
+#    var_dict = {'xsec': "cross section [fb]", 'nEvents': "# events",
+#                'genWeight': "generator weight",
+#                'bjet1eta': r"$\eta(b_{1})$", 'bjet2eta': r"$\eta(b_{2})$",
+#                'bjet1phi': r"$\phi(b_{1})$", 'bjet2phi': r"$\phi(b_{2})$",
+#                'bjet1pt': r"$p_T(b_{1})$ [GeV]", 'bjet2pt': r"$p_T(b_{2})$ [GeV]",
+#                'lep1eta': r"$\eta(l_{1})$", 'lep2eta': r"$\eta(l_{2})$",
+#                'lep1phi': r"$\phi(l_{1})$", 'lep2phi': r"$\phi(l_{2})$",
+#                'lep1pt': r"$p_T(l_{1})$ [GeV]", 'lep2pt': r"$p_T(l_{2})$ [GeV]",
+#                'njets': r"$n_{jets}$", 'nbjets': r"$\n_{b}$",
+#                'met': r"$p_{T}^{miss}$ [GeV]", 'metphi': r"$\phi^{miss}$",
+#                'metsigHt': r"$p_{T}^{miss}/H_{T}~[\sqrt{GeV}]$",
+#                'sumptllbb': r"$H_{T}$ [GeV]", 'sumptllbbMET': r"$H_{T} + p_{T}^{miss}$ [GeV]",
+#                'mt2': r"$M_{T2}$ [GeV]",
+#                'mindPhiMETl': r"$min(\Delta\phi(p_{T}^{miss},l))$",
+#                'maxdPhiMETl': r"$max(\Delta\phi(p_{T}^{miss},l))$",
+#                'mindPhiMETb': r"$min(\Delta\phi(p_{T}^{miss},b))$",
+#                'maxdPhiMETb': r"$max(\Delta\phi(p_T}^{miss},b))$",
+#                'avedPhiMETl': r"$<(\Delta\phi(p_{T}^{miss},l))>$",
+#                'avedPhiMETb': r"$<(\Delta\phi(p_{T}^{miss},b))>$",
+#                'mtl1': r"$m_{T}(l_{1})$ [GeV]", 'mtl2': r"$m_{T}(l_{2})$ [GeV]",
+#                'mtlb1': r"$m_{T}(l, b)-close$ [GeV]", 'mtlb2': r"$m_{T}(l,b)-far$ [GeV]",
+#                'mtlmin': r"$min(m_{T}(l))$ [GeV]", 'mtlbmin': r"$min(m_{T}(l,b))$ [GeV]",
+#                'summtlb': r"$\Sigma(m_{T}(l,b))$ [GeV]",
+#                'summtl': r"$\Sigma(m_{T}(p_{T}^{miss},l))$ [GeV]",
+#                'dPhil1MET': r"$\Delta\phi(p_{T}^{miss},l_{1})$",
+#                'dPhil2MET': r"$\Delta\phi(p_{T}^{miss},l_{2})",
+#                'dPhib1MET': r"$\Delta\phi(p_{T}^{miss},b_{1})$",
+#                'dPhib2MET': r"$\Delta\phi(p_{T}^{miss},b_{2})$",
+#                'dRl1b1': r"$\Delta R(l_{1}, b_{1})$", 'dRl1b2': r"$\Delta R(l_{1}, b_{2})$",
+#                'dRl2b1': r"$\Delta R(l_{2}, b_{1})$", 'dRl2b2': r"$\Delta R(l_{2}, b_{2})$",
+#                'sumdRlb': r"$\Sigma(\Delta R(l,b))$", 'mindRlb': r"$min(\Delta R(l,b))$",
+#                'invsumdRlb': r"$1/Sigma(\Delta R(l,b))$", 'invmindRlb': r"$1/min(\Delta R(l,b))",
+#                'mH1': r'$m(H_{1})$ [GeV]', 'mH2': r'$m(H_{2})$ [GeV]', 'mH3': r'$m(H_{3})$ [GeV]',
+#                'mHHH': r'$m(HHH)$ [GeV]',
+#                'dRH1': r'$\Delta R(H_{1})$', 'dRH2': r'$\Delta R(H_{2})$',
+#                'dRH3': r'$\Delta R(H_{3})$', 'meandRBB': r'$<\Delta R(jj)>$',
+#                'sphere3dv2b': r'Sphericity$_{6j}$',
+#                'sphere3dv2btrans': 'Transverse Sphericity$_{6j}$',
+#                'aplan3dv2b': r'Aplanarity$_{6jets}$', 'theta3dv2b': r'$\theta_{6jets}$',
+#                'feat_01': 'Feature 01', 'feat_02': 'Feature 02', 'feat_03': 'Feature 03',
+#                'feat_04': 'Feature 04', 'feat_05': 'Feature 05', 'feat_06': 'Feature 06',
+#                'feat_07': 'Feature 07', 'feat_08': 'Feature 08', 'feat_09': 'Feature 09',
+#                'feat_10': 'Feature 10', 'feat_11': 'Feature 11', 'feat_12': 'Feature 12',
+#                'feat_13': 'Feature 13', 'feat_14': 'Feature 14', 'feat_15': 'Feature 15',
+#                'feat_16': 'Feature 16', 'feat_17': 'Feature 17', 'feat_18': 'Feature 18',
+#                'feat_19': 'Feature 19', 'feat_20': 'Feature 20', 'feat_21': 'Feature 21'
+#                }
     if var in var_dict:
-        return r"{var_dict[var]}"
+        return r"{}".format(var_dict[var])
     else:
         print(f"{var} not in var dict for x label LaTeX formatting, will use var as-is")
         return var
@@ -155,7 +165,7 @@ def plot_distances(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
         label (str): extra str for filename
     """
     # bin/range
-    x_max = max((bkgbkg, sigsig, sigbkg))
+    x_max = max(bkgbkg.max(), sigsig.max(), sigbkg.max())
     n_bins=100
     binning=np.linspace(0,x_max,n_bins)
 
@@ -218,11 +228,10 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var,
         plot_text.append(text)
     add_text(ax, plot_text)
 
-    #xlabel = r"{}".format(get_x_label(var))
-    xlabel = fr"{get_x_label(var)}"
+    xlabel = r"{}".format(get_x_label(var))
 
-    xmin = math.floor(min(min(df_sig.loc[:, var]), min(df_bkg.loc[:, var])))
-    xmax = math.ceil(max(max(df_sig.loc[:, var]), max(df_bkg.loc[:, var])))
+    xmin = math.floor(min(df_sig.loc[:, var].min(), df_bkg.loc[:, var].min()))
+    xmax = math.ceil(max(df_sig.loc[:, var].max(), df_bkg.loc[:, var].max()))
 
     # don't bother plotting the variables that are all 1 value and just for sanity checking,
     #    e.g. btag should always be 1.
@@ -231,19 +240,19 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var,
         return
     binning = np.linspace(xmin, xmax, 25) #rounding to nearest integer, nicer in most cases
 
-    ys, xs, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal", alpha=0.3,
+    ys, _, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal", alpha=0.3,
                         color="red", density=normalise, weights=sig_wgts)
-    yb, xb, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background", alpha=0.3,
+    yb, _, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background", alpha=0.3,
                         color="steelblue", density=normalise, weights=bkg_wgts)
 
     if log_scale:
         ax.set_yscale("log")
         if normalise:
-            ax.set_ylim([0.1*(min((ys, yb))+0.00001), 5*max((ys, yb))])
+            ax.set_ylim([0.1*(np.min((ys, yb))+0.00001), 5*np.max((ys, yb))])
         else:
-            ax.set_ylim([0.01, 5*max((ys, yb))])
+            ax.set_ylim([0.01, 5*np.max((ys, yb))])
     else:
-        ax.set_ylim([0.8*min((ys, yb)), 1.2*max((ys, yb))])
+        ax.set_ylim([0.8*np.min((ys, yb)), 1.2*np.max((ys, yb))])
     ax.legend(loc='upper right')
 
     ax.set_xlabel(xlabel, loc="right")
@@ -436,7 +445,7 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
         sigsig_eff (list(float)): list of eff. values to plot
     """
     fig, ax = plt.subplots()
-    n_bins = 50
+    n_bins = 100
     binning = np.linspace(0, torch.max(torch.cat((sigsig, sigbkg, bkgbkg))), n_bins)
     ax.hist(sigsig, bins=binning, label="sig-sig", weights=sigsig_wgt,
             alpha=0.5, density=True, color="steelblue")
@@ -484,7 +493,7 @@ def plot_roc(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_
         distance (str): distance metric choice
         plot_path (str): directory of where to save plot
     """
-    fig, ax = plt.subplots()
+    fig, _ = plt.subplots()
     plt.style.use(hep.style.ROOT)
     plt.plot(fpr_ss_sb, tpr_ss_sb, label='sig-sig sig-bkg (AUC = {roc_auc_ss_sb:.3f})')
     plt.plot(fpr_bb_sb, tpr_bb_sb, label='bkg-bkg sig-bkg (AUC = {roc_auc_bb_sb:.3f})')
@@ -523,7 +532,7 @@ def plot_roc_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb
         distance (str): distance metric choice
         plot_path (str): directory of where to save plot
     """
-    fig, ax = plt.subplots()
+    fig, _ = plt.subplots()
     plt.style.use(hep.style.ROOT)
     plt.plot(fpr_ss_sb, tpr_ss_sb, label='sig-sig sig-bkg (AUC = {roc_auc_ss_sb:.3f})')
     plt.plot(fpr_bb_sb, tpr_bb_sb, label='bkg-bkg sig-bkg (AUC = {roc_auc_bb_sb:.3f})')
@@ -658,6 +667,36 @@ def plot_distances_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist, var, distance,
 
     return
 
+def plot_event_weights(df_sig, signal, df_bkgs, backgrounds, h5_path, signal_mass="", cutstring=""):
+    """
+    Function to plot event weight distribution
+
+    Args:
+        df_sig (torch.tensor): dataframe of signal events
+        df_bkgs (list(torch.tensor)): list of dataframes for each background
+        backgrouds (list(str)): list of backgrounds
+        plot_path (str): directory to save plot in
+    """
+    fig, ax = plt.subplots()
+    _, _, _ = ax.hist(df_sig[signal]["eventWeight"], histtype="step", bins=100, label=signal)
+
+    for background in backgrounds:
+        ax.hist(df_bkgs[background]["eventWeight"], histtype="step", bins=100, label=background)
+
+    ax.legend(loc='upper right', fontsize=9)
+    ax.set_yscale("log")
+    ax.set_xlabel("Event weight", loc="right")
+    ax.set_ylabel("No. Events", loc="top")
+    save_path = h5_path + "/eventweight_check" + signal
+    if signal_mass != "":
+        save_path = save_path + "_" + signal_mass
+    if cutstring != "":
+        save_path = save_path + "_" + cutstring
+    save_fig(fig, save_path)
+
+    return
+
+
 def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
                              sigsig_thresholds,sig_label, bkg_label, plot_path,
                              variable, distance, sigsig_eff, standardised=False):
@@ -688,7 +727,7 @@ def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
     add_text(ax, plot_text)
     bins = sigsig_hist[1]
     n_bins = sigsig_hist[0].shape[0]
-    bin_centres = [ bins[b] + 0.5*(bins[b+1]-bins[b]) for b in range(0,n_bins) ]
+    bin_centres = [bins[b] + 0.5*(bins[b+1]-bins[b]) for b in range(0,n_bins)]
     ax.hist(bin_centres, bins=sigsig_hist[1], label="sig-sig", alpha=0.5,
             weights=sigsig_hist[0], density=True, color="steelblue")
     ax.hist(bin_centres, bins=sigbkg_hist[1], label="sig-bkg", alpha=0.5,
@@ -697,9 +736,9 @@ def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
             weights=bkgbkg_hist[0], density=True, color="forestgreen")
     y_min, y_max = ax.get_ylim()
     for i, eff in enumerate(sigsig_eff):
-        eff_label=str(eff*100)+"%"
-        ax.axvline(x=sigsig_thresholds[i], ymax=0.6+i*0.02, linestyle="--", color="red")
-        ax.text(x=sigsig_thresholds[i], y=0.63+i*0.022,
+        eff_label = str(eff*100)+ "%"
+        ax.axvline(x=sigsig_thresholds[i], ymax=0.6 + i*0.02, linestyle="--", color="red")
+        ax.text(x=sigsig_thresholds[i], y=0.63 + i*0.022,
                 transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label,
                 ha='center', va='bottom', fontsize=7)
     ax.legend(loc='upper right')

@@ -92,12 +92,13 @@ logging.info("output plot path: "+plot_path)
 logging.info("making a friend graph? " + str(flip))
 
 logging.info("Loading sigsig distances in batches")
-sigsig_distance, sigsig_wgt = misc.get_batched_distances(dist_path, variable, distance, "sigsig", sample=True)
+sigsig_distance, sigsig_wgt, sigsig_max = misc.get_batched_distances(dist_path, variable, distance, 10000, "sigsig", sample=True, cutstring="_met200")
 logging.info("Loading sigbkg distances in batches")
-sigbkg_distance, sigbkg_wgt = misc.get_batched_distances(dist_path, variable, distance, "sigbkg", sample=True)
+sigbkg_distance, sigbkg_wgt, sigbkg_max = misc.get_batched_distances(dist_path, variable, distance, 10000, "sigbkg", sample=True, cutstring="_met200")
 logging.info("Loading bkgbkg distances in batches")
-bkgbkg_distance, bkgbkg_wgt = misc.get_batched_distances(dist_path, variable, distance, "bkgbkg", sample=True)
+bkgbkg_distance, bkgbkg_wgt, bkgbkg_max = misc.get_batched_distances(dist_path, variable, distance, 10000, "bkgbkg", sample=True, cutstring="_met200")
 
+print(sigsig_distance,type(sigsig_distance))
 # calculate ROC values for sigsig and bkgbkg
 # Between sigsig (0) and bkgbkg (1)
 # Need to normalise the distances to be between 0 and 1, e.g. using minmax normalisation
