@@ -104,12 +104,12 @@ df_bkg = df_all.iloc[len(df_sig):]
 for v, var in enumerate(kinematics):
     print(f"Plotting {var}")
     print("-----> Weighted:")
-    plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label,
+    plotting.plot_kinematics(df_sig, df_bkg, signal_label, background_label,
                                   var, plot_path, standardised=False, normalise=False,
                                   log_scale=True, sig_wgts=df_sig["eventWeight"],
                                   bkg_wgts=df_bkg["eventWeight"], ex=cutstring)
     print("-----> Normed:")
-    plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label,
+    plotting.plot_kinematics(df_sig, df_bkg, signal_label, background_label,
                                   var, plot_path, standardised=False, normalise=True,
                                   log_scale=True, ex=cutstring)
     # Standardising kinematics
@@ -118,5 +118,5 @@ for v, var in enumerate(kinematics):
     df_all.loc[:, var] = standardised_values.astype('float32')  # convert to float32
     df_sig = df_all.iloc[:len(df_sig)]
     df_bkg = df_all.iloc[len(df_sig):]
-    plotting.plot_kinematic_hists(df_sig, df_bkg, signal_label, background_label, var, plot_path,
+    plotting.plot_kinematics(df_sig, df_bkg, signal_label, background_label, var, plot_path,
                                   standardised=True, normalise=True, log_scale=True, ex=cutstring)

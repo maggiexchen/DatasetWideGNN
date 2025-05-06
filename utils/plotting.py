@@ -1,5 +1,6 @@
 """Functions for plotting"""
 import math
+import json
 
 import utils.normalisation as norm
 import utils.misc as misc
@@ -63,10 +64,11 @@ def get_plot_labels(signal_type, signal_mass = None):
         signal = "6b resonant TRSM HHH signal"
         background = "Data-driven QCD background estimate (5b data)"
     elif "LQ" in signal_type:
-        signal = "Leptoquark signal"
+        signal = "leptoquark signal"
         if signal_mass is not None:
             signal += f" ({signal_mass} GeV)"
-        background = r"$t\bar{t}$ and Single top backgrounds"
+#        background = "top backgrounds"
+        background = r"$t\bar{t}$ and single top"
     elif signal_type == "stau":
         signal = "StauStau signal"
         background = r"$W$ jets, $Z\rightarrow ll$ jets, Diboson (0$l$, 1$l$, 2$l$, 3$l$, 4$l$),\
@@ -117,11 +119,10 @@ def draw_n_hists(ax, hists, wgts, binning, labels, normalise):
     """
     assert len(hists) == len(wgts), "hists and wgts not the same length"
     assert len(hists) == len(labels), "hists and labels not the same length"
-    
+
     ys = []
     xs = []
     for i,hist in enumerate(hists):
-        print(i, hist)
         tmpy, tmpx, _ = ax.hist(hist, bins=binning, label=labels[i], weights=wgts[i],
             alpha=0.5, density=normalise)
         ys.append(tmpy)
@@ -130,57 +131,66 @@ def draw_n_hists(ax, hists, wgts, binning, labels, normalise):
     return ys, xs
 
 
-def plot_distances(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
-                   var, distance, path, label="", standardised=False):
+def draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', xrange=None, yrange=None,
+                        log_y=False):
     """
-    Function to plot distances for sig-sig, sig-bkg and bkg-bkg on one figure.
+    Function to draw legend, axis labels and set y-axis range.
 
     Args:
-        sigsig (numpy.ndarray): array of the distances for each pair of sig-sig events
-        sigbkg (numpy.ndarray): array of the distances for each pair of sig-bkg events
-        bkgbkg (numpy.ndarray): array of the distances for each pair of bkg-bkg events
-        sigsig_wgt (numpy.ndarray): array of product of eventWeights for each sig-sig event pair
-        sigbkg_wgt (numpy.ndarray): array of product of eventWeights for each sig-bkg event pair
-        bkgbkg_wgt (numpy.ndarray): array of product of eventWeights for each bkg-bkg event pair
-        var (str): Kinematic variable
-        distance (str): Distance metric (euclidean, cosine, cityblock)
-        path (str): base dir to store output
-        label (str): extra str for filename
+        ax (mpl.axis): figure axes to draw on
+        xlabel (str): x axis label
+        ylabel (str): y axis label
+        legendloc (default 'upper right')
+        xrange (list(float)): 2-dim min and max x-range (optional)
+        yrange (list(float)): 2-dim min and max y-range (optional)
+        log_y (bool): do a log scale on y-axis
     """
-    # bin/range
-    x_max = max(bkgbkg.max(), sigsig.max(), sigbkg.max())
-    n_bins=100
-    binning=np.linspace(0,x_max,n_bins)
 
-    # plot
-    fig, ax = plt.subplots()
+    ax.legend(loc=legendloc)
+    ax.set_xlabel(xlabel, loc='right')
+    ax.set_ylabel(ylabel, loc='top')
+    if log_y:
+        ax.set_yscale("log")
+    if xrange is not None:
+        if len(xrange) != 2:
+            raise IndexError("need 2 values for x range: [min, max]")
+        ax.set_xlim(xrange[0], xrange[1])
+    if yrange is not None:
+        if len(yrange) != 2:
+            raise IndexError("need 2 values for y range: [min, max]")
+        ax.set_ylim(yrange[0], yrange[1])
+    return
 
-    # plot text if needed
-    plot_text = []
-    if standardised:
-        plot_text.append("Min-Max Standardised")
-    add_text(ax, plot_text)
-    print(sigsig_wgt, sigbkg_wgt, bkgbkg_wgt)
-    # draw histograms
-    _, _ = draw_n_hists(ax, [sigsig, sigbkg, bkgbkg], [sigsig_wgt, sigbkg_wgt, bkgbkg_wgt], binning,
-                     ["sig-sig", "sig-bkg", "bkg-bkg"], True)
-    # aesthesics
-    ax.legend(loc='upper right')
-    ax.set_xlabel(var+" "+distance +" distance", loc="right")
-    ax.ticklabel_format(axis='x', style='plain')
-    ax.set_ylabel("Normalised event pairs / bin", loc="top")
-    # save
-    if label != "":
-        label = "_" + label
-    if standardised:
-        label = label + "_minmaxNormed"
 
-    save_fig(fig, path + "/" + var + "_" + distance + label + "_distances")
+def save_data(ys, xs, legend_entries, axis_labels, plot_path, plot_text):
+    """
+    Function to save metadata for a figure so it can be replotted separately without
+    rerunning the slow main scripts if needed.
+    
+    Args:
+        ys (list(np.array)): list of bin contents for each histogram
+        xs (list(np.array)): list of binnings for each histogram
+        legend_entries (list(str)): list of legend entries for each histogram
+        axis_labels (list(str)): list of x and y axis labels for plot
+        plot_path (str): path to save data to
+        plot_text (list(str)): list of lines of text to draw on plot
+    """
+    data_dict = {
+        "ys": [y.tolist() for y in ys],
+        "xs": [x.tolist() for x in xs],
+        "legend_entries": legend_entries,
+        "axis_labels": axis_labels,
+        "plot_text": plot_text
+    }
+    data_file = plot_path + "_data.json"
+    with open(data_file, "w", encoding="utf-8") as outfile:
+        json.dump(data_dict, outfile)
+    print(f"saved figure data to: {data_file}")
 
     return
 
 
-def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var,
+def plot_kinematics(df_sig, df_bkg, sig_label, bkg_label, var,
                          file_path, standardised=True, normalise=True,
                          log_scale=True, sig_wgts=None, bkg_wgts=None, text="", ex=""):
     """
@@ -211,8 +221,6 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var,
         plot_text.append(text)
     add_text(ax, plot_text)
 
-    xlabel = r"{}".format(get_x_label(var))
-
     xmin = math.floor(min(df_sig.loc[:, var].min(), df_bkg.loc[:, var].min()))
     xmax = math.ceil(max(df_sig.loc[:, var].max(), df_bkg.loc[:, var].max()))
 
@@ -222,22 +230,21 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var,
         print("trying to plot "+var+" that just has the same value for everything, skipping")
         return
     binning = np.linspace(xmin, xmax, 25) #rounding to nearest integer, nicer in most cases
+    legend_entries = [sig_label, bkg_label]
 
-    [ys, yb], _ = draw_n_hists(ax, [df_sig.loc[:, var], df_bkg.loc[:, var]], [sig_wgts, bkg_wgts], binning, [sig_label, bkg_label], normalise)
+    [ys, yb], [xs, xb] = draw_n_hists(ax, [df_sig.loc[:, var], df_bkg.loc[:, var]],
+                                      [sig_wgts, bkg_wgts], binning, legend_entries, normalise)
 
+    yrange = [0.8*np.min((ys, yb)), 1.2*np.max((ys, yb))]
     if log_scale:
-        ax.set_yscale("log")
         if normalise:
-            ax.set_ylim([0.1*(np.min((ys, yb))+0.00001), 5*np.max((ys, yb))])
+            yrange = [0.1*(np.min((ys, yb))+0.00001), 5*np.max((ys, yb))]
         else:
-            ax.set_ylim([0.01, 5*np.max((ys, yb))])
-    else:
-        ax.set_ylim([0.8*np.min((ys, yb)), 1.2*np.max((ys, yb))])
-    ax.legend(loc='upper right')
+            yrange = [0.01, 5*np.max((ys, yb))]
 
-    ax.set_xlabel(xlabel, loc="right")
+    xlabel = r"{}".format(get_x_label(var))
     ylabel = "Normalised Events" if normalise else "Events / Bin"
-    ax.set_ylabel(ylabel, loc="top")
+    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', yrange=yrange, log_y=log_scale)
 
     # save
     if ((len(ex) > 0) and (ex[0] != "_")):
@@ -254,6 +261,8 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var,
     fig.tight_layout()
 
     save_fig(fig, save_path + var + setting_label)
+    save_data([ys, yb], [xs, xb], legend_entries, [xlabel, ylabel],
+              save_path + var + setting_label, plot_text)
 
     return
 
@@ -381,20 +390,21 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
 
     for plot, setup in toplot.items():
         fig, ax = plt.subplots()
-        ax.hist(setup["data"][: len(sig)].detach().cpu().numpy(), bins=50, label="Signal",
+        ax.hist(setup["data"][: len(sig)], bins=50, label="Signal",
                 alpha=0.3, density=True, color="red")
-        ax.hist(setup["data"][len(sig):].detach().cpu().numpy(), bins=50, label="Background",
+        ax.hist(setup["data"][len(sig):], bins=50, label="Background",
                 alpha=0.3, density=True, color="steelblue")
         text = [r"$\sqrt{s}=13$ TeV, 5b data", r"6b resonant TRSM signals",
                 r"Linking length at edge fraction "+str(eff)]
         if setup["extratext"] != "":
             text.append(setup["extratext"])
         add_text(ax, text)
-        ax.legend(loc='upper right')
         ymin, ymax = ax.get_ylim()
-        ax.set_ylim((ymin, ymax*1.4))
-        ax.set_xlabel(setup["xlabel"], loc="right")
-        ax.set_ylabel("Normalised No. Events", loc="top")
+        yrange = [ymin, ymax*1.4]
+        xlabel = setup["xlabel"]
+        ylabel = "Normalised No. Events"
+        draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', yrange=yrange)
+
         # save
         save_path = file_path+"/"+plot
         misc.create_dirs(save_path)
@@ -402,55 +412,6 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
 
     return
 
-
-def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
-                        sigsig_thresholds, sig_label, bkg_label, plot_path,
-                        variable, distance, sigsig_eff):
-    """
-    Function to plot distances for sig-sig, sig-bkg and bkg-bkg on one figure.
-
-    Args:
-        sigsig (numpy.ndarray): array of the distances for each pair of sig-sig events
-        sigbkg (numpy.ndarray): array of the distances for each pair of sig-bkg events
-        bkgbkg (numpy.ndarray): array of the distances for each pair of bkg-bkg events
-        sigsig_wgt (numpy.ndarray): array of product of eventWeights for each sig-sig event pair
-        sigbkg_wgt (numpy.ndarray): array of product of eventWeights for each sig-bkg event pair
-        bkgbkg_wgt (numpy.ndarray): array of product of eventWeights for each bkg-bkg event pair
-        sig_sig thresholds (list(float)): list of distances for each eff. value
-        sig_label (str): signal label for text
-        bkg_label (str): background label for text
-        plot_path (str): base dir to store plot
-        variable (str): Kinematic variableset
-        distance (str): Distance metric (euclidean, cosine, cityblock)
-        sigsig_eff (list(float)): list of eff. values to plot
-    """
-    fig, ax = plt.subplots()
-
-    plot_text = [sig_label, bkg_label]
-    add_text(ax, plot_text)
-
-    n_bins = 100
-    binning = np.linspace(0, torch.max(torch.cat((sigsig, sigbkg, bkgbkg))), n_bins)
-
-    _, _ = draw_n_hists(ax, [sigsig, sigbkg, bkgbkg], [sigsig_wgt, sigbkg_wgt, bkgbkg_wgt], binning,
-                     ["sig-sig", "sig-bkg", "bkg-bkg"], True)
-
-    y_min, y_max = ax.get_ylim()
-    for i, eff in enumerate(sigsig_eff):
-        eff_label=str(eff*100)+"%"
-        ax.axvline(x=sigsig_thresholds[i], ymax=0.6+i*0.02, linestyle="--", color="red")
-        ax.text(x=sigsig_thresholds[i], y=0.63+i*0.022,
-                transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label,
-                ha='center', va='bottom', fontsize=7)
-    ax.legend(loc='upper right')
-    ax.set_ylim(y_min, y_max*1.2)
-    ax.set_xlabel(variable + " " + distance +" distance", loc="right")
-    ax.set_ylabel("Normalised # event pairs / bin", loc="top")
-    sigsigbkgbkg_path = plot_path+"linking_lengths/"
-    misc.create_dirs(sigsigbkgbkg_path)
-    save_fig(fig, sigsigbkgbkg_path + "/" + variable + "_" + distance + "_linking_lengths")
-
-    return
 
 
 def plot_roc(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_bb_sb,
@@ -535,6 +496,59 @@ def plot_roc_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb
     return
 
 
+def plot_distances(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
+                   var, distance, path, label="", standardised=False):
+    """
+    Function to plot distances for sig-sig, sig-bkg and bkg-bkg on one figure.
+
+    Args:
+        sigsig (numpy.ndarray): array of the distances for each pair of sig-sig events
+        sigbkg (numpy.ndarray): array of the distances for each pair of sig-bkg events
+        bkgbkg (numpy.ndarray): array of the distances for each pair of bkg-bkg events
+        sigsig_wgt (numpy.ndarray): array of product of eventWeights for each sig-sig event pair
+        sigbkg_wgt (numpy.ndarray): array of product of eventWeights for each sig-bkg event pair
+        bkgbkg_wgt (numpy.ndarray): array of product of eventWeights for each bkg-bkg event pair
+        var (str): Kinematic variable
+        distance (str): Distance metric (euclidean, cosine, cityblock)
+        path (str): base dir to store output
+        label (str): extra str for filename
+    """
+    # bin/range
+    x_max = max(bkgbkg.max(), sigsig.max(), sigbkg.max())
+    n_bins=100
+    binning=np.linspace(0,x_max,n_bins)
+
+    # plot
+    fig, ax = plt.subplots()
+
+    # plot text if needed
+    plot_text = []
+    if standardised:
+        plot_text.append("Min-Max Standardised")
+    add_text(ax, plot_text)
+    legend_entries = ["sig-sig", "sig-bkg", "bkg-bkg"]
+
+    # draw histograms
+    ys, xs = draw_n_hists(ax, [sigsig, sigbkg, bkgbkg], [sigsig_wgt, sigbkg_wgt, bkgbkg_wgt],
+                          binning, legend_entries, True)
+    # aesthesics
+    ax.ticklabel_format(axis='x', style='plain')
+    xlabel = var + " " + distance + " distance"
+    ylabel = "Normalised # event pairs / bin"
+    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right')
+
+    # save
+    if label != "":
+        label = "_" + label
+    if standardised:
+        label = label + "_minmaxNormed"
+
+    save_fig(fig, path + "/" + var + "_" + distance + label + "_distances")
+    save_data(ys, xs, legend_entries, [xlabel, ylabel],
+              path + "/" + var + "_" + distance + label + "_distances", plot_text)
+
+    return
+
 def plot_full_distances_hist(sigsig_hists, sigbkg_hists, bkgbkg_hists, sig_label, bkg_label,
                              var, distance, path, label="", standardised=False):
     """
@@ -574,15 +588,18 @@ def plot_full_distances_hist(sigsig_hists, sigbkg_hists, bkgbkg_hists, sig_label
     fig, ax = plt.subplots()
 
     add_text(ax, plot_text)
+    legend_entries = ["sig-sig", "sig-bkg", "bkg-bkg"]
 
-    _, _ = draw_n_hists(ax, [bin_centres, bin_centres, bin_centres],
+    ys, xs = draw_n_hists(ax, [bin_centres, bin_centres, bin_centres],
                      [sigsig_hist_total, sigbkg_hist_total, bkgbkg_hist_total],
-                     bins, ["sig-sig", "sig-bkg", "bkg-bkg"], True)
+                     bins, legend_entries, True)
 
     # aesthesics
-    ax.legend(loc='upper right')
-    ax.set_xlabel(var+" "+distance +" distance", loc="right")
-    ax.set_ylabel("Normalised # event pairs / bin", loc="top")
+
+    xlabel = var + " " + distance + " distance"
+    ylabel = "Normalised # event pairs / bin"
+    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right')
+
     # save
     if label!="":
         label = "_" + label
@@ -590,6 +607,8 @@ def plot_full_distances_hist(sigsig_hists, sigbkg_hists, bkgbkg_hists, sig_label
         label = label + "_minmaxNormed"
     fig.tight_layout()
     save_fig(fig, path + "/" + var + "_" + distance + label + "_distances")
+    save_data(ys, xs, legend_entries, [xlabel, ylabel],
+              path + "/" + var + "_" + distance + label + "_distances", plot_text)
 
     return
 
@@ -623,15 +642,18 @@ def plot_distances_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist, var, distance,
     n_bins = sigsig_hist[0].shape[0]
     bin_centres = [ bins[b] + 0.5*(bins[b+1]-bins[b]) for b in range(0,n_bins) ]
 
-    _, _ = draw_n_hists(ax, [bin_centres, bin_centres, bin_centres],
+    legend_entries = ["sig-sig", "sig-bkg", "bkg-bkg"]
+    ys, xs = draw_n_hists(ax, [bin_centres, bin_centres, bin_centres],
                      [sigsig_hist[0], sigbkg_hist[0], bkgbkg_hist[0]],
-                     sigsig_hist[1], ["sig-sig", "sig-bkg", "bkg-bkg"], True)
+                     sigsig_hist[1], legend_entries, True)
 
     # aesthetics
-    ax.legend(loc='upper right')
-    ax.set_xlabel(var+" "+distance +" distance", loc="right")
-    ax.set_ylabel("Normalised # event pairs / bin", loc="top")
     ax.ticklabel_format(axis='x', style='plain')
+
+    xlabel = var + " " + distance + " distance"
+    ylabel = "Normalised # event pairs / bin"
+    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right')
+
     # save
     if label!="":
         label = "_"+label
@@ -639,6 +661,8 @@ def plot_distances_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist, var, distance,
         label = label + "_minmaxNormed"
     fig.tight_layout()
     save_fig(fig, path + "/" + var + "_" + distance + label + "_distances")
+    save_data(ys, xs, legend_entries, [xlabel, ylabel],
+              path + "/" + var + "_" + distance + label + "_distances", plot_text)
 
     return
 
@@ -658,10 +682,10 @@ def plot_event_weights(df_sig, signal, df_bkgs, backgrounds, h5_path, signal_mas
     for background in backgrounds:
         ax.hist(df_bkgs[background]["eventWeight"], histtype="step", bins=100, label=background)
 
-    ax.legend(loc='upper right', fontsize=9)
-    ax.set_yscale("log")
-    ax.set_xlabel("Event weight", loc="right")
-    ax.set_ylabel("No. Events", loc="top")
+    xlabel = "event weight"
+    ylabel = "events / bin"
+    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', log_y=True)
+
     save_path = h5_path + "/eventweight_check" + signal
     if signal_mass != "":
         save_path = save_path + "_" + signal_mass
@@ -671,6 +695,61 @@ def plot_event_weights(df_sig, signal, df_bkgs, backgrounds, h5_path, signal_mas
 
     return
 
+
+def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
+                        sigsig_thresholds, sig_label, bkg_label, plot_path,
+                        variable, distance, sigsig_eff):
+    """
+    Function to plot distances for sig-sig, sig-bkg and bkg-bkg on one figure.
+
+    Args:
+        sigsig (numpy.ndarray): array of the distances for each pair of sig-sig events
+        sigbkg (numpy.ndarray): array of the distances for each pair of sig-bkg events
+        bkgbkg (numpy.ndarray): array of the distances for each pair of bkg-bkg events
+        sigsig_wgt (numpy.ndarray): array of product of eventWeights for each sig-sig event pair
+        sigbkg_wgt (numpy.ndarray): array of product of eventWeights for each sig-bkg event pair
+        bkgbkg_wgt (numpy.ndarray): array of product of eventWeights for each bkg-bkg event pair
+        sig_sig thresholds (list(float)): list of distances for each eff. value
+        sig_label (str): signal label for text
+        bkg_label (str): background label for text
+        plot_path (str): base dir to store plot
+        variable (str): Kinematic variableset
+        distance (str): Distance metric (euclidean, cosine, cityblock)
+        sigsig_eff (list(float)): list of eff. values to plot
+    """
+    fig, ax = plt.subplots()
+
+    plot_text = [sig_label, bkg_label]
+    add_text(ax, plot_text)
+
+    n_bins = 100
+    binning = np.linspace(0, torch.max(torch.cat((sigsig, sigbkg, bkgbkg))), n_bins)
+    legend_entries = ["sig-sig", "sig-bkg", "bkg-bkg"]
+
+    ys, xs = draw_n_hists(ax, [sigsig, sigbkg, bkgbkg], [sigsig_wgt, sigbkg_wgt, bkgbkg_wgt],
+                          binning, legend_entries, True)
+
+    y_min, y_max = ax.get_ylim()
+    for i, eff in enumerate(sigsig_eff):
+        eff_label=str(eff*100)+"%"
+        ax.axvline(x=sigsig_thresholds[i], ymax=0.6+i*0.02, linestyle="--", color="red")
+        ax.text(x=sigsig_thresholds[i], y=0.63+i*0.022,
+                transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label,
+                ha='center', va='bottom', fontsize=7)
+
+    xlabel = variable + " " + distance + " distance"
+    ylabel = "Normalised # event pairs / bin"
+    yrange = [y_min, y_max*1.2]
+    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', yrange=yrange)
+
+    sigsigbkgbkg_path = plot_path+"linking_lengths/"
+    misc.create_dirs(sigsigbkgbkg_path)
+    save_fig(fig, sigsigbkgbkg_path + "/" + variable + "_" + distance + "_linking_lengths")
+    save_data(ys, xs, legend_entries, [xlabel, ylabel],
+              sigsigbkgbkg_path + "/" + variable + "_" + distance + "_linking_lengths",
+              plot_text)
+
+    return
 
 def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
                              sigsig_thresholds,sig_label, bkg_label, plot_path,
@@ -703,10 +782,11 @@ def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
     bins = sigsig_hist[1]
     n_bins = sigsig_hist[0].shape[0]
     bin_centres = [bins[b] + 0.5*(bins[b+1]-bins[b]) for b in range(0,n_bins)]
-    _, _ = draw_n_hists(ax, [bin_centres, bin_centres, bin_centres],
+    legend_entries = ["sig-sig", "sig-bkg", "bkg-bkg"]
+    ys, xs = draw_n_hists(ax, [bin_centres, bin_centres, bin_centres],
                      [sigsig_hist[0], sigbkg_hist[0], bkgbkg_hist[0]],
-                     sigsig_hist[1], ["sig-sig", "sig-bkg", "bkg-bkg"], True)
-    
+                     sigsig_hist[1], legend_entries, True)
+
     y_min, y_max = ax.get_ylim()
     for i, eff in enumerate(sigsig_eff):
         eff_label = str(eff*100)+ "%"
@@ -714,13 +794,17 @@ def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
         ax.text(x=sigsig_thresholds[i], y=0.63 + i*0.022,
                 transform=ax.get_xaxis_text1_transform(0)[0], s=eff_label,
                 ha='center', va='bottom', fontsize=7)
-    ax.legend(loc='upper right')
-    ax.set_ylim(y_min, y_max*1.2)
-    ax.set_xlabel(variable + " " + distance + " distance", loc="right")
-    ax.set_ylabel("Normalised # event pairs / bin", loc="top")
+
+    xlabel = variable + " " + distance + " distance"
+    ylabel = "Normalised # event pairs / bin"
+    yrange = [y_min, y_max*1.2]
+    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', yrange=yrange)
+
     ll_path = plot_path+"linking_lengths/"
     misc.create_dirs(ll_path)
     fig.tight_layout()
     save_fig(fig, ll_path + "/" + variable + "_" + distance + "_linking_lengths")
+    save_data(ys, xs, legend_entries, [xlabel, ylabel],
+              ll_path + "/" + variable + "_" + distance + "_linking_lengths", plot_text)
 
     return
