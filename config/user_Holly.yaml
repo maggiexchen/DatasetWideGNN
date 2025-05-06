@@ -4,7 +4,6 @@
 
 # signal model hhh, LQ, stau
 signal: LQ
-
 signal_mass: 1000
 backgrounds: ["singletop", "ttbar"]
 cuts:
@@ -12,6 +11,13 @@ cuts:
     threshold: 200
     operation: ">"
 feature_dim:
+distance:
+  euclidean:
+  cosine:
+  emd:
+    objects: ["bjet1", "bjet2", "lep1", "lep2"]
+run_with_cuda: False
+n_folds: 2
 
 # input paths
 ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_140325/

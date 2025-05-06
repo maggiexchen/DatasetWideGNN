@@ -1,5 +1,4 @@
 """dictionary to store config for all the variables for plotting"""
-# todo add embedded features
 # todo add variable binning or limited ranges where needed.
 var_dict = {
     'xsec': {
@@ -187,6 +186,7 @@ var_dict = {
     }
 }
 
-    #'feat_01': {
-    #    "label": 'Feature 01'
-    #}
+for feature in range(0, 21):
+    var_dict[f"feat_{feature+1:02d}"] = {
+        "label": f"Feature {feature+1:02d}"
+    }

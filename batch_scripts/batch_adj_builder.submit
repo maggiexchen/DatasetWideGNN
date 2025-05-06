@@ -6,6 +6,6 @@ log = ../logs/batch_adj_builder_$(ClusterID).log
 request_gpus = 1
 
 require_gpus = (Capability >= 8.0) && (GlobalMemoryMb >= 20000)
-request_memory = 20000
+request_memory = 80000
 queue 1
 

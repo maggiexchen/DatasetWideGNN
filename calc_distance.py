@@ -140,9 +140,9 @@ def calc_a_b_batched_distances(species_a, species_b, full_a, full_b, kinematics_
 
     # find the numbers of events and batches we have
     num_a_events = full_a.shape[0]
-    num_a_batches = math.ceil(num_a_events/batchsize)
+    num_a_batches = 2#math.ceil(num_a_events/batchsize)
     num_b_events = full_b.shape[0]
-    num_b_batches = math.ceil(num_b_events/batchsize)
+    num_b_batches = 2#math.ceil(num_b_events/batchsize)
     logging.info("%s %s events", str(num_a_events), species_a)
     logging.info("%s %s events", str(num_b_events), species_b)
     logging.info("%s %s batches", str(num_a_batches), species_a)

@@ -18,6 +18,9 @@ distance:
   emd:
     objects: ["bjet1", "bjet2", "lep1", "lep2"]
 
+run_with_cuda: False
+n_folds: 2
+
 # input paths
 ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
 feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/

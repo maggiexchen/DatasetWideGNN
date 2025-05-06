@@ -17,3 +17,4 @@ conda install -c conda-forge uproot
 pip install mplhep
 pip install fsspec
 pip install torchinfo
+pip install energyflow

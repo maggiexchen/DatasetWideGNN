@@ -12,6 +12,8 @@ cuts:
     operation: ">"
 feature_dim: 12
 objects: ["bjet1", "bjet2", "lep1", "lep2"]
+run_with_cuda: False
+n_folds: 2
 
 # input paths
 ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/

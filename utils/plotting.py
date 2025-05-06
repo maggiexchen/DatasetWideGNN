@@ -3,8 +3,7 @@ import math
 
 import utils.normalisation as norm
 import utils.misc as misc
-import utils.variables as var_config
-from var_config import var_dict
+from utils.variables import var_dict
 
 #from scipy import stats
 #from scipy.stats import entropy
@@ -12,6 +11,8 @@ import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
 import torch
+
+plt.style.use(hep.style.ATLAS)
 
 def save_fig(fig, save_str):
     """
@@ -42,7 +43,7 @@ def get_x_label(var):
     """
 
     if var in var_dict:
-        return r"{}".format(var_dict[var])
+        return r"{}".format(var_dict[var]["label"])
     else:
         print(f"{var} not in var dict for x label LaTeX formatting, will use var as-is")
         return var
@@ -76,7 +77,7 @@ def get_plot_labels(signal_type, signal_mass = None):
     return signal, background
 
 
-def add_text(ax, text, do_atlas=False, startx=0.04, starty=0.93):
+def add_text(ax, text, do_atlas=False, startx=0.04, starty=0.9):
     """
     Function to add text to figures
 
@@ -88,17 +89,45 @@ def add_text(ax, text, do_atlas=False, startx=0.04, starty=0.93):
         starty (float): topmost point to align text to, as a fraction of the axis height.
     """
     jump = 0.05
+    ax.text(startx, starty, r"$\sqrt{s}=13.6$ TeV, 370 fb$^{-1}$", verticalalignment="bottom",\
+                transform=ax.transAxes)
     if do_atlas:
         ax.text(startx, starty, "ATLAS", fontweight="bold", fontstyle="italic",\
-                verticalalignment="bottom", size=10, transform=ax.transAxes)
+                verticalalignment="bottom", transform=ax.transAxes)
         ax.text(startx + 0.1, starty, "Internal", verticalalignment="bottom",\
-                size=10, transform=ax.transAxes)
+                transform=ax.transAxes)
     for i,t in enumerate(text):
-        atlasdrop = jump if do_atlas else 0.0
+        atlasdrop = 2*jump if do_atlas else jump
         ax.text(startx, starty-jump*i-atlasdrop, t, verticalalignment="bottom",\
-                size=10, transform=ax.transAxes)
+                transform=ax.transAxes)
 
     return
+
+def draw_n_hists(ax, hists, wgts, binning, labels, normalise):
+    """
+    Function to draw 3 histograms
+
+    Args:
+        ax (mpl.pyplot axis): axes to draw on
+        hists (list(np.array/torch.tensor)): list of datasets to histogram
+        wgts (list(np.array/torch.tensor)): list of weight sets
+        binning (list(float)): binning to use
+        labels (list(str)): list of legend entries
+        normalise (bool): whether to normalise histograms
+    """
+    assert len(hists) == len(wgts), "hists and wgts not the same length"
+    assert len(hists) == len(labels), "hists and labels not the same length"
+    
+    ys = []
+    xs = []
+    for i,hist in enumerate(hists):
+        print(i, hist)
+        tmpy, tmpx, _ = ax.hist(hist, bins=binning, label=labels[i], weights=wgts[i],
+            alpha=0.5, density=normalise)
+        ys.append(tmpy)
+        xs.append(tmpx)
+
+    return ys, xs
 
 
 def plot_distances(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
@@ -133,12 +162,12 @@ def plot_distances(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
     add_text(ax, plot_text)
     print(sigsig_wgt, sigbkg_wgt, bkgbkg_wgt)
     # draw histograms
-    ax.hist(sigsig, bins=binning, label="sig-sig", alpha=0.5, weights=sigsig_wgt, density=True)
-    ax.hist(sigbkg, bins=binning, label="sig-bkg", alpha=0.5, weights=sigbkg_wgt, density=True)
-    ax.hist(bkgbkg, bins=binning, label="bkg-bkg", alpha=0.5, weights=bkgbkg_wgt, density=True)
+    _, _ = draw_n_hists(ax, [sigsig, sigbkg, bkgbkg], [sigsig_wgt, sigbkg_wgt, bkgbkg_wgt], binning,
+                     ["sig-sig", "sig-bkg", "bkg-bkg"], True)
     # aesthesics
     ax.legend(loc='upper right')
     ax.set_xlabel(var+" "+distance +" distance", loc="right")
+    ax.ticklabel_format(axis='x', style='plain')
     ax.set_ylabel("Normalised event pairs / bin", loc="top")
     # save
     if label != "":
@@ -175,7 +204,7 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var,
     # plot
     fig, ax = plt.subplots()
 
-    plot_text = [r"$\sqrt{s}=13.6$ TeV, 370 fb$^{-1}$", sig_label, bkg_label]
+    plot_text = []
     if standardised:
         plot_text.append("Standardised to (mean, std) = (0, 1)")
     if text!="":
@@ -194,10 +223,7 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var,
         return
     binning = np.linspace(xmin, xmax, 25) #rounding to nearest integer, nicer in most cases
 
-    ys, _, _ = ax.hist(df_sig.loc[:, var], bins=binning, label="Signal", alpha=0.3,
-                        color="red", density=normalise, weights=sig_wgts)
-    yb, _, _ = ax.hist(df_bkg.loc[:, var], bins=binning, label="Background", alpha=0.3,
-                        color="steelblue", density=normalise, weights=bkg_wgts)
+    [ys, yb], _ = draw_n_hists(ax, [df_sig.loc[:, var], df_bkg.loc[:, var]], [sig_wgts, bkg_wgts], binning, [sig_label, bkg_label], normalise)
 
     if log_scale:
         ax.set_yscale("log")
@@ -399,18 +425,16 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
         sigsig_eff (list(float)): list of eff. values to plot
     """
     fig, ax = plt.subplots()
+
+    plot_text = [sig_label, bkg_label]
+    add_text(ax, plot_text)
+
     n_bins = 100
     binning = np.linspace(0, torch.max(torch.cat((sigsig, sigbkg, bkgbkg))), n_bins)
-    ax.hist(sigsig, bins=binning, label="sig-sig", weights=sigsig_wgt,
-            alpha=0.5, density=True, color="steelblue")
-    ax.hist(sigbkg, bins=binning, label="sig-bkg", weights=sigbkg_wgt,
-            alpha=0.5, density=True, color="darkorange")
-    ax.hist(bkgbkg, bins=binning, label="bkg-bkg", weights=bkgbkg_wgt,
-            alpha=0.5, density=True, color="forestgreen")
-    ax.text(0.04, 0.88, "Signal - " + sig_label, verticalalignment="bottom",
-            size=10, transform=ax.transAxes)
-    ax.text(0.04, 0.83, "Background - " + bkg_label, verticalalignment="bottom",
-            size=10, transform=ax.transAxes)
+
+    _, _ = draw_n_hists(ax, [sigsig, sigbkg, bkgbkg], [sigsig_wgt, sigbkg_wgt, bkgbkg_wgt], binning,
+                     ["sig-sig", "sig-bkg", "bkg-bkg"], True)
+
     y_min, y_max = ax.get_ylim()
     for i, eff in enumerate(sigsig_eff):
         eff_label=str(eff*100)+"%"
@@ -511,7 +535,7 @@ def plot_roc_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb
     return
 
 
-def plot_full_distances_hist(sigsig_hists, sigbkg_hists, bkgbkg_hists,
+def plot_full_distances_hist(sigsig_hists, sigbkg_hists, bkgbkg_hists, sig_label, bkg_label,
                              var, distance, path, label="", standardised=False):
     """
     Function to plot distances for sig-sig, sig-bkg and bkg-bkg on one figure.
@@ -528,7 +552,7 @@ def plot_full_distances_hist(sigsig_hists, sigbkg_hists, bkgbkg_hists,
     """
 
     # plot text if needed
-    plot_text = []
+    plot_text = [sig_label, bkg_label]
     if standardised:
         plot_text.append("Min-Max Standardised")
 
@@ -550,12 +574,11 @@ def plot_full_distances_hist(sigsig_hists, sigbkg_hists, bkgbkg_hists,
     fig, ax = plt.subplots()
 
     add_text(ax, plot_text)
-    ax.hist(bin_centres, bins=bins, label="sig-sig", alpha=0.5,
-            weights=sigsig_hist_total, density=True)
-    ax.hist(bin_centres, bins=bins, label="sig-bkg", alpha=0.5,
-            weights=sigbkg_hist_total, density=True)
-    ax.hist(bin_centres, bins=bins, label="bkg-bkg", alpha=0.5,
-            weights=bkgbkg_hist_total, density=True)
+
+    _, _ = draw_n_hists(ax, [bin_centres, bin_centres, bin_centres],
+                     [sigsig_hist_total, sigbkg_hist_total, bkgbkg_hist_total],
+                     bins, ["sig-sig", "sig-bkg", "bkg-bkg"], True)
+
     # aesthesics
     ax.legend(loc='upper right')
     ax.set_xlabel(var+" "+distance +" distance", loc="right")
@@ -588,29 +611,27 @@ def plot_distances_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist, var, distance,
         standardised (bool): whether the distances have been min-max normed
     """
 
-    # plot text if needed
-    plot_text = [r"$\sqrt{s}=13.6$ TeV, 370 fb$^{-1}$", sig_label, bkg_label]
+    plot_text = [sig_label, bkg_label]
     if standardised:
         plot_text.append("Min-Max Standardised")
 
     # plot
     fig, ax = plt.subplots()
 
-    add_text(ax, plot_text)
+    add_text(ax, plot_text, startx=0.24)
     bins = sigsig_hist[1]
     n_bins = sigsig_hist[0].shape[0]
     bin_centres = [ bins[b] + 0.5*(bins[b+1]-bins[b]) for b in range(0,n_bins) ]
-    ax.hist(bin_centres, bins=sigsig_hist[1], label="sig-sig", alpha=0.5,
-            weights=sigsig_hist[0], density=True, color="steelblue")
-    ax.hist(bin_centres, bins=sigbkg_hist[1], label="sig-bkg", alpha=0.5,
-            weights=sigbkg_hist[0], density=True, color="darkorange")
-    ax.hist(bin_centres, bins=bkgbkg_hist[1], label="bkg-bkg", alpha=0.5,
-            weights=bkgbkg_hist[0], density=True, color="forestgreen")
+
+    _, _ = draw_n_hists(ax, [bin_centres, bin_centres, bin_centres],
+                     [sigsig_hist[0], sigbkg_hist[0], bkgbkg_hist[0]],
+                     sigsig_hist[1], ["sig-sig", "sig-bkg", "bkg-bkg"], True)
 
     # aesthetics
     ax.legend(loc='upper right')
     ax.set_xlabel(var+" "+distance +" distance", loc="right")
     ax.set_ylabel("Normalised # event pairs / bin", loc="top")
+    ax.ticklabel_format(axis='x', style='plain')
     # save
     if label!="":
         label = "_"+label
@@ -672,7 +693,7 @@ def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
             standardised to 0-1 (default false)
     """
     # plot text if needed
-    plot_text = [r"$\sqrt{s}=13.6$ TeV, 370 fb$^{-1}$", sig_label, bkg_label]
+    plot_text = [sig_label, bkg_label]
     if standardised:
         plot_text.append("Min-Max Standardised")
 
@@ -682,12 +703,10 @@ def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
     bins = sigsig_hist[1]
     n_bins = sigsig_hist[0].shape[0]
     bin_centres = [bins[b] + 0.5*(bins[b+1]-bins[b]) for b in range(0,n_bins)]
-    ax.hist(bin_centres, bins=sigsig_hist[1], label="sig-sig", alpha=0.5,
-            weights=sigsig_hist[0], density=True, color="steelblue")
-    ax.hist(bin_centres, bins=sigbkg_hist[1], label="sig-bkg", alpha=0.5,
-            weights=sigbkg_hist[0], density=True, color="darkorange")
-    ax.hist(bin_centres, bins=bkgbkg_hist[1], label="bkg-bkg", alpha=0.5,
-            weights=bkgbkg_hist[0], density=True, color="forestgreen")
+    _, _ = draw_n_hists(ax, [bin_centres, bin_centres, bin_centres],
+                     [sigsig_hist[0], sigbkg_hist[0], bkgbkg_hist[0]],
+                     sigsig_hist[1], ["sig-sig", "sig-bkg", "bkg-bkg"], True)
+    
     y_min, y_max = ax.get_ylim()
     for i, eff in enumerate(sigsig_eff):
         eff_label = str(eff*100)+ "%"

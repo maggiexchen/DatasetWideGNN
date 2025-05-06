@@ -1,0 +1,10 @@
+executable = batch_calc_distance.sh
+arguments = 5000
+getenv = true
+output = ../logs/batch_calc_distance_$(ClusterID).out
+error = ../logs/batch_calc_distance_$(ClusterID).err
+log = ../logs/batch_calc_distance_$(ClusterID).log
+
+request_memory = 100000
+queue 1
+

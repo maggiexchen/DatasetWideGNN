@@ -4,6 +4,6 @@ output = ../logs/batch_ll_$(ClusterID).out
 error = ../logs/batch_ll_$(ClusterID).err
 log = ../logs/batch_ll_$(ClusterID).log
 
-request_memory = 100000
+request_memory = 10000
 queue 1
 

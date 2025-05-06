@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # change to your own area to run from:
-cd /home/pacey/GNN/TestMphys/hhhgraph/
+cd /home/pacey/GNN/new_merge/hhhgraph/
 
 source setup/setup_conda_env_Holly.sh
 
