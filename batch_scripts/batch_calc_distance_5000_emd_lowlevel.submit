@@ -10,8 +10,8 @@ log = ../logs/batch_calc_distance_$(ClusterID).log
 #request_gpus = 1
 
 #require_gpus = (Capability >= 4.0) && (GlobalMemoryMb >= 30000)
-request_cpus = 3
-request_memory = 8 GB
+request_cpus = 5
+request_memory = 10 GB
 #irequest_memory = 10000
 queue 1
 

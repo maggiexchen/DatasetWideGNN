@@ -101,6 +101,11 @@ else:
 df_all = pd.concat([df_sig, df_bkg], axis=0)
 df_sig = df_all.iloc[:len(df_sig)]
 df_bkg = df_all.iloc[len(df_sig):]
+
+print("signal weights: ",df_sig_wgts.min())
+print("bkg weights: ",df_bkg_wgts.min())
+
+kinematics=['met']
 for v, var in enumerate(kinematics):
     print(f"Plotting {var}")
     print("-----> Weighted:")

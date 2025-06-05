@@ -132,7 +132,7 @@ def draw_n_hists(ax, hists, wgts, binning, labels, normalise):
 
 
 def draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', xrange=None, yrange=None,
-                        log_y=False):
+                        log_y=False, xtick_format=None):
     """
     Function to draw legend, axis labels and set y-axis range.
 
@@ -144,11 +144,14 @@ def draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', xrange=None
         xrange (list(float)): 2-dim min and max x-range (optional)
         yrange (list(float)): 2-dim min and max y-range (optional)
         log_y (bool): do a log scale on y-axis
+        xtick_format (str): format plain vs stdindex for xticks (optional)
     """
 
     ax.legend(loc=legendloc)
     ax.set_xlabel(xlabel, loc='right')
     ax.set_ylabel(ylabel, loc='top')
+    if xtick_format is not None:
+        ax.ticklabel_format(axis='x', style=xtick_format)
     if log_y:
         ax.set_yscale("log")
     if xrange is not None:
@@ -166,7 +169,7 @@ def save_data(ys, xs, legend_entries, axis_labels, plot_path, plot_text):
     """
     Function to save metadata for a figure so it can be replotted separately without
     rerunning the slow main scripts if needed.
-    
+
     Args:
         ys (list(np.array)): list of bin contents for each histogram
         xs (list(np.array)): list of binnings for each histogram
@@ -197,17 +200,17 @@ def plot_kinematics(df_sig, df_bkg, sig_label, bkg_label, var,
     Function to plot the histogram of a kinematic variable for signal and background on one figure.
 
     Args:
-        df_sig (pandas.dataframe): dataframe of kinematics for set of signal events 
-        df_bkg (pandas.dataframe): dataframe of kinematics for set of background events 
+        df_sig (pandas.dataframe): dataframe of kinematics for set of signal events
+        df_bkg (pandas.dataframe): dataframe of kinematics for set of background events
         var (str): name of kinematic variable to plot
         file_path (str): where to save the plots to.
         standardised (bool): whether the variable distributions were standardised
             to have a mean of 0 and stdev of 1.
         normalise (bool): whether to normalise the distributions to have unit area
             (remember "density" normalises by binwidth as well as height).
-        log_scale (bool): whether to use a log scale on the y-axis. 
-        sig_wgts (pandas.series): dataframe of event weights for set of signal events 
-        bkg_wgts (pandas.series): dataframe of event weights for set of background events 
+        log_scale (bool): whether to use a log scale on the y-axis.
+        sig_wgts (pandas.series): dataframe of event weights for set of signal events
+        bkg_wgts (pandas.series): dataframe of event weights for set of background events
         text (str): text to add to plot e.g. describing cuts placed.
 
     """
@@ -366,7 +369,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
         bkg (numpy array): array of background events
         file_path (str): directory to store plot
         eff (float): sigsig-eff used for LL
-        
+
     """
     degree_centrality = centrality.detach().cpu().numpy() / (len(sig)+len(bkg))
     norm_centrality = norm.standardise(centrality.detach().cpu().numpy())
@@ -496,8 +499,8 @@ def plot_roc_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb
     return
 
 
-def plot_distances(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
-                   var, distance, path, label="", standardised=False):
+def plot_distances(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, var, distance,
+                   sig_label, bkg_label, path, label="", standardised=False):
     """
     Function to plot distances for sig-sig, sig-bkg and bkg-bkg on one figure.
 
@@ -514,15 +517,14 @@ def plot_distances(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
         label (str): extra str for filename
     """
     # bin/range
-    x_max = max(bkgbkg.max(), sigsig.max(), sigbkg.max())
-    n_bins=100
+    x_max = math.ceil(max(bkgbkg.max(), sigsig.max(), sigbkg.max()))
+    n_bins=101
     binning=np.linspace(0,x_max,n_bins)
-
     # plot
     fig, ax = plt.subplots()
 
     # plot text if needed
-    plot_text = []
+    plot_text = ["sig: " + sig_label, "bkg: " + bkg_label]
     if standardised:
         plot_text.append("Min-Max Standardised")
     add_text(ax, plot_text)
@@ -532,10 +534,10 @@ def plot_distances(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
     ys, xs = draw_n_hists(ax, [sigsig, sigbkg, bkgbkg], [sigsig_wgt, sigbkg_wgt, bkgbkg_wgt],
                           binning, legend_entries, True)
     # aesthesics
-    ax.ticklabel_format(axis='x', style='plain')
     xlabel = var + " " + distance + " distance"
-    ylabel = "Normalised # event pairs / bin"
-    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right')
+    ylabel = "Normalised # event pairs"
+    draw_labels_legends(ax, xlabel, ylabel, xrange=[0, x_max], legendloc='upper right',
+                        xtick_format='plain')
 
     # save
     if label != "":
@@ -597,8 +599,8 @@ def plot_full_distances_hist(sigsig_hists, sigbkg_hists, bkgbkg_hists, sig_label
     # aesthesics
 
     xlabel = var + " " + distance + " distance"
-    ylabel = "Normalised # event pairs / bin"
-    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right')
+    ylabel = "Normalised # event pairs"
+    draw_labels_legends(ax, xlabel, ylabel, xrange=[bins[0], bins[-1]], legendloc='upper right')
 
     # save
     if label!="":
@@ -648,11 +650,9 @@ def plot_distances_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist, var, distance,
                      sigsig_hist[1], legend_entries, True)
 
     # aesthetics
-    ax.ticklabel_format(axis='x', style='plain')
-
     xlabel = var + " " + distance + " distance"
-    ylabel = "Normalised # event pairs / bin"
-    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right')
+    ylabel = "Normalised # event pairs"
+    draw_labels_legends(ax, xlabel, ylabel, xrange=[bins[0], bins[-1]], legendloc='upper right', xtick_format='plain')
 
     # save
     if label!="":
@@ -685,20 +685,19 @@ def plot_event_weights(df_sig, signal, df_bkgs, backgrounds, h5_path, signal_mas
     xlabel = "event weight"
     ylabel = "events / bin"
     draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', log_y=True)
-
-    save_path = h5_path + "/eventweight_check" + signal
+    ax.set_xscale("log")
+    save_path = h5_path + "/eventweight_check_" + signal
     if signal_mass != "":
-        save_path = save_path + "_" + signal_mass
-    if cutstring != "":
-        save_path = save_path + "_" + cutstring
+        save_path = save_path + "_mass" + signal_mass
+    save_path = save_path + cutstring
     save_fig(fig, save_path)
 
     return
 
 
 def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt,
-                        sigsig_thresholds, sig_label, bkg_label, plot_path,
-                        variable, distance, sigsig_eff):
+                        sigsig_thresholds, sig_label, bkg_label, do_edge_frac, plot_path,
+                        variable, distance, sigsig_eff, target_eff_label=""):
     """
     Function to plot distances for sig-sig, sig-bkg and bkg-bkg on one figure.
 
@@ -712,14 +711,22 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
         sig_sig thresholds (list(float)): list of distances for each eff. value
         sig_label (str): signal label for text
         bkg_label (str): background label for text
+        do_edge_frac (bool): do edge fraction values or target species self-connection eff values?
         plot_path (str): base dir to store plot
         variable (str): Kinematic variableset
         distance (str): Distance metric (euclidean, cosine, cityblock)
         sigsig_eff (list(float)): list of eff. values to plot
+        target_eff_label (str): label of target species efficiencies e.g. "sigsig_eff" default ""
     """
     fig, ax = plt.subplots()
 
-    plot_text = [sig_label, bkg_label]
+    if target_eff_label=="" and not do_edge_frac:
+        raise ValueError("Need to give the edge frac label if using the efficiency approach")
+    red_line_label = f"lines: % {target_eff_label} below distance value",
+    if do_edge_frac:
+        red_line_label = "% edges below distance value"
+
+    plot_text = ["sig: " + sig_label, "bkg: " + bkg_label, red_line_label]
     add_text(ax, plot_text)
 
     n_bins = 100
@@ -740,20 +747,25 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
     xlabel = variable + " " + distance + " distance"
     ylabel = "Normalised # event pairs / bin"
     yrange = [y_min, y_max*1.2]
-    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', yrange=yrange)
+    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', yrange=yrange, xtick_format='plain')
 
     sigsigbkgbkg_path = plot_path+"linking_lengths/"
     misc.create_dirs(sigsigbkgbkg_path)
-    save_fig(fig, sigsigbkgbkg_path + "/" + variable + "_" + distance + "_linking_lengths")
+    approach_label = target_eff_label
+    if do_edge_frac:
+        approach_label = "edge_frac"
+
+    save_fig(fig,
+             sigsigbkgbkg_path + "/" + variable + "_" + distance + "_" + approach_label + "_linking_lengths")
     save_data(ys, xs, legend_entries, [xlabel, ylabel],
-              sigsigbkgbkg_path + "/" + variable + "_" + distance + "_linking_lengths",
+              sigsigbkgbkg_path + "/" + variable + "_" + distance + "_" + approach_label + "_linking_lengths",
               plot_text)
 
     return
 
 def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
-                             sigsig_thresholds,sig_label, bkg_label, plot_path,
-                             variable, distance, sigsig_eff, standardised=False):
+                             sigsig_thresholds,sig_label, bkg_label, do_edge_frac, plot_path,
+                             variable, distance, sigsig_eff, standardised=False, target_eff_label=""):
     """
     Function to plot distances for sig-sig, sig-bkg and bkg-bkg on one figure.
 
@@ -764,15 +776,23 @@ def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
         sig_sig thresholds (list(float)): list of distances for each eff. value
         sig_label (str): signal label for text
         bkg_label (str): background label for text
+        do_edge_frac (bool): do edge fraction values or target species self-connection eff values?
         plot_path (str): base dir to store plot
         variable (str): Kinematic variableset
         distance (str): Distance metric (euclidean, cosine, cityblock)
         sigsig_eff (list(float)): list of eff. values to plot
         standardised (bool): whether to indicate the distance metric was
             standardised to 0-1 (default false)
+        target_eff_label (str): label of the target species efficiencies e.g. "sigsig_eff" default ""
     """
     # plot text if needed
-    plot_text = [sig_label, bkg_label]
+    if target_eff_label=="" and not do_edge_frac:
+        raise ValueError("Need to give the edge frac label if using the efficiency approach")
+    red_line_label = f"lines: % {target_eff_label} below distance value"
+    if do_edge_frac:
+        red_line_label = "% edges below distance value"
+
+    plot_text = ["sig: " + sig_label, "bkg: " + bkg_label, red_line_label]
     if standardised:
         plot_text.append("Min-Max Standardised")
 
@@ -798,13 +818,18 @@ def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
     xlabel = variable + " " + distance + " distance"
     ylabel = "Normalised # event pairs / bin"
     yrange = [y_min, y_max*1.2]
-    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', yrange=yrange)
+    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', yrange=yrange, xtick_format='plain')
 
     ll_path = plot_path+"linking_lengths/"
     misc.create_dirs(ll_path)
     fig.tight_layout()
-    save_fig(fig, ll_path + "/" + variable + "_" + distance + "_linking_lengths")
+    approach_label = target_eff_label
+    if do_edge_frac:
+        approach_label = "edge_frac"
+    save_fig(fig,
+             ll_path + "/" + variable + "_" + distance + "_" + approach_label + "_linking_lengths")
     save_data(ys, xs, legend_entries, [xlabel, ylabel],
-              ll_path + "/" + variable + "_" + distance + "_linking_lengths", plot_text)
+              ll_path + "/" + variable + "_" + distance + "_" + approach_label + "_linking_lengths",
+              plot_text)
 
     return

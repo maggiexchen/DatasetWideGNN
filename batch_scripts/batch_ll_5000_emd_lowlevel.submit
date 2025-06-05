@@ -1,5 +1,5 @@
 executable = batch_ll.sh
-arguments = "10000 euclidean LQ_HighLevel"
+arguments = "5000 emd LQ_LowLevel"
 getenv = true
 output = ../logs/batch_ll_$(ClusterID).out
 error = ../logs/batch_ll_$(ClusterID).err

@@ -67,12 +67,12 @@ dist_path = str(user_config["dist_path"])
 
 signal = str(user_config["signal"])
 signal_mass = str(user_config["signal_mass"])
+signal_label, background_label = plotting.get_plot_labels(signal)
 distance_items = user_config["distance"]
 feature_dim = user_config["feature_dim"]
 assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
 cuts = user_config["cuts"]
 cutstring = misc.get_cutstring(cuts)
-n_folds = int(user_config["n_folds"])
 
 logging.info("distance metric: %s", distance)
 logging.info("signal: %s", signal)
@@ -94,9 +94,9 @@ if distance == "emd":
     standardise = False
     objects = distance_items[distance]['objects']
 
-full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels, sig_fold_indices, bkg_fold_indices = \
+full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels, _, _ = \
     adj.data_loader(feature_h5_path, kinematics, ex=cutstring, signal=signal,
-                    signal_mass=signal_mass, standardisation=standardise, num_folds=None)
+                    signal_mass=signal_mass, standardisation=standardise)
 
 print(full_sig)
 
@@ -140,15 +140,16 @@ def calc_a_b_batched_distances(species_a, species_b, full_a, full_b, kinematics_
 
     # find the numbers of events and batches we have
     num_a_events = full_a.shape[0]
-    num_a_batches = 2#math.ceil(num_a_events/batchsize)
+    num_a_batches = math.ceil(num_a_events/batchsize)
     num_b_events = full_b.shape[0]
-    num_b_batches = 2#math.ceil(num_b_events/batchsize)
+    num_b_batches = math.ceil(num_b_events/batchsize)
     logging.info("%s %s events", str(num_a_events), species_a)
     logging.info("%s %s events", str(num_b_events), species_b)
     logging.info("%s %s batches", str(num_a_batches), species_a)
     logging.info("%s %s batches", str(num_b_batches), species_b)
 
-    kinematics_indices = dis.get_emd_kinematics_key(kinematics_list, signal="LQ")
+    if distance=="emd":
+        kinematics_indices = dis.get_emd_kinematics_key(kinematics_list, signal="LQ")
 
     for i in range(num_a_batches):
         # find the event index range for species a
@@ -179,14 +180,14 @@ def calc_a_b_batched_distances(species_a, species_b, full_a, full_b, kinematics_
 
             batch_ab = dis.distance_calc(batch_a, batch_b, distance)
             batch_ab_wgt = torch.ger(batch_a_wgt, batch_b_wgt)
-            logging.info("done distances")
+            logging.debug("done distances")
             del batch_b, batch_b_wgt
 
             # save all the wgts and distances for this batch to a torch tensor .pt file.
             batch_dict = {'distance': batch_ab, 'weight': batch_ab_wgt}
             torch.save(batch_dict, save_path + f'{species_a}{species_b}_distances_batch_{i}_{j}.pt')
             del batch_dict
-            logging.info("saved file")
+            logging.debug("saved file")
 
             # flatten the distance/weight tensors;
             # take a uniform subset of them for later plotting.
@@ -196,7 +197,7 @@ def calc_a_b_batched_distances(species_a, species_b, full_a, full_b, kinematics_
             del batch_ab
             flat_wgts = torch.flatten(batch_ab_wgt).to(torch.float32)
             del batch_ab_wgt
-            logging.info("got flat things")
+            logging.debug("got flat things")
             subset_indices = np.linspace(0,
                                          flat_distances.shape[0]-1,
                                          int(subset_frac*flat_distances.shape[0]),
@@ -205,7 +206,7 @@ def calc_a_b_batched_distances(species_a, species_b, full_a, full_b, kinematics_
             del flat_distances
             wgt_subsample = torch.cat((wgt_subsample, flat_wgts[subset_indices]))
             del flat_wgts
-            logging.info("made subsets")
+            logging.debug("made subsets")
 
         del batch_a, batch_a_wgt
 
@@ -222,6 +223,7 @@ sigbkg_distance_subsample, sigbkg_wgt_subsample = \
 del full_sig, sig_wgt
 bkgbkg_distance_subsample, bkgbkg_wgt_subsample = \
     calc_a_b_batched_distances("bkg", "bkg", full_bkg, full_bkg, kinematics, bkg_wgt, bkg_wgt, batch_size)
+del full_bkg, bkg_wgt
 
 # Plot the distance distributions for the subset.
 logging.info("Plotting ... ")
@@ -234,6 +236,7 @@ plotting.plot_distances(sigsig_distance_subsample.numpy(),
                         sigbkg_wgt_subsample.numpy(),
                         bkgbkg_wgt_subsample.numpy(),
                         variable, distance,
+                        signal_label, background_label,
                         plot_path)
 
 print("--- %s seconds ---" % (time.time() - start_time))

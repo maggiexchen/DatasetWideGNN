@@ -8,45 +8,46 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import roc_curve, roc_auc_score
 
-def calc_roc(sig, bkg, sig_wgt, bkg_wgt, flip=False):
+def calc_roc(target, reject, target_wgt, reject_wgt, is_target_closest=False):
     """
     Function to calculate roc curve
 
     Args:
-        sig (numpy.array): array of signal efficiencies/probabilities for each sig event
-        bkg (numpy.array): array of signal efficiencies/probabilities for each bkg event
-        sig_wgt (numpy.array): array of sig event weights
-        bkg_wgt (numpy.array): array of blg event weights
-        flip (bool): flipping the fpr and tpr definitions
+        target (numpy.array): array of target species distance values
+        reject (numpy.array): array of reject species distance values
+        target_wgt (numpy.array): array of target species event weights
+        reject_wgt (numpy.array): array of reject species event weights
+        is_target_closest (bool): if true the fpr and tpr definitions assume the true signal
+            value is 0 rather than 1
 
     Returns:
-        (numpy.array): true positive rate: fraction of sig passing a given threshold
-        (numpy.array): false positive rate: fraction of bkg passing a given threshold
+        (numpy.array): true positive rate: fraction of target passing a given threshold
+        (numpy.array): false positive rate: fraction of reject passing a given threshold
         (numpy.array): thresholds
         (float): overall AUC
 
     """
-    if flip:
-        y_sig = [0]*len(sig)
-        y_bkg = [1]*len(bkg)
+    if is_target_closest:
+        y_target = [0]*len(target)
+        y_reject = [1]*len(reject)
     else:
-        y_sig = [1]*len(sig)
-        y_bkg = [0]*len(bkg)
-    x_combined = np.concatenate((sig, bkg))
-    y_combined = np.concatenate((y_sig, y_bkg))
-    wgt_combined = np.concatenate((sig_wgt, bkg_wgt))
+        y_target = [1]*len(target)
+        y_reject = [0]*len(reject)
+    x_combined = np.concatenate((target, reject))
+    y_combined = np.concatenate((y_target, y_reject))
+    wgt_combined = np.concatenate((target_wgt, reject_wgt))
 
     sklearn_fpr, sklearn_tpr, cut = roc_curve(y_combined, x_combined, sample_weight=wgt_combined)
     auc = roc_auc_score(y_combined, x_combined, sample_weight=wgt_combined)
 
     # IN THE CASE WHERE MOST SIGSIG DISTANCES ARE SMALLER THAN BKGBKG DISTANCES
     #  (E.G. TRSM HHH SIGNALS)
-    # fpr here is the fraction of sigsig above a certain cut
-    # tpr here is the fraction of sig(bkg)bkg above a certain cut
-    # the actual tpr we want is the fraction of sigsig below a certain cut: (1-fnr)
-    # and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tnr)
+    # fpr here is the fraction of targettarget above a certain cut
+    # tpr here is the fraction of target(reject)reject above a certain cut
+    # the actual tpr we want is the fraction of targettarget below a certain cut: (1-fnr)
+    # and the actual fpr is the fraction of target(reject)reject below a certain cut: (1-tnr)
 
-    if flip:
+    if is_target_closest:
         true_tpr = 1-sklearn_fpr
         true_fpr = 1-sklearn_tpr
     else:

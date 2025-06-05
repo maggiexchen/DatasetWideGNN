@@ -18,7 +18,6 @@ process = psutil.Process()
 cpu = torch.device('cpu')
 device = torch.device('cuda:0')
 
-### apply fold here??
 def data_loader(h5_path, kinematics, ex="", signal="LQ", signal_mass="",
                 standardisation=False, num_folds = None):
     """
@@ -43,7 +42,7 @@ def data_loader(h5_path, kinematics, ex="", signal="LQ", signal_mass="",
         (numpy.array): background fold indices
     """
     bkg_types = misc.get_background_types(signal)
-    print("Loading for kinematics: ", kinematics)
+    logging.info("Loading for kinematics: %s", kinematics)
 
     if ((len(ex) > 0) and (ex[0] != "_")):
         ex = "_"+ex
@@ -65,7 +64,7 @@ def data_loader(h5_path, kinematics, ex="", signal="LQ", signal_mass="",
     df_bkg = pd.DataFrame()
     if signal == "stau":
         for bkg in bkg_types:
-            print(f"loading {bkg} background sample for {ex}")
+            logging.info("loading %s background sample for %s", bkg, ex)
             camps = ["mc20a", "mc20d","mc20e"]
             tmp_df_bkg = pd.DataFrame()
             for camp in camps:
@@ -93,13 +92,18 @@ def data_loader(h5_path, kinematics, ex="", signal="LQ", signal_mass="",
         # Standardising kinematics
         df_all = pd.concat([df_sig, df_bkg], axis=0)
         for var in kinematics:
-            print(f"-----> Standardising {var}:")
+            logging.info("-----> Standardising %s:", var)
             standardised_values = norm.standardise(df_all.loc[:, var])
             df_all.loc[:, var] = standardised_values.astype('float32')
             df_sig = df_all.iloc[:len(df_sig)]
             df_bkg = df_all.iloc[len(df_sig):]
 
-    # convert pd dataframes to torch tensors
+    if num_folds is not None:
+        fold_var = 'eventNumber' if signal=="HHH" else "metphi"
+        sig_folds = df_sig[fold_var].apply(lambda x: misc.assign_fold_deterministically(x, n_folds=num_folds))
+        bkg_folds = df_bkg[fold_var].apply(lambda x: misc.assign_fold_deterministically(x, n_folds=num_folds))
+
+    # filter out un-needed variables and convert pd dataframes to torch tensors
     df_sig = df_sig[kinematics]
     df_bkg = df_bkg[kinematics]
     torch_sig = torch.tensor(df_sig.values, dtype=torch.float32).to(cpu)
@@ -114,10 +118,6 @@ def data_loader(h5_path, kinematics, ex="", signal="LQ", signal_mass="",
                torch.tensor(sig_label).to(cpu), torch.tensor(bkg_label).to(cpu),\
                None, None
     else:
-        sig_folds = df_sig['metphi'].apply(
-            lambda x: misc.assign_fold_deterministically(x, n_folds=num_folds))
-        bkg_folds = df_bkg['metphi'].apply(
-            lambda x: misc.assign_fold_deterministically(x, n_folds=num_folds))
         return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts,\
                torch.tensor(sig_label).to(cpu), torch.tensor(bkg_label).to(cpu),\
                sig_folds.to_numpy(), bkg_folds.to_numpy()
@@ -169,7 +169,7 @@ def generate_adj_mat(x, x_wgts, distance, linking_length):
     # initialise adjacency matrix
     adj_mat = torch.empty((0, len(x)))
     #TODO add weights?
-    node_wgts = torch.empty((0, len(x_wgts)))
+    #node_wgts = torch.empty((0, len(x_wgts)))
 
     # calculate distances
     if distance == "euclidean":
@@ -182,7 +182,7 @@ def generate_adj_mat(x, x_wgts, distance, linking_length):
         raise ValueError("not given a supported distance metric")
 
     adj_mat = create_adj_mat(distance_matrix, linking_length)
-    print(f"Time taken for adjacency matrix generation: {time.time() - st}")
+    logging.info("Time taken for adjacency matrix generation: %s", str(time.time() - st))
     return adj_mat
 
 
@@ -203,7 +203,7 @@ def generate_adj_mat_from_batch(distance, linking_length):
 
 def generate_batched_nonzero_ind(dist_path, variable, distance, species,
                                  linking_length, batch_size, cutstring="",
-                                 flip=False, edge_wgt=False):
+                                 friend_graph=False, edge_wgt=False):
     """
     Function that loads in the distances in batches, within each batch, apply the linking length,
     and returns non-zero indices within that batch
@@ -224,17 +224,20 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, species,
         (torch.tensor())indices of non-empty elements in the adj matrix
     """
     # Load in files in batches (sigsig, sigbkg, or bkgbkg) by the i and j indices
-    dist_dir = dist_path + "/batched_" + str(batch_size) + "_" + variable +"_" +\
-               distance + cutstring + "_distances/"
+    dist_dir = dist_path + "batched_" + str(batch_size) + "_"\
+               + variable + "_" + distance + cutstring + "_distances/"
+    logging.info("looking for distances in : %s", dist_dir)
     files = sorted(glob(dist_dir + species + '*.pt'))
-    print(len(files), " files found for " + species + " distances")
+    if len(files) == 0:
+        raise IndexError(f"Didn't find any {species} *.pt files in here :(")
+    logging.info("%s files found for %s distances", len(files), species)
 
     # apply linking length within each batch, and pull out non-zero indices
     indices = torch.empty(0, dtype=torch.int32)
     if edge_wgt:
         edge_wgts = torch.empty(0, dtype=torch.float32)
 
-    print("Loading batch size ", batch_size)
+    logging.info("Loading batch size %s", batch_size)
     for f in files:
         # get the i and j batch numbers
         # use -1 and -2 here to count from back - to account for possible
@@ -243,11 +246,11 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, species,
         j_ind = int(re.findall(r'\d+', f)[-1])
         if species == "sigsig" or species == "bkgbkg":
             if i_ind >= j_ind:
-                print("File ", i_ind, j_ind)
+                logging.info("File %s, %s", i_ind, j_ind)
                 distance = torch.load(f)["distance"]
 
                 # apply the linking length to the distances in that batch
-                if flip:
+                if friend_graph:
                     mask = distance <= linking_length
                 else:
                     mask = distance >= linking_length
@@ -277,17 +280,19 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, species,
                 del ind
                 if edge_wgt:
                     del edge_wgts_tmp
-                print(f"CPU allocated after {process.memory_info().rss/(1024 ** 3):.2f}, GB")
+                logging.info("CPU allocated after %s, GB", str(process.memory_info().rss/(1024 ** 3)))
         else:
-            print("File ", i_ind, j_ind)
+            logging.info("File %s %s", i_ind, j_ind)
             distance = torch.load(f)["distance"]
 
             # apply the linking length to the distances in that batch
-            if flip:
+            if friend_graph:
                 mask = distance <= linking_length
             else:
                 mask = distance >= linking_length
+
             ind = mask.nonzero().to(torch.int32)
+
             if edge_wgt:
                 edge_wgts_tmp = 1 / distance[mask]
 
@@ -298,11 +303,11 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, species,
             ind[:,0] += i_ind*batch_size
             ind[:,1] += j_ind*batch_size
             indices = torch.cat((indices, ind))
+            del ind
             if edge_wgt:
                 edge_wgts = torch.cat((edge_wgts, edge_wgts_tmp))
                 del edge_wgts_tmp
-            del ind
-            print(f"CPU allocated after {process.memory_info().rss/(1024 ** 3):.2f}, GB")
+            logging.info("CPU allocated after %s, GB", str(process.memory_info().rss/(1024 ** 3)))
 
     # Minmax normalise the edge weights
     if edge_wgt:

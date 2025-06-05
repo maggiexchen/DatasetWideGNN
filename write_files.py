@@ -40,6 +40,7 @@ plot_event_weights = args.plotEventWeights
 
 h5_path = user_config["kinematic_h5_path"]
 ntuple_path = user_config["ntuple_path"]
+plot_path = user_config["plot_path"]
 os.makedirs(h5_path, exist_ok=True)
 
 signal = user_config["signal"]
@@ -90,8 +91,8 @@ if cuts is not None:
     df_sig[signal] = misc.cut_operation(df_sig[signal], cuts)
     print("Total ", signal, " events after cuts: ", len(df_sig[signal]))
 
-df_sig[signal].to_hdf(h5_path + str(signal) + "_" + signal_mass + ".h5",
-                      key=str(signal), mode="w")
+df_sig[signal].to_hdf(h5_path + str(signal) + "_" + signal_mass + 
+                      cutstring + ".h5", key=str(signal), mode="w")
 
 logging.info('Importing and writing background ')
 df_bkgs = {}
@@ -125,7 +126,7 @@ for background in backgrounds:
         df_bkgs[background] = misc.cut_operation(df_bkgs[background], cuts)
         print("Total ", background, " events after cuts: ", len(df_bkgs[background]))
 
-    df_bkgs[background].to_hdf(h5_path + str(background)+".h5", key=str(background), mode="w")
+    df_bkgs[background].to_hdf(h5_path + str(background) + cutstring + ".h5", key=str(background), mode="w")
 
 if plot_event_weights:
 

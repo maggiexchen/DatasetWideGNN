@@ -461,10 +461,12 @@ def get_batched_distances(dist_path, variable, distance, batch_size,
         (torch tensor): distance tensor
         (torch tensor): event weight tensor
     """
-    dist_dir = dist_path + "/batched_" + str(batch_size) + "_"\
+    dist_dir = dist_path + "batched_" + str(batch_size) + "_"\
                + variable + "_" + distance + cutstring + "_distances/"
     print("looking for distances in :", dist_dir)
-    files = glob.glob(dist_dir + species + '*0_0.pt')
+    files = glob.glob(dist_dir + species + '*.pt')
+    if len(files) == 0:
+        raise IndexError("Didn't find any {0}+*.pt files in here :(".format(species))
     distance = torch.empty(0, dtype=torch.float32)
     wgt = torch.empty(0, dtype=torch.float32)
     max_dist = 0

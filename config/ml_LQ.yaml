@@ -1,10 +1,11 @@
-kinematic_variable: "LQ_LowLevel"
+kinematic_variable: "LQ_HighLevel"
 embedding_variable:
 distance: "euclidean"
-flip: True
-edge_weights: False
-edge_frac: 0.1
-linking_length:
+friend_graph: True
+edge_weights: True
+edge_frac:
+targettarget_eff: 
+linking_length: 0.7
 hidden_sizes_gcn: []
 hidden_sizes_mlp: [12, 12]
 dropout_rates: [0, 0]
@@ -15,6 +16,5 @@ batch_size: 128
 gnn_type: "MLP"
 epochs: 50
 patience_early_stopping: 20
-num_folds: 3
 single_fold:
 plot_conv_kinematics: False
