@@ -271,7 +271,7 @@ if plot_conv_kins:
     del adj_mat
 misc.print_mem_info()
 
-
+""""
 ### define loss function and optimiser
 def weighted_bce_loss(output, target, class_weights, event_weights):
     sig_w_sum = class_weights[1] * target * event_weights
@@ -609,7 +609,7 @@ finally:
     ax_pred.set_ylim((ymin, ymax*5))
     fig_pred.savefig(plot_path+"training_validation_pred.pdf", transparent=True)
 
-    score_path = score_path + model_label + "/"
+    score_path = score_path + str(distance) + "_models/" + model_label + "/"
     misc.create_dirs(score_path)
 
     np.save(score_path+"train_sig_pred.npy", train_sig_pred.detach().cpu().numpy())
@@ -648,3 +648,4 @@ finally:
                }
     with open(roc_json_path, 'w') as json_file:
         json.dump(roc_dict, json_file)
+"""

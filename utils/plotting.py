@@ -29,7 +29,7 @@ def get_plot_labels(signal_type):
     return signal, background
 
 
-def add_text(ax, text, doATLAS=False, startx=0.04, starty=0.93):
+def add_text(ax, text, doATLAS=False, startx=0.04, starty=0.93, inc=0.05):
     """
     Function to add text to figures
     
@@ -40,13 +40,12 @@ def add_text(ax, text, doATLAS=False, startx=0.04, starty=0.93):
         startx (float): leftmost point the text will align too, as a fraction of the axis width.
         starty (float): topmost point thee text will align to, as a fraction of the axis height.
     """
-    jump = 0.05
     if doATLAS:
         ax.text(startx, starty, "ATLAS", fontweight="bold", fontstyle="italic", verticalalignment="bottom", size=10, transform=ax.transAxes)
         ax.text(startx + 0.1, starty, "Internal", verticalalignment="bottom", size=10, transform=ax.transAxes)
     for i,t in enumerate(text):
-        atlasdrop = jump if doATLAS else 0.0
-        ax.text(startx, starty-jump*i-atlasdrop, t, verticalalignment="bottom", size=10, transform=ax.transAxes)
+        atlasdrop = inc if doATLAS else 0.0
+        ax.text(startx, starty-inc*i-atlasdrop, t, verticalalignment="bottom", size=10, transform=ax.transAxes)
 
 def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, label=""):
     """
@@ -79,7 +78,7 @@ def plot_distances(ss, sb, bb, ss_wgt, sb_wgt, bb_wgt, var, distance, path, labe
     # aesthesics
     ax.legend(loc='upper right')
     ax.set_xlabel(var+" "+distance +" distance", loc="right")
-    ax.set_ylabel("Normalised event pairs / bin", loc="top")
+    ax.set_ylabel("Normalised event pairs", loc="top")
     # ax.set_xlim((0, 1650))
     # ax.set_yscale('log')
     # save
@@ -108,12 +107,12 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var, var_label, f
     # plot
     fig, ax = plt.subplots()
     if standardise:
-        add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", sig_label, bkg_label, r"$E_T^{miss}$ > 200 GeV ", r"Standardised to (mean, std) = (0, 1)"])
+        add_text(ax, [r"$\sqrt{s}=13.6$ TeV, 370 fb$^{-1}$", sig_label, bkg_label, r"$E_T^{miss}$ > 200 GeV ", r"Standardised to (mean, std) = (0, 1)"])
         plot_name = "/standardised_"
         binning = np.linspace(min(min(df_sig.loc[:, var]), min(df_bkg.loc[:, var])), max(max(df_sig.loc[:, var]), max(df_bkg.loc[:, var])), 50)
         bool_density = True
     else:
-        add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", sig_label, bkg_label, r"$E_T^{miss}$ > 200 GeV "])
+        add_text(ax, [r"$\sqrt{s}=13.6$ TeV, 370 fb$^{-1}$", sig_label, bkg_label, r"$E_T^{miss}$ > 200 GeV "])
         plot_name = "/"
         binning = np.linspace(min(min(df_sig.loc[:, var]), min(df_bkg.loc[:, var])), max(max(df_sig.loc[:, var]), max(df_bkg.loc[:, var])), 50)
         bool_density = True
@@ -123,7 +122,7 @@ def plot_kinematic_hists(df_sig, df_bkg, sig_label, bkg_label, var, var_label, f
     ax.set_ylim([0, 1.2*max(max(ys),max(yb))])
     ax.set_xlabel("\n"+str(var_label), loc="right")
     if bool_density:
-        ax.set_ylabel("Normalised Events / Bin", loc="top")
+        ax.set_ylabel("Normalised Events", loc="top")
     else:
         ax.set_ylabel("Events / Bin", loc="top")
     # save
@@ -199,13 +198,16 @@ def plot_conv_kinematics(adj_mat, x, len_sig, len_bkg, kinematics, kinematic_lab
 
     for v, var in enumerate(kinematics):
         fig, ax = plt.subplots()
-        binning = numpy.linspace(min(post_conv_bkg[:,v]),max(post_conv_bkg[:,v]), 50)
+        if nconv == 0:
+            binning = numpy.linspace(min(post_conv_bkg[:,v]),max(post_conv_bkg[:,v]), 50)
+        else: 
+            binning = numpy.linspace(min(post_conv_bkg[:,v]),max(post_conv_bkg[:,v])/2, 50)
         ax.hist(post_conv_sig[:,v], bins=binning, label="Signal", alpha=0.3, density=True, color="red")
         ax.hist(post_conv_bkg[:,v], bins=binning, label="Background", alpha=0.3, density=True, color="steelblue")
         if standardise:
-            add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", signal_label, background_label, r"$E_T^{miss}$ > 200 GeV ", r"Linking length at "+str(eff)+" edge fraction", "After "+str(nconv)+" convolutions", r"Standardised to (mean, std) = (0, 1)"])
+            add_text(ax, [r"$\sqrt{s}=13.6$ TeV, 370 fb$^{-1}$", signal_label, background_label, r"$E_T^{miss}$ > 200 GeV ", r"Linking length at "+str(eff)+" edge fraction", "After "+str(nconv)+" convolutions", r"Standardised to (mean, std) = (0, 1)"])
         else:
-            add_text(ax, [r"$\sqrt{s}=13$ TeV, 370 fb$^{-1}$", signal_label, background_label, r"$E_T^{miss}$ > 200 GeV ", r"Linking length at "+str(eff)+" edge fraction", "After "+str(nconv)+" convolutions"])
+            add_text(ax, [r"$\sqrt{s}=13.6$ TeV, 370 fb$^{-1}$", signal_label, background_label, r"$E_T^{miss}$ > 200 GeV ", r"Linking length at "+str(eff)+" edge fraction", "After "+str(nconv)+" convolutions"])
         ax.legend(loc='upper right')
         ymin, ymax = ax.get_ylim()
         ax.set_ylim((ymin, ymax*1.4))
@@ -232,7 +234,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
         fig, ax = plt.subplots()
         ax.hist(setup["data"][: len(sig)].detach().cpu().numpy(), bins=50, label="Signal", alpha=0.3, density=True, color="red")
         ax.hist(setup["data"][len(sig):].detach().cpu().numpy(), bins=50, label="Background", alpha=0.3, density=True, color="steelblue")
-        text = [r"$\sqrt{s}=13$ TeV, 5b data", r"6b resonant TRSM signals", r"Linking length at edge fraction "+str(eff)]
+        text = [r"$\sqrt{s}=13.6$ TeV, 5b data", r"6b resonant TRSM signals", r"Linking length at edge fraction "+str(eff)]
         if setup["extratext"] != "": text.append(setup["extratext"])
         add_text(ax, text)
         ax.legend(loc='upper right')
@@ -248,7 +250,7 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
 
 def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, ss_thresholds, sig_label, bkg_label, plot_path, variable, distance, sigsig_eff):
     fig, ax = plt.subplots()
-    nBins = 50
+    nBins = 100
     binning = np.linspace(0, torch.max(torch.cat((sigsig, sigbkg, bkgbkg))), nBins)
     sigsig_hist, bin_edges = numpy.histogram(sigsig, bins=binning, weights=sigsig_wgt, density=True)
     sigbkg_hist, _ = numpy.histogram(sigbkg, bins=binning, weights=sigbkg_wgt, density=True)
@@ -275,7 +277,7 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
     ax.set_ylim(y_min, y_max*1.3)
     kinematic_label = misc.get_kinematics_labels(variable)
     ax.set_xlabel(kinematic_label + " " + distance +" distance", loc="right")
-    ax.set_ylabel("Normalised # event pairs / bin", loc="top")
+    ax.set_ylabel("Normalised # event pairs", loc="top")
     ssbb_path = plot_path+"linking_lengths/"
     misc.create_dirs(ssbb_path)
     fig.tight_layout()
