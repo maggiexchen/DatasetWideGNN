@@ -6,6 +6,9 @@ import math
 import pandas as pd
 import pdb
 import uproot
+import numpy as np
+import hashlib
+
 torch.manual_seed(42)
 
 cpu = torch.device('cpu')
@@ -59,7 +62,7 @@ def get_background_types(signal_type):
     """
     if signal_type == "hhh":
         background_type = ["bkg"]
-    elif signal_type == "LQ":
+    elif "LQ" in signal_type:
         background_type = ["singletop", "ttbar"]
     elif signal_type == "stau":
         background_type = [
@@ -519,3 +522,27 @@ def get_event_vectors_torch(batch_tensor, objects, kinematics):
     events = torch.stack([batch_tensor[:, indices[obj]] for obj in objects], dim=1)
 
     return events
+
+# Convert dataframe into EMD-compatible event representations for dataframes (for testing and development)
+def get_event_vectors(df):
+    events = []
+    # weights = []
+    for _, row in df.iterrows():
+        event = np.array([
+            [row['bjet1pt'], row['bjet1eta'], row['bjet1phi']],
+            [row['bjet2pt'], row['bjet2eta'], row['bjet2phi']],
+            [row['lep1pt'], row['lep1eta'], row['lep1phi']],
+            [row['lep2pt'], row['lep2eta'], row['lep2phi']],
+        ])
+        events.append(event)
+        # weights.append(row['eventWeight'])
+    return events #, np.array(weights)
+
+def stable_int_from_string(s):
+    h = hashlib.md5(s.encode('utf-8')).hexdigest()
+    return int(h, 16)  # Big integer, deterministic everywhere
+
+def assign_fold_deterministically(event_id, n_folds):
+    seed = stable_int_from_string(str(event_id)) % (2**32)
+    rng = np.random.RandomState(seed)
+    return rng.randint(n_folds)

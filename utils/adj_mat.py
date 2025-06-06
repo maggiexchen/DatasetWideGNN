@@ -22,8 +22,8 @@ process = psutil.Process()
 cpu = torch.device('cpu')
 device = torch.device('cuda:0')
 
-
-def data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal="LQ", signal_mass="", standardisation=False):
+### apply fold here??
+def data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=False, signal="LQ", signal_mass="", standardisation=False, num_folds = None):
     """
     Function to load our sign and bkg data into pandas dataframes
 
@@ -35,6 +35,7 @@ def data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=Fa
         plot (bool): flag to plot raw and standardised kinematics, default is False
         signal (str): type of signal, to determine the bkgs present, default is LQ
         standardisation (bool): flag to do standardisation
+        num_folds (int): number of folds for cross-validation, default is None
     Returns:
         (torch.tensor(float32)): signal events/kinematics tensor
         (torch.tensor(float32)): background events/kinematics tensor
@@ -59,7 +60,7 @@ def data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=Fa
             df_sig_camp = misc.stau_selections(df_sig_camp)
             df_sig = pd.concat([df_sig, df_sig_camp], ignore_index=True, axis=0)
     else:
-        df_sig =  pd.read_hdf(h5_path+str(signal)+"_"+str(signal_mass)+str(ex)+".h5", key=str(signal)+str(ex))
+        df_sig =  pd.read_hdf(h5_path+str(signal)+"_"+str(signal_mass)+str(ex)+".h5")#, key=str(signal)+str(ex))
     
     df_bkg = pd.DataFrame()
     if signal == "stau":
@@ -119,8 +120,12 @@ def data_loader(h5_path, plot_path, kinematics, kinematic_labels, ex="", plot=Fa
     # concatenating signal and background events
     torch_all = torch.concat((torch_sig, torch_bkg), dim=0)
 
-    return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label).to(cpu), torch.tensor(bkg_label).to(cpu)
-
+    if num_folds is None:
+        return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label).to(cpu), torch.tensor(bkg_label).to(cpu)
+    else:
+        sig_folds = df_sig['metphi'].apply(lambda x: misc.assign_fold_deterministically(x, n_folds=num_folds))
+        bkg_folds = df_bkg['metphi'].apply(lambda x: misc.assign_fold_deterministically(x, n_folds=num_folds))
+        return torch_sig, torch_bkg, torch_all, torch_sig_wgts, torch_bkg_wgts, torch.tensor(sig_label).to(cpu), torch.tensor(bkg_label).to(cpu), sig_folds.to_numpy(), bkg_folds.to_numpy()
 
 def create_adj_mat(a, length):
     """
@@ -223,7 +228,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
     indices = torch.empty(0, dtype=torch.int32)#.to("cuda")
     if edge_wgt:
         edge_wgts = torch.empty(0, dtype=torch.float32)
-        inf_mask = torch.empty(0, dtype=torch.bool)
+        # inf_mask = torch.empty(0, dtype=torch.bool)
     batch_size = 30000
     print("Loading batch size ", batch_size)
     for f in files:
@@ -244,7 +249,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
                 ind = mask.nonzero().to(torch.int32)
                 if edge_wgt:
                     edge_wgts_tmp = (1 / distance[mask])
-                    inf_mask_tmp = torch.isinf(edge_wgts_tmp)
+                    # inf_mask_tmp = torch.isinf(edge_wgts_tmp)
                 print(f"CPU allocated before {process.memory_info().rss/(1024 ** 3):.2f}, GB")
                 del distance, mask
                 
@@ -255,7 +260,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
                 indices = torch.cat((indices, ind))
                 if edge_wgt:
                     edge_wgts = torch.cat((edge_wgts, edge_wgts_tmp))
-                    inf_mask = torch.cat((inf_mask, inf_mask_tmp))
+                    # inf_mask = torch.cat((inf_mask, inf_mask_tmp))
                 if i_ind != j_ind:
                     # swapping the columns for the opposite corner of a symmetric adjacency matrix 
                     ind_lowerleft = ind[:, torch.tensor([0, 1])][:, torch.tensor([1, 0])]
@@ -263,7 +268,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
                     del ind_lowerleft
                     if edge_wgt:
                         edge_wgts = torch.cat((edge_wgts, edge_wgts_tmp))
-                        inf_mask = torch.cat((inf_mask, inf_mask_tmp))
+                        # inf_mask = torch.cat((inf_mask, inf_mask_tmp))
                 del ind
                 if edge_wgt:
                     del edge_wgts_tmp
@@ -281,9 +286,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
             ind = mask.nonzero().to(torch.int32)
             if edge_wgt:
                 edge_wgts_tmp = 1 / distance[mask]
-                inf_mask_tmp = torch.isinf(edge_wgts_tmp)
-                edge_wgts_tmp[inf_mask_tmp] = 1.
-                inf_mask = torch.cat((inf_mask, inf_mask_tmp))
+
 
             print(f"CPU allocated before {process.memory_info().rss/(1024 ** 3):.2f}, GB")
             del distance, mask
@@ -299,14 +302,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, t, linking_lengt
             print(f"CPU allocated after {process.memory_info().rss/(1024 ** 3):.2f}, GB")
     # Minmax normalise the edge weights
     if edge_wgt:
-        # normed_edge_wgts = torch.clone(edge_wgts)
-        # non_inf_edge_wgts = edge_wgts[~inf_mask]
-        # non_inf_edge_wgts = norm.minmax(non_inf_edge_wgts, torch.min(non_inf_edge_wgts), torch.max(non_inf_edge_wgts))
-        # normed_edge_wgts[~inf_mask] = non_inf_edge_wgts
-        # normed_edge_wgts[inf_mask] = 1.
-        # del edge_wgts
-        edge_wgts[inf_mask] = 1.
-        return indices, edge_wgts, inf_mask
+        return indices, edge_wgts 
     else:
         return indices
 

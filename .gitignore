@@ -26,5 +26,6 @@ GraphBuilder/embeddings/
 config/ml_default.yaml
 data/*
 config/*
+ntuples/
 GraphBuilder/config/*
 compare.py

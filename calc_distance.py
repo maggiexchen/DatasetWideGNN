@@ -16,7 +16,7 @@ import utils.misc as misc
 import utils.plotting as plotting
 import utils.adj_mat as adj
 import torch
-import energyflow as ef
+import pdb
 torch.manual_seed(42)
 
 def GetParser():
@@ -146,7 +146,6 @@ for i in range(num_sig_batches):
 
         batch_sig_j = full_sig[start_idx_sig_j:end_idx_sig_j]
         batch_sig_wgt_j = sig_wgt[start_idx_sig_j:end_idx_sig_j]
-
         batch_sigsig = distance_calc(batch_sig_i, batch_sig_j, distance)
         batch_sigsig_wgt = torch.ger(batch_sig_wgt_i, batch_sig_wgt_j)
 
@@ -201,9 +200,9 @@ for i in range(num_sig_batches):
 
 # plot the MAD-normed distances from the first batch
 logging.info("Plotting ... ")
-sigsig = torch.load(save_path + 'sigsig_distances_batch_0_0.pt')
-bkgbkg = torch.load(save_path + 'bkgbkg_distances_batch_0_0.pt')
-sigbkg = torch.load(save_path + 'sigbkg_distances_batch_0_0.pt')
+sigsig = torch.load(save_path + f'sigsig_distances_batch_0_0.pt')
+bkgbkg = torch.load(save_path + f'bkgbkg_distances_batch_0_0.pt')
+sigbkg = torch.load(save_path + f'sigbkg_distances_batch_0_0.pt')
 np_sigsig = sigsig['distance'].numpy().flatten()
 np_sigbkg = sigbkg['distance'].numpy().flatten()
 np_bkgbkg = bkgbkg['distance'].numpy().flatten()
