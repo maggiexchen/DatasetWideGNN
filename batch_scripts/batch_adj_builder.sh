@@ -1,6 +1,5 @@
 #! /bin/bash
 
-
 # change to your own area to run from:
 cd /home/pacey/GNN/new_merge/hhhgraph/
 

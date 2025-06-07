@@ -1,4 +1,6 @@
-"""Function to calculate linking lengths for a bunch of sig-sig efficiencies"""
+"""
+Function to calculate linking lengths for a bunch of sig-sig efficiencies
+"""
 import logging
 import argparse
 import math
@@ -171,7 +173,7 @@ plotting.plot_distances_hist(norm_sigsig_hist, norm_sigbkg_hist, norm_bkgbkg_his
                              plot_path, standardised=True)
 
 ############################
-# Now work out if we have a case where sig-sig or bkg-bkg are
+# Now work out if we have a case where sig-sig or bkg-bkg are friendlier
 is_signal_closest = True
 friend_species = "signal"
 if sigsig_mean > bkgbkg_mean:
@@ -203,21 +205,22 @@ if do_edge_frac:
 #   and the actual fpr is the fraction of sig(bkg)bkg below a certain cut: (1-tpr)
 
 
-tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = perf.calc_roc(norm_sigsig, norm_sigbkg,
-                                                               sigsig_wgt, sigbkg_wgt,
-                                                               is_target_closest=is_signal_closest)
+tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = \
+    perf.calc_roc(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt,
+                  is_target_closest=is_signal_closest)
 
-tpr_bb_sb, fpr_bb_sb, cut_bb_sb, roc_auc_bb_sb = perf.calc_roc(norm_bkgbkg, norm_sigbkg,
-                                                               bkgbkg_wgt, sigbkg_wgt,
-                                                               is_target_closest=(not is_signal_closest))
+tpr_bb_sb, fpr_bb_sb, cut_bb_sb, roc_auc_bb_sb = \
+    perf.calc_roc(norm_bkgbkg, norm_sigbkg, bkgbkg_wgt, sigbkg_wgt,
+                  is_target_closest=(not is_signal_closest))
 del sigbkg_wgt
 if not do_edge_frac:
-    tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = perf.calc_roc(norm_sigsig, norm_bkgbkg,
-                                                                   sigsig_wgt, bkgbkg_wgt,
-                                                                   is_target_closest=is_signal_closest)
-    tpr_bb_ss, fpr_bb_ss, cut_bb_ss, roc_auc_bb_ss = perf.calc_roc(norm_bkgbkg, norm_sigsig,
-                                                                   bkgbkg_wgt, sigsig_wgt,
-                                                                   is_target_closest=(not is_signal_closest))
+    tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = \
+        perf.calc_roc(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt,
+                      is_target_closest=is_signal_closest)
+    tpr_bb_ss, fpr_bb_ss, cut_bb_ss, roc_auc_bb_ss = \
+        perf.calc_roc(norm_bkgbkg, norm_sigsig, bkgbkg_wgt, sigsig_wgt,
+                      is_target_closest=(not is_signal_closest))
+
 del sigsig_wgt, bkgbkg_wgt
 # saving roc and auc to json file
 roc_dict = {

@@ -91,7 +91,7 @@ if cuts is not None:
     df_sig[signal] = misc.cut_operation(df_sig[signal], cuts)
     print("Total ", signal, " events after cuts: ", len(df_sig[signal]))
 
-df_sig[signal].to_hdf(h5_path + str(signal) + "_" + signal_mass + 
+df_sig[signal].to_hdf(h5_path + str(signal) + "_" + signal_mass +
                       cutstring + ".h5", key=str(signal), mode="w")
 
 logging.info('Importing and writing background ')

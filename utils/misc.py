@@ -466,7 +466,7 @@ def get_batched_distances(dist_path, variable, distance, batch_size,
     print("looking for distances in :", dist_dir)
     files = glob.glob(dist_dir + species + '*.pt')
     if len(files) == 0:
-        raise IndexError("Didn't find any {0}+*.pt files in here :(".format(species))
+        raise IndexError(f"Didn't find any {species}+*.pt files in here :(")
     distance = torch.empty(0, dtype=torch.float32)
     wgt = torch.empty(0, dtype=torch.float32)
     max_dist = 0
@@ -582,7 +582,7 @@ def stable_int_from_string(s):
     h = hashlib.md5(s.encode('utf-8')).hexdigest()
     return int(h, 16)  # Big integer, deterministic everywhere
 
-def assign_fold_deterministically(event_id, n_folds):
+def assign_fold_det(event_id, n_folds):
     """
     Function to assign k-fold fold for given event.
 

@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, GraphConv
-from torch_geometric.nn.conv.gat_conv_weighted import GATConv_weighted
-from torch_geometric.utils._softmax_weighted import softmax_weighted
+#from torch_geometric.nn.conv.gat_conv_weighted import GATConv_weighted
+#from torch_geometric.utils._softmax_weighted import softmax_weighted
 from torch.utils.checkpoint import checkpoint
 
 sys.path.insert(0, 'external/pyg_custom')
@@ -16,7 +16,7 @@ class GCNClassifier(nn.Module):
     """
     Class defining pytorch MLP Classifier Network
     """
-    def __init__(self, input_size, hidden_sizes_gcn, hidden_sizes_mlp,\
+    def __init__(self, input_size, hidden_sizes_gcn, hidden_sizes_mlp,
                  output_size, dropout_rates, gnn_type = "GCN"):
         """
         Function to initialise GCNClassifier Class instance
@@ -37,27 +37,27 @@ class GCNClassifier(nn.Module):
         self.batch_norms_gcn = nn.ModuleList()
         self.dropout_gcn = nn.ModuleList()
         i = 0
-        for i in enumerate(hidden_sizes_gcn):
+        for i, hidden_size in enumerate(hidden_sizes_gcn):
             if gnn_type == "GCN":
-                self.layers_gcn.append(GCNConv(input_size, hidden_sizes_gcn[i]))
-            elif gnn_type == "GAT":
-                self.layers_gcn.append(GATConv_weighted(input_size, hidden_sizes_gcn[i]))
+                self.layers_gcn.append(GCNConv(input_size, hidden_size))
+            #elif gnn_type == "GAT":
+            #    self.layers_gcn.append(GATConv_weighted(input_size, hidden_size))
             elif gnn_type == "Graph":
-                self.layers_gcn.append(GraphConv(input_size, hidden_sizes_gcn[i]))
+                self.layers_gcn.append(GraphConv(input_size, hidden_size))
             else:
                 raise ValueError("Invalid GNN type, please choose from 'GCN', 'GAT', 'Graph'")
-            self.batch_norms_gcn.append(nn.BatchNorm1d(hidden_sizes_gcn[i]))
+            self.batch_norms_gcn.append(nn.BatchNorm1d(hidden_size))
             self.dropout_gcn.append(nn.Dropout(p=dropout_rates[i]))
-            input_size = hidden_sizes_gcn[i]
+            input_size = hidden_size
 
         self.layers_mlp = nn.ModuleList()
         self.batch_norms_mlp = nn.ModuleList()
         self.dropout_mlp = nn.ModuleList()
-        for j in enumerate(hidden_sizes_mlp):
-            self.layers_mlp.append(nn.Linear(input_size, hidden_sizes_mlp[j]))
-            self.batch_norms_mlp.append(nn.BatchNorm1d(hidden_sizes_mlp[j]))
+        for j, hidden_size in enumerate(hidden_sizes_mlp):
+            self.layers_mlp.append(nn.Linear(input_size, hidden_size))
+            self.batch_norms_mlp.append(nn.BatchNorm1d(hidden_size))
             if len(hidden_sizes_gcn) > 0:
-                self.dropout_mlp.append(nn.Dropout(p=dropout_rates[i+j]))
+                self.dropout_mlp.append(nn.Dropout(p=dropout_rates[len(hidden_sizes_gcn)+j]))
             else:
                 self.dropout_mlp.append(nn.Dropout(p=dropout_rates[j]))
             input_size = hidden_sizes_mlp[j]
@@ -97,7 +97,7 @@ class GCNClassifier(nn.Module):
                        edge_weights, mc_weights, use_reentrant=False)
 
         def mlp_forward(x):
-            for layer, batch_norm, dropout in zip(self.layers_mlp, self.batch_norms_mlp,\
+            for layer, batch_norm, dropout in zip(self.layers_mlp, self.batch_norms_mlp,
                                                   self.dropout_mlp):
                 x = F.relu(dropout(batch_norm(layer(x))))
             return x

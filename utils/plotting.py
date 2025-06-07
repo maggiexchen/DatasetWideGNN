@@ -270,8 +270,8 @@ def plot_kinematics(df_sig, df_bkg, sig_label, bkg_label, var,
     return
 
 
-def plot_conv_kinematics(adj_mat, x, len_sig, kinematics, kinematic_labels,\
-                         signal_type, eff, file_path, normalisation, standardise=True,\
+def plot_conv_kinematics(adj_mat, x, len_sig, kinematics,
+                         signal_type, eff, file_path, normalisation, standardise=True,
                          nconv=1, edge_wgts=False, cutstring=""):
     """
     Function to plot the histograms of a list of kinematics variable for signal and
@@ -351,7 +351,8 @@ def plot_conv_kinematics(adj_mat, x, len_sig, kinematics, kinematic_labels,\
         ax.legend(loc='upper right')
         ymin, ymax = ax.get_ylim()
         ax.set_ylim((ymin, ymax*1.4))
-        ax.set_xlabel("\n"+str(kinematic_labels[v]), loc="right")
+        xlabel = r"{}".format(get_x_label(var))
+        ax.set_xlabel("\n" + xlabel, loc="right")
         ax.set_ylabel("Normalised No. Events", loc="top")
         fig.tight_layout()
         save_fig(fig, conv_plot_path + plot_name + var)

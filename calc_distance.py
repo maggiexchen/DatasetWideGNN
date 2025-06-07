@@ -98,7 +98,6 @@ full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels, _, _ = \
     adj.data_loader(feature_h5_path, kinematics, ex=cutstring, signal=signal,
                     signal_mass=signal_mass, standardisation=standardise)
 
-print(full_sig)
 
 # option to weight events, atm only relevant for HHH.
 global_bkg_wgt = 1.0
@@ -185,7 +184,7 @@ def calc_a_b_batched_distances(species_a, species_b, full_a, full_b, kinematics_
 
             # save all the wgts and distances for this batch to a torch tensor .pt file.
             batch_dict = {'distance': batch_ab, 'weight': batch_ab_wgt}
-            torch.save(batch_dict, save_path + f'{species_a}{species_b}_distances_batch_{i}_{j}.pt')
+            torch.save(batch_dict, save_path + f'{species_a}{species_b}_distances_batch_{i:02d}_{j:02d}.pt')
             del batch_dict
             logging.debug("saved file")
 
@@ -217,12 +216,15 @@ def calc_a_b_batched_distances(species_a, species_b, full_a, full_b, kinematics_
 #  Also take a subset of 10% of the values and return as a tensor to plot.
 logging.info("Calculating batched distances ... ")
 sigsig_distance_subsample, sigsig_wgt_subsample = \
-    calc_a_b_batched_distances("sig", "sig", full_sig, full_sig, kinematics, sig_wgt, sig_wgt, batch_size)
+    calc_a_b_batched_distances("sig", "sig", full_sig, full_sig, kinematics,
+                               sig_wgt, sig_wgt, batch_size)
 sigbkg_distance_subsample, sigbkg_wgt_subsample = \
-    calc_a_b_batched_distances("sig", "bkg", full_sig, full_bkg, kinematics, sig_wgt, bkg_wgt, batch_size)
+    calc_a_b_batched_distances("sig", "bkg", full_sig, full_bkg, kinematics,
+                               sig_wgt, bkg_wgt, batch_size)
 del full_sig, sig_wgt
 bkgbkg_distance_subsample, bkgbkg_wgt_subsample = \
-    calc_a_b_batched_distances("bkg", "bkg", full_bkg, full_bkg, kinematics, bkg_wgt, bkg_wgt, batch_size)
+    calc_a_b_batched_distances("bkg", "bkg", full_bkg, full_bkg, kinematics,
+                               bkg_wgt, bkg_wgt, batch_size)
 del full_bkg, bkg_wgt
 
 # Plot the distance distributions for the subset.
@@ -239,4 +241,4 @@ plotting.plot_distances(sigsig_distance_subsample.numpy(),
                         signal_label, background_label,
                         plot_path)
 
-print("--- %s seconds ---" % (time.time() - start_time))
+logging.info("--- %s seconds ---", (time.time() - start_time))

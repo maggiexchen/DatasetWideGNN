@@ -23,9 +23,7 @@ data/dnn_scores/
 data/stau_split_files/
 trained_models/
 GraphBuilder/embeddings/
-config/ml_default.yaml
 data/*
-config/*
 ntuples/
 GraphBuilder/config/*
 compare.py

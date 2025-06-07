@@ -100,8 +100,8 @@ def data_loader(h5_path, kinematics, ex="", signal="LQ", signal_mass="",
 
     if num_folds is not None:
         fold_var = 'eventNumber' if signal=="HHH" else "metphi"
-        sig_folds = df_sig[fold_var].apply(lambda x: misc.assign_fold_deterministically(x, n_folds=num_folds))
-        bkg_folds = df_bkg[fold_var].apply(lambda x: misc.assign_fold_deterministically(x, n_folds=num_folds))
+        sig_folds = df_sig[fold_var].apply(lambda x: misc.assign_fold_det(x, n_folds=num_folds))
+        bkg_folds = df_bkg[fold_var].apply(lambda x: misc.assign_fold_det(x, n_folds=num_folds))
 
     # filter out un-needed variables and convert pd dataframes to torch tensors
     df_sig = df_sig[kinematics]
@@ -280,7 +280,8 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, species,
                 del ind
                 if edge_wgt:
                     del edge_wgts_tmp
-                logging.info("CPU allocated after %s, GB", str(process.memory_info().rss/(1024 ** 3)))
+                logging.info("CPU allocated after %s, GB", \
+                             str(process.memory_info().rss/(1024 ** 3)))
         else:
             logging.info("File %s %s", i_ind, j_ind)
             distance = torch.load(f)["distance"]
@@ -309,6 +310,7 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, species,
                 del edge_wgts_tmp
             logging.info("CPU allocated after %s, GB", str(process.memory_info().rss/(1024 ** 3)))
 
+    print("max indices: ", torch.max(indices[0]), torch.max(indices[1]))
     # Minmax normalise the edge weights
     if edge_wgt:
         return indices, edge_wgts

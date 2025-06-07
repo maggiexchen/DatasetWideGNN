@@ -1,3 +1,6 @@
+"""
+Module to calculate the adjacency matrix
+"""
 import os
 import json
 import argparse
@@ -12,13 +15,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
-# from torch.utils.data import DataLoader, TensorDataset
-# from torchinfo import summary
-
 st = time.time()
 
 logging.getLogger().setLevel(logging.INFO)
-#os.environ["NUMEXPR_MAX_THREADS"] = "16"
 
 torch.cuda.empty_cache()
 
@@ -39,7 +38,8 @@ parser.add_argument(
     "-u",
     type=str,
     required=True,
-    help="Specify the config for the user e.g. paths to store all the input/output data and results, signal model to look at",
+    help="""Specify the config for the user e.g. paths to store all the
+            input/output data and results, signal model to look at""",
 )
 
 parser.add_argument(
@@ -99,11 +99,12 @@ targettarget_eff = train_config["targettarget_eff"]
 
 os.makedirs(ll_path, exist_ok=True)
 
-# TODO support edge_frac or target_eff 
+# TODO support edge_frac or target_eff
 if linking_length is not None:
     logging.info("linking length is given in config,\
                  IGNORING edge_frac/targettarget_eff if present!")
-    adj_path = adj_path + "/" + str(distance) + "_" + "linking_length_" + str(linking_length).replace(".","p") + "/"
+    adj_path = adj_path + "/" + str(distance) + "_" + "linking_length_" + \
+        str(linking_length).replace(".","p") + "/"
 
 elif edge_frac is not None and targettarget_eff is not None:
     raise ValueError("edge_frac and targettarget_eff in ML config, pick just one!")
@@ -115,7 +116,8 @@ elif edge_frac is not None:
         raise ValueError("""not given a supported edge fraction,
                          (0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5)""")
     ll_path = ll_path + "edge_frac"
-    adj_path = adj_path + "/" + str(distance) + "_" + "edge_frac_" + str(edge_frac).replace(".","p") + "/"
+    adj_path = adj_path + "/" + str(distance) + "_" + "edge_frac_" + \
+        str(edge_frac).replace(".","p") + "/"
 
 elif targettarget_eff is not None:
     logging.info("Will try to use targettarget_eff to define linking length....")
@@ -124,8 +126,9 @@ elif targettarget_eff is not None:
         raise ValueError("""not given a supported sig-sig efficiency,
                          (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)""")
 
-    ll_path = ll_path + "targettarget_eff_" 
-    adj_path = adj_path + "/" + str(distance) + "_" + "targettarget_eff_" + str(targettarget_eff).replace(".","p") + "/"
+    ll_path = ll_path + "targettarget_eff_"
+    adj_path = adj_path + "/" + str(distance) + "_" + "targettarget_eff_" + \
+        str(targettarget_eff).replace(".","p") + "/"
 
 else:
     raise ValueError("Neither manual LL, edge_frac or targettarget_eff in ML config, pick one!")
@@ -141,7 +144,6 @@ if linking_length is None:
             linking_length = lengths[length_dict["edge_frac"].index(edge_frac)]
         else:
             linking_length = lengths[length_dict["bkgbkg_eff"].index(targettarget_eff)]
-#            linking_length = lengths[length_dict["targettarget_eff"].index(targettarget_eff)]
         logging.info("linking length = %s", str(linking_length))
 
 misc.create_dirs(adj_path)
@@ -188,7 +190,9 @@ del sig_wgt, bkg_wgt
 ### load distances and apply linking length to receieve indices
 logging.info("Batch applying the linking length and getting non-zero indices ...")
 logging.info("For sigsig ...")
-sigsig_result = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "sigsig", linking_length, batch_size, cutstring, friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
+sigsig_result = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "sigsig",
+                                                 linking_length, batch_size, cutstring,
+                                                 friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
 if bool_edge_wgt:
     sigsig_ind, sigsig_edge_wgts = sigsig_result
 else:
@@ -197,7 +201,9 @@ print("sigsig: ",sigsig_ind.shape)
 print("fraction of egdes in sigsig: ", sigsig_ind.shape[0]/(len(full_sig)**2))
 
 logging.info("For sigbkg ...")
-sigbkg_result = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "sigbkg", linking_length, batch_size, cutstring, friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
+sigbkg_result = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "sigbkg",
+                                                 linking_length, batch_size, cutstring,
+                                                 friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
 if bool_edge_wgt:
     sigbkg_ind, sigbkg_edge_wgts = sigbkg_result
 else:
@@ -215,7 +221,9 @@ print("bgsig: ", bkgsig_ind.shape)
 print("fraction of egdes in bkgsig: ", bkgsig_ind.shape[0]/(len(full_bkg)*len(full_sig)))
 
 logging.info("For bkgbkg ...")
-bkgbkg_result = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "bkgbkg", linking_length, batch_size, cutstring, friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
+bkgbkg_result = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "bkgbkg",
+                                                 linking_length, batch_size, cutstring,
+                                                 friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
 if bool_edge_wgt:
     bkgbkg_ind, bkgbkg_edge_wgts = bkgbkg_result
 else:
@@ -229,10 +237,11 @@ bkgsig_ind[:,0] += len(full_sig)
 bkgbkg_ind += len(full_sig)
 
 logging.info("Concatenating the indices ...")
-full_ind = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind)).round().to(torch.int32)
+full_ind = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind)).to(torch.int32)
 
 if bool_edge_wgt:
-    full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
+    full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts,
+                                bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
 
     ### define indices for plotting random subsets of the edge weights
     sigsig_plot_ind = torch.randperm(len(sigsig_edge_wgts))[:2000]
@@ -242,10 +251,15 @@ if bool_edge_wgt:
 
     ### plot the edge weights before minmax normalisation (1/d)
     fig, ax = plt.subplots()
-    _, binning, _ = ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind], bkgsig_edge_wgts[bkgsig_plot_ind])) , bins=70, color="darkorange", alpha=0.5, label="sig-bkg")
-    ax.hist(sigsig_edge_wgts[sigsig_plot_ind], bins=binning, color="steelblue", alpha=0.5, label="sig-sig")
-    ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind], bkgsig_edge_wgts[bkgsig_plot_ind])) , bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
-    ax.hist(bkgbkg_edge_wgts[bkgbkg_plot_ind], bins=binning, color="forestgreen", alpha=0.5, label="bkg-bkg")
+    _, binning, _ = ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind],
+                                       bkgsig_edge_wgts[bkgsig_plot_ind])),
+                            bins=70, color="darkorange", alpha=0.5, label="sig-bkg")
+    ax.hist(sigsig_edge_wgts[sigsig_plot_ind], bins=binning,
+            color="steelblue", alpha=0.5, label="sig-sig")
+    ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind], bkgsig_edge_wgts[bkgsig_plot_ind])),
+            bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
+    ax.hist(bkgbkg_edge_wgts[bkgbkg_plot_ind],
+            bins=binning, color="forestgreen", alpha=0.5, label="bkg-bkg")
     ax.set_xlabel("Edge weights (excluding event weights)", loc="right")
     ax.set_ylabel("Edges / Bin", loc="top")
     ax.legend(loc="upper right")
@@ -263,9 +277,15 @@ if bool_edge_wgt:
     ### plot the edge weights after minmax normalisation (1/d)
     fig, ax = plt.subplots()
     binning = np.linspace(0, 1, 70)
-    ax.hist(full_edge_wgts[sigsig_plot_ind], bins=binning, color="steelblue", alpha=0.5, label="sig-sig")
-    ax.hist(torch.cat((full_edge_wgts[sigbkg_plot_ind+len(sigsig_edge_wgts)], full_edge_wgts[bkgsig_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)])) , bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
-    ax.hist(full_edge_wgts[bkgbkg_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)+len(bkgsig_edge_wgts)], bins=binning, color="forestgreen", alpha=0.5, label="bkg-bkg")
+    ax.hist(full_edge_wgts[sigsig_plot_ind], bins=binning,
+            color="steelblue", alpha=0.5, label="sig-sig")
+    ax.hist(torch.cat((full_edge_wgts[sigbkg_plot_ind+len(sigsig_edge_wgts)],
+                       full_edge_wgts[bkgsig_plot_ind+len(sigsig_edge_wgts)+\
+                                      len(sigbkg_edge_wgts)])),
+            bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
+    ax.hist(full_edge_wgts[bkgbkg_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)+\
+                           len(bkgsig_edge_wgts)],
+            bins=binning, color="forestgreen", alpha=0.5, label="bkg-bkg")
     ax.set_xlabel("Edge weights (including event weights)", loc="right")
     ax.set_ylabel("Edges / Bin", loc="top")
     ax.legend(loc="upper right")
@@ -273,11 +293,18 @@ if bool_edge_wgt:
     fig.tight_layout()
     fig.savefig(adj_path+"Normed_edge_wgts_no_EventWeights.pdf", transparent=True)
 
-    ### we are only combining the MC events later, in torch_train.py, depending on the gnn model type
+    ### we are only combining the MC events later, in torch_train.py,
+    # depending on the gnn model type
     # fig, ax = plt.subplots()
-    # _, binning, _ = ax.hist(normed_full_edge_wgts[bkgbkg_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)+len(bkgsig_edge_wgts)], bins=70, color="forestgreen", alpha=0.5, label="bkg-bkg")
-    # ax.hist(torch.cat((normed_full_edge_wgts[sigbkg_plot_ind+len(sigsig_edge_wgts)], normed_full_edge_wgts[bkgsig_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)])) , bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
-    # ax.hist(normed_full_edge_wgts[sigsig_plot_ind], bins=binning, color="steelblue", alpha=0.5, label="sig-sig")
+    # _, binning, _ = ax.hist(normed_full_edge_wgts[bkgbkg_plot_ind+len(sigsig_edge_wgts)+\
+    #                                               len(sigbkg_edge_wgts)+len(bkgsig_edge_wgts)],\
+    #                         bins=70, color="forestgreen", alpha=0.5, label="bkg-bkg")
+    # ax.hist(torch.cat((normed_full_edge_wgts[sigbkg_plot_ind+len(sigsig_edge_wgts)],
+    #           normed_full_edge_wgts[bkgsig_plot_ind+len(sigsig_edge_wgts)+\
+    #                                 len(sigbkg_edge_wgts)])),
+    #           bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
+    # ax.hist(normed_full_edge_wgts[sigsig_plot_ind], bins=binning,
+    #           color="steelblue", alpha=0.5, label="sig-sig")
     # ax.set_xlabel("Edge weights (including event weights)", loc="right")
     # ax.set_ylabel("Edges / Bin", loc="top")
     # ax.legend(loc="upper right")
