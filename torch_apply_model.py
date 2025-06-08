@@ -6,6 +6,7 @@ import utils.misc as misc
 import utils.plotting as plotting
 import utils.adj_mat as adj
 from utils.gcn_model import GCNClassifier
+import utils.user_config as uconfig
 import json
 from torch_geometric.data import Data 
 from torch_geometric.loader import NeighborLoader
@@ -46,31 +47,16 @@ args = parser.parse_args()
 
 ### load user config
 user_config_path = args.userconfig
-user_config = misc.load_config(user_config_path)
-print("Using user config ",user_config)
-feature_h5_path = user_config["feature_h5_path"]
-kinematic_h5_path = user_config["kinematic_h5_path"]
-plot_path = user_config["plot_path"]
-ll_path = user_config["ll_path"]
-adj_path = user_config["adj_path"]
-dist_path = user_config["dist_path"]
-model_path = user_config["model_path"]
-score_path = user_config["score_path"]
-
-signal = user_config["signal"]
-signal_mass = user_config["signal_mass"]
-feature_dim = user_config["feature_dim"]
-assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {signal}"
+user = uconfig.UserConfig.from_yaml(user_config_path)
 
 ### rename signal to include mass
-signal = signal + "_" + str(signal_mass)
+signal = user.signal + "_" + str(user.signal_mass)
 
 signal_label, background_label = plotting.get_plot_labels(signal)
 
 ### set up CUDA/CPU device settings
-run_with_cuda = user_config["run_with_cuda"]
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
-device = torch.device('cuda') if (torch.cuda.is_available() & run_with_cuda) else torch.device('cpu') 
+device = torch.device('cuda') if (torch.cuda.is_available() & user.run_with_cuda) else torch.device('cpu') 
 cpu = torch.device('cpu')
 
 # set random seed for training
@@ -92,7 +78,6 @@ epochs = train_config["epochs"]
 num_nb_list = train_config["num_nb_list"] 
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
-num_folds = user_config["n_folds"]
 single_fold = train_config["single_fold"]
 plot_conv_kins = train_config["plot_conv_kinematics"]
 bool_edge_wgt = train_config["edge_weights"]
@@ -119,23 +104,23 @@ if linking_length is None:
         raise Exception("not given a supported efficiency, (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)")
     else:
         ll_str = "_LLEff" + str(eff).replace(".", "p")
-        adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
+        adj_path = user.adj_path + "/" + f"sigsig_eff_{eff}/"
 else:
     if eff is not None:
         # when both linking length and sigsig eff are specified, use the linking length at specified sigsig efficiency
         ll_str = "_LLEff" + str(eff).replace(".", "p")
-        adj_path = adj_path + "/" + f"sigsig_eff_{eff}/"
+        adj_path = user.adj_path + "/" + f"sigsig_eff_{eff}/"
     else:
         print("linking length is given in config, IGNORING the sigsig_eff in the config!")
         ll_str = "_LL" + str(linking_length).replace(".", "p")
-        adj_path = adj_path + "/" + f"linking_length_{linking_length}/"
+        adj_path = user.adj_path + "/" + f"linking_length_{linking_length}/"
 
 ### str for train/val split label. If single fold, then val_frac is 1/num_folds. Otherwise, nf is num_folds
 if single_fold == True:
-    val_frac = 1/num_folds
+    val_frac = 1/user.n_folds
     nf_str = f"_val_frac{val_frac:.2f}"
 else:
-    nf_str = "_nf" + str(num_folds)
+    nf_str = "_nf" + str(user.n_folds)
 
 ### create model label and result plot path
 if len(hidden_sizes_gcn) == 0:
@@ -160,27 +145,27 @@ else:
             + "_edge_wgt_seed_fold" 
     
 if gnn == False:
-    plot_path = plot_path + "/MLP/" + model_label + "/"
-plot_path = plot_path + model_label + "/"
+    plot_path = user.plot_path + "/MLP/" + model_label + "/"
+plot_path = user.plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
 if signal == "stau":
-    kinematics = misc.get_kinematics_staus(kinematic_variable, feature_dim)
+    kinematics = misc.get_kinematics_staus(kinematic_variable)
 else:
-    kinematics = misc.get_kinematics(kinematic_variable, feature_dim)
+    kinematics = misc.get_kinematics(kinematic_variable)
 input_size = len(kinematics)
 
 logging.info("signal: "+signal)
 logging.info("chosen model: "+model_label)
 logging.info("kinematic variable set: "+kinematic_variable)
 logging.info("embedding variable set: "+embedding_variable)
-logging.info("input data path: "+feature_h5_path)
-logging.info("input ll json path: "+ll_path)
-logging.info("input distances path: "+dist_path)
-logging.info("output plot path: "+plot_path)
-logging.info("adj matrix storage path: "+adj_path)
-logging.info("model storage path: "+model_path)
-model_path = model_path + model_label + "/" + gnn_type + "/"
+logging.info("input data path: "+user.feature_h5_path)
+logging.info("input ll json path: "+user.ll_path)
+logging.info("input distances path: "+user.dist_path)
+logging.info("output plot path: "+user.plot_path)
+logging.info("adj matrix storage path: "+user.adj_path)
+logging.info("model storage path: "+user.model_path)
+model_path = user.model_path + model_label + "/" + gnn_type + "/"
 
 logging.info("distance metric: "+distance)
 if eff is not None:    
@@ -192,7 +177,7 @@ elif linking_length is not None:
 logging.info('Importing signal and background files...')
 
 # normal loading setup
-full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels, sig_fold, bkg_fold = adj.data_loader(kinematic_h5_path, plot_path, kinematics, ex="", plot=False, signal=signal, num_folds = num_folds)
+full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels, sig_fold, bkg_fold = adj.data_loader(user.kinematic_h5_path, kinematics, ex=user.cutstring, signal=user.signal, signal_mass=user.signal_mass, num_folds = user.n_folds)
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
 print("full sig size ", full_sig.size())
@@ -271,7 +256,7 @@ val_outputs = torch.tensor([]).to(cpu)
 val_truth_labels = torch.tensor([]).to(cpu)
 val_wgts = torch.tensor([]).to(cpu)
 
-for fold_no in range(num_folds):
+for fold_no in range(user.n_folds):
 
     model_file_name = f"model_fold_{fold_no}.pth"
     #### finish loading model to use mean and std from model to standardise data
@@ -328,7 +313,7 @@ val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
 val_bkg_wgts = val_wgts[torch.logical_not(val_label_bool)]
 
 val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(), val_outputs.detach().cpu().numpy(), sample_weight = val_wgts.detach().cpu().numpy())
-if signal == "stau": ### stau fpr needs to be clipped and sorted due to rounding errors
+if user.signal == "stau": ### stau fpr needs to be clipped and sorted due to rounding errors
     val_fpr = np.clip(val_fpr, 0, 1)
     val_fpr = np.sort(val_fpr)
 val_auc = auc(val_fpr, val_tpr)
@@ -343,7 +328,7 @@ ax.hist(val_bkg_pred.detach().cpu().numpy(), bins=binning, label="Background (va
 
 
 
-score_path = score_path + model_label + "/"
+score_path = user.score_path + model_label + "/"
 misc.create_dirs(score_path)
 
 np.save(score_path+"val_sig_pred_reduced_sample.npy", val_sig_pred.detach().cpu().numpy())
@@ -360,23 +345,23 @@ if gnn:
 else:
     linking_length_label = ""
 signal_label, background_label = plotting.get_plot_labels(signal)
-if signal == "hhh":
+if user.signal == "hhh":
     if eff is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
     elif linking_length is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-elif signal == "stau":
+elif user.signal == "stau":
     if eff is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
     elif linking_length is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-elif "LQ" in signal:
+elif "LQ" in user.signal:
     if eff is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
     elif linking_length is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
 
-plotting.add_text(ax, text, doATLAS=False, startx=0.02, starty=0.95)
+plotting.add_text(ax, text, do_atlas=False, startx=0.02, starty=0.95)
 ax.legend(loc='upper right', fontsize=9)
 ax.set_xlabel("Output score", loc="right")
 ax.set_ylabel("Normalised No. Events", loc="top")
@@ -399,5 +384,5 @@ roc_dict = {"val_fpr": val_fpr.tolist(),
             "val_trp": val_tpr.tolist(),
             "val_auc": [val_auc]
         }
-with open(roc_json_path, 'w') as json_file:
+with open(roc_json_path, 'w', encoding='utf-8') as json_file:
     json.dump(roc_dict, json_file)

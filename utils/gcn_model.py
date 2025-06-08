@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, GraphConv
-from torch_geometric.nn.conv.gat_conv_weighted import GATConv_weighted
-from torch_geometric.utils._softmax_weighted import softmax_weighted
+#from torch_geometric.nn.conv.gat_conv_weighted import GATConv_weighted
+#from torch_geometric.utils._softmax_weighted import softmax_weighted
 from torch.utils.checkpoint import checkpoint
 
 sys.path.insert(0, 'external/pyg_custom')
@@ -40,8 +40,8 @@ class GCNClassifier(nn.Module):
         for i, hidden_size in enumerate(hidden_sizes_gcn):
             if gnn_type == "GCN":
                 self.layers_gcn.append(GCNConv(input_size, hidden_size))
-            elif gnn_type == "GAT":
-                self.layers_gcn.append(GATConv_weighted(input_size, hidden_size))
+            #elif gnn_type == "GAT":
+            #    self.layers_gcn.append(GATConv_weighted(input_size, hidden_size))
             elif gnn_type == "Graph":
                 self.layers_gcn.append(GraphConv(input_size, hidden_size))
             else:

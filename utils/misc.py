@@ -26,10 +26,8 @@ def get_cutstring(cuts):
         (str) cutstring
     """
     cutstring = ""
-    for var,cut in cuts.items():
-        if not "threshold" in cut.keys():
-            raise KeyError("no threshold for {var}, check your cut dictionary...")
-        cutstring = cutstring + "_" + var + str(cut["threshold"]).replace(".","p")
+    for var, cut in cuts.items():
+        cutstring = cutstring + "_" + var + str(cut["threshold"]).replace(".0","").replace(".","p")
     return cutstring
 
 def print_mem_info():
@@ -377,8 +375,8 @@ def cut_operation(df, cuts):
     """
     conditions = []
     for variable, cut in cuts.items():
-        threshold = cut.get("threshold")
-        operation = cut.get("operation")
+        threshold = cut.threshold
+        operation = cut.operation
         if operation == ">":
             conditions.append(df[variable] > threshold)
         elif operation == "<":

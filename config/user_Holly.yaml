@@ -11,11 +11,6 @@ cuts:
     threshold: 200
     operation: ">"
 feature_dim:
-distance:
-  euclidean:
-  cosine:
-  emd:
-    objects: ["bjet1", "bjet2", "lep1", "lep2"]
 run_with_cuda: False
 n_folds: 2
 

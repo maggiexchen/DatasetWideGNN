@@ -2,41 +2,27 @@
 Module to train the GCN!
 """
 import json
-#import glob
-#import re
-#import os
 import argparse
 import gc
 import logging
 import time
 
-#import utils.normalisation as norm
-#import utils.torch_distances as dis
 import utils.adj_mat as adj
 import utils.misc as misc
 import utils.performance as perf
 import utils.plotting as plotting
 import utils.training as training
+import utils.user_config as uconfig
 from utils.gcn_model import GCNClassifier
 #from utils.dnn_model import DNNClassifier
 
-#import pandas as pd
 import numpy as np
-#from scipy.spatial.distance import pdist, squareform
 import matplotlib.pyplot as plt
-#import mplhep as hep
 import torch
-#import torch.nn as nn
-#import torch.nn.functional as F
-#from torch.utils.data import DataLoader, TensorDataset, Subset
 import torch.optim as optim
-#from torch.utils.checkpoint import checkpoint
-# from torchinfo import summary
 from torch_geometric.data import Data
 from torch_geometric.loader import NeighborLoader
-from sklearn.metrics import roc_curve, auc #, roc_auc_score, precision_recall_curve
-#from sklearn.utils import shuffle
-#import shap
+from sklearn.metrics import roc_curve, auc
 
 logging.getLogger().setLevel(logging.INFO)
 st = time.time()
@@ -67,31 +53,13 @@ args = parser.parse_args()
 
 ### load user config
 user_config_path = args.userconfig
-user_config = misc.load_config(user_config_path)
-
-print("Using user config ",user_config)
-feature_h5_path = user_config["feature_h5_path"]
-kinematic_h5_path = user_config["kinematic_h5_path"]
-plot_path = user_config["plot_path"]
-ll_path = user_config["ll_path"]
-adj_path = user_config["adj_path"]
-dist_path = user_config["dist_path"]
-model_path = user_config["model_path"]
-score_path = user_config["score_path"]
-cuts = user_config["cuts"]
-cutstring = misc.get_cutstring(cuts)
-
-signal = str(user_config["signal"])
-signal_mass = user_config["signal_mass"]
-feature_dim = user_config["feature_dim"]
-assert signal in ["hhh", "LQ", "stau", "embedding"], f"Invalid signal type: {signal}"
+user = uconfig.UserConfig.from_yaml(user_config_path)
 
 ### set up CUDA/CPU device settings
-run_with_cuda = user_config["run_with_cuda"]
 print("CUDA is available? ", torch.cuda.is_available())
 cpu = torch.device('cpu')
 device = torch.device('cpu')
-if torch.cuda.is_available() and run_with_cuda:
+if torch.cuda.is_available() and user.run_with_cuda:
     torch.device('cuda')
 
 # set random seed for training
@@ -113,7 +81,6 @@ num_nb_list = train_config["num_nb_list"]
 batch_size = train_config["batch_size"]
 gnn_type = train_config["gnn_type"]
 patience_early_stopping = train_config["patience_early_stopping"]
-num_folds = user_config["n_folds"]
 single_fold = train_config["single_fold"]
 plot_conv_kins = train_config["plot_conv_kinematics"]
 do_edge_wgt = train_config["edge_weights"]
@@ -147,30 +114,30 @@ if linking_length is None:
         raise ValueError(f"not given a supported edge fraction, {edge_frac_list}")
     else:
         ll_str = "_LLFrac" + str(frac).replace(".", "p")
-        adj_path = adj_path + "/" + distance + "_edge_frac_" + str(frac).replace(".", "p") + "/"
+        adj_path = user.adj_path + "/" + distance + "_edge_frac_" + str(frac).replace(".", "p") + "/"
 else:
     if frac is not None:
         # when both linking length and edge fraction are specified,
         # use the linking length at specified edge fraction
         ll_str = "_LLFrac" + str(frac).replace(".", "p")
-        adj_path = adj_path + "/" + distance + "_edge_frac_" + str(frac).replace(".", "p") + "/"
+        adj_path = user.adj_path + "/" + distance + "_edge_frac_" + str(frac).replace(".", "p") + "/"
     else:
         print("linking length is given in config, IGNORING the edge fraction in the config")
         ll_str = "_LL" + str(linking_length).replace(".", "p")
-        adj_path = adj_path + "/" + distance + "_linking_length_" + \
+        adj_path = user.adj_path + "/" + distance + "_linking_length_" + \
             str(linking_length).replace(".", "p") + "/"
 
 ### str for train/val split label. If single fold, then val_frac is 1/num_folds.
 # Otherwise, nf is num_folds
 if single_fold is True:
-    val_frac = 1/num_folds
+    val_frac = 1/user.n_folds
     nf_str = f"_val_frac{val_frac:.2f}"
 else:
-    nf_str = "_nf" + str(num_folds)
+    nf_str = "_nf" + str(user.n_folds)
 
 ### create model label and result plot path
 if len(hidden_sizes_gcn) == 0:
-    model_label = signal\
+    model_label = user.signal\
           + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
           + "_lr" + str(LR).replace(".", "p")\
           + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
@@ -178,7 +145,7 @@ if len(hidden_sizes_gcn) == 0:
           + "_e" + str(epochs)\
           + nf_str
 else:
-    model_label = signal\
+    model_label = user.signal\
             + f"_{gnn_type}" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
             + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
             + "_nb" + "-".join(map(str, num_nb_list))\
@@ -189,29 +156,28 @@ else:
             + "_e" + str(epochs)\
             + nf_str
 
-kinematic_plot_path = plot_path + "/training_kinematics/"+distance+"_frac" + str(frac) + "/"
+kinematic_plot_path = user.plot_path + "/training_kinematics/"+distance+"_frac" + str(frac) + "/"
 if not do_gnn:
-    plot_path = plot_path + "/MLP/" + model_label + "/"
-plot_path = plot_path + distance + "_models/" + model_label + "/"
+    plot_path = user.plot_path + "/MLP/" + model_label + "/"
+plot_path = user.plot_path + distance + "_models/" + model_label + "/"
 misc.create_dirs(plot_path)
 
-if signal == "stau":
+if user.signal == "stau":
     kinematics = misc.get_kinematics_staus(kinematic_variable)
 else:
     kinematics = misc.get_kinematics(kinematic_variable)
 input_size = len(kinematics)
 
-logging.info("signal: %s", signal)
 logging.info("chosen model: %s", model_label)
 logging.info("kinematic variable set: %s", kinematic_variable)
 logging.info("embedding variable set: %s", embedding_variable)
-logging.info("input data path: %s", feature_h5_path)
-logging.info("input ll json path: %s", ll_path)
-logging.info("input distances path: %s", dist_path)
+logging.info("input data path: %s", user.feature_h5_path)
+logging.info("input ll json path: %s", user.ll_path)
+logging.info("input distances path: %s", user.dist_path)
 logging.info("output plot path: %s", plot_path)
 logging.info("adj matrix storage path: %s", adj_path)
+model_path = user.model_path + distance + "_models/" + model_label + "/" + gnn_type + "/"
 logging.info("model storage path: %s", model_path)
-model_path = model_path + distance + "_models/" + model_label + "/" + gnn_type + "/"
 
 logging.info("distance metric: %s", distance)
 if frac is not None:
@@ -226,8 +192,8 @@ logging.info('Importing signal and background files...')
 full_sig, full_bkg, full_x, \
 full_sig_wgts, full_bkg_wgts, \
 full_sig_labels, full_bkg_labels, \
-sig_fold, bkg_fold = adj.data_loader(kinematic_h5_path, kinematics, ex=cutstring,
-                                     signal=signal, signal_mass=signal_mass, num_folds=num_folds)
+sig_fold, bkg_fold = adj.data_loader(user.kinematic_h5_path, kinematics, ex=user.cutstring,
+                                     signal=user.signal, signal_mass=user.signal_mass, num_folds=user.n_folds)
 
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
@@ -346,12 +312,12 @@ try:
     logging.info("Starting k-fold cross validation ...")
     logging.info("Time taken so far: %s", str(time.time()-st))
 
-    for fold_no in range(num_folds):
+    for fold_no in range(user.n_folds):
 
         train_idx = np.where(fold_assignment != fold_no)[0]
         val_idx = np.where(fold_assignment == fold_no)[0]
 
-        print("starting fold %s/%s", fold_no+1, num_folds)
+        print("starting fold %s/%s", fold_no+1, user.n_folds)
         print("train idx", len(train_idx))
         print("val idx", len(val_idx))
 
@@ -501,7 +467,7 @@ try:
         train_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = train_outputs_fold.flatten()
         val_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = val_outputs_fold.flatten()
 
-        logging.info("Finished fold %s/%s", fold_no, num_folds)
+        logging.info("Finished fold %s/%s", fold_no, user.n_folds)
         logging.info("Number of epochs: %s/%s", str(epoch+1), str(epochs))
         logging.info("Final train Loss: %s", avg_tr_loss)
         logging.info("Final validation Loss: %s", avg_vl_loss)
@@ -536,7 +502,7 @@ try:
     print("plotting model outputs per fold")
     fig_fold, ax_fold = plt.subplots()
     fold_colours = ["steelblue", "darkorange", "forestgreen"]
-    for k in range(num_folds):
+    for k in range(user.n_folds):
         print(f"Training Fold {str(k+1)}", train_outputs_per_fold["fold_"+str(k+1)+"_outputs"])
         print(f"Validation Fold {str(k+1)}", val_outputs_per_fold["fold_"+str(k+1)+"_outputs"])
         fig_fold, ax_fold = plt.subplots()
@@ -566,7 +532,7 @@ finally:
     train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().cpu().numpy(),
                                                 train_outputs.detach().cpu().numpy(),
                                                 sample_weight=train_wgts.detach().cpu().numpy())
-    if signal == "stau":
+    if user.signal == "stau":
         # stau fpr needs to be clipped and sorted due to rounding errors
         train_fpr = np.clip(train_fpr, 0, 1)
         train_fpr = np.sort(train_fpr)
@@ -583,7 +549,7 @@ finally:
     val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().cpu().numpy(),
                                           val_outputs.detach().cpu().numpy(),
                                           sample_weight=val_wgts.detach().cpu().numpy())
-    if signal == "stau": ### stau fpr needs to be clipped and sorted due to rounding errors
+    if user.signal == "stau": ### stau fpr needs to be clipped and sorted due to rounding errors
         val_fpr = np.clip(val_fpr, 0, 1)
         val_fpr = np.sort(val_fpr)
     val_auc = auc(val_fpr, val_tpr)
@@ -592,7 +558,7 @@ finally:
     # save performance to json
     perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc,
                           val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
-    perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), num_folds,
+    perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), user.n_folds,
                              hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates,
                              epochs, model_path)
 
@@ -632,7 +598,7 @@ finally:
             linking_length_label = "Linking length at "+str(frac)+" edge fraction"
         elif linking_length is not None:
             linking_length_label = "Linking length "+str(linking_length)
-    signal_label, background_label = plotting.get_plot_labels(signal, signal_mass)
+    signal_label, background_label = plotting.get_plot_labels(user.signal, user.signal_mass)
     text = [f"Training AUC = {train_auc:.3f}", f"Validation AUC = {val_auc:.3f}",
             signal_label, background_label, linking_length_label]
 
@@ -656,7 +622,7 @@ finally:
                                  yrange=[ymin, ymax], log_y=True)
     plotting.save_fig(fig_pred, plot_path+"training_validation_pred")
 
-    score_path = score_path + model_label + "/"
+    score_path = user.score_path + model_label + "/"
     misc.create_dirs(score_path)
 
     np.save(score_path+"train_sig_pred.npy", train_sig_pred.detach().cpu().numpy())

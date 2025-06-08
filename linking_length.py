@@ -11,6 +11,7 @@ import utils.misc as misc
 import utils.plotting as plotting
 import utils.performance as perf
 import utils.graph_definition as graph_def
+import utils.user_config as uconfig
 
 import numpy as np
 import torch
@@ -66,21 +67,14 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+user_config_path = args.userconfig
+user = uconfig.UserConfig.from_yaml(user_config_path)
+
 variable = str(args.variable)
 distance = str(args.distance)
 batch_size = args.batchsize
-user_config_path = args.userconfig
-user_config = misc.load_config(user_config_path)
-feature_h5_path = user_config["feature_h5_path"]
-plot_path = user_config["plot_path"]
-dist_path = user_config["dist_path"]
-ll_path = user_config["ll_path"]
 
-signal = user_config["signal"]
-assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
-signal_label, background_label = plotting.get_plot_labels(signal)
-cuts = user_config["cuts"]
-cutstring = misc.get_cutstring(cuts)
+signal_label, background_label = plotting.get_plot_labels(user.signal)
 
 train_config_path = args.MLconfig
 train_config = misc.load_config(train_config_path)
@@ -100,27 +94,24 @@ do_friend_graph = friend_graph
 
 logging.info("variable set: %s", variable)
 logging.info("distance metric: %s", distance)
-logging.info("signal: %s", signal)
 logging.info("variable set: %s", variable)
-logging.info("input data path: %s", feature_h5_path)
-logging.info("input distances path: %s", dist_path)
-logging.info("output ll json path: %s", ll_path)
-logging.info("output plot path: %s", plot_path)
 logging.info("making a friend graph? %s", str(friend_graph))
 
 
 logging.info("Loading sigbkg distances in batches")
-sigbkg_distance, sigbkg_wgt, sigbkg_max = misc.get_batched_distances(dist_path, variable, distance,
+sigbkg_distance, sigbkg_wgt, sigbkg_max = misc.get_batched_distances(user.dist_path,
+                                                                     variable, distance,
                                                                      batch_size, "sigbkg",
                                                                      sample=True,
-                                                                     cutstring=cutstring)
+                                                                     cutstring=user.cutstring)
 sigbkg_mean = torch.mean(sigbkg_distance)
 
 logging.info("Loading bkgbkg distances in batches")
-bkgbkg_distance, bkgbkg_wgt, bkgbkg_max = misc.get_batched_distances(dist_path, variable, distance,
+bkgbkg_distance, bkgbkg_wgt, bkgbkg_max = misc.get_batched_distances(user.dist_path,
+                                                                     variable, distance,
                                                                      batch_size, "bkgbkg",
                                                                      sample=True,
-                                                                     cutstring=cutstring)
+                                                                     cutstring=user.cutstring)
 bkgbkg_mean = mean_wgted(bkgbkg_distance, bkgbkg_wgt)
 
 logging.info("Minmax normalising sigbkg/bkgbkg distances")
@@ -144,10 +135,11 @@ norm_bkgbkg_hist = np.histogram(norm_bkgbkg, bins=norm_binning, range=(0, 1),
 
 
 logging.info("Loading sigsig distances in batches")
-sigsig_distance, sigsig_wgt, sigsig_max = misc.get_batched_distances(dist_path, variable, distance,
+sigsig_distance, sigsig_wgt, sigsig_max = misc.get_batched_distances(user.dist_path,
+                                                                     variable, distance,
                                                                      batch_size, "sigsig",
                                                                      sample=True,
-                                                                     cutstring=cutstring)
+                                                                     cutstring=user.cutstring)
 sigsig_mean = mean_wgted(sigsig_distance, sigsig_wgt)
 
 logging.info("Minmax normalising sigsig distances")
@@ -159,7 +151,7 @@ norm_sigsig_hist = np.histogram(norm_sigsig, bins=norm_binning, range=(0, 1),
 
 
 logging.info("Plotting ...")
-plot_path = plot_path + "/" + variable + "/"
+plot_path = user.plot_path + "/" + variable + "/"
 misc.create_dirs(plot_path)
 
 plotting.plot_distances_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
@@ -241,7 +233,7 @@ if not do_edge_frac:
 
 roc_path = plot_path + "/" + variable + "/ROC/"
 misc.create_dirs(roc_path)
-roc_name = roc_path + variable + "_" + distance + cutstring + "_ROC_" +\
+roc_name = roc_path + variable + "_" + distance + user.cutstring + "_ROC_" +\
            friend_species + "friends.json"
 logging.info("saving ROC curve to %s", roc_name)
 with open(roc_name, "w", encoding="utf-8") as outfile:
@@ -261,17 +253,11 @@ if do_edge_frac:
                                                          edge_frac, x_max,
                                                          do_friend_graph=do_friend_graph)
 
-    #linking_lengths_continuous = graph_def.find_threshold_edge_frac_continuous(sigsig_distance, sigbkg_distance,
-    #                                                     bkgbkg_distance,
-    #                                                     edge_frac,
-    #                                                     do_friend_graph=do_friend_graph)
-    #print(linking_lengths)
-    #print(linking_lengths_continuous)
-    # saving linking lengths
 
     length_dict = {"edge_frac": edge_frac, "length": linking_lengths}
-    misc.create_dirs(ll_path)
-    ll_path = ll_path + "edge_frac_" + variable + "_" + distance + cutstring + "_linking_length.json"
+    misc.create_dirs(user.ll_path)
+    ll_path = user.ll_path + "edge_frac_" + variable + "_" +\
+            distance + user.cutstring + "_linking_length.json"
 
     # plotting sig-sig and bkg-bkg distributions and the linking lengths
     logging.info("Plotting linking lengths ...")
@@ -316,52 +302,55 @@ else:
     #   just determined as the threshold for the given ss efficiency.
     for eff in targettarget_eff:
         if do_same_class:
-            ss_sb_roc_cut, ss_sb_threshold = graph_def.find_threshold(tpr_ss_sb, fpr_ss_sb, eff,
-                                                                      cut_ss_sb,
-                                                                      is_target_closest=is_signal_closest)
+            ss_sb_roc_cut, ss_sb_threshold = \
+                graph_def.find_threshold(tpr_ss_sb, fpr_ss_sb, eff, cut_ss_sb,
+                                         is_target_closest=is_signal_closest)
             ss_sb_roc_cuts.append(ss_sb_roc_cut)
             ss_sb_thresholds.append(norm.reverse_minmax(ss_sb_threshold, 0, d_max))
-            bb_sb_roc_cut, bb_sb_threshold = graph_def.find_threshold(tpr_bb_sb, fpr_bb_sb, eff,
-                                                                      cut_bb_sb,
-                                                                      is_target_closest=(not is_signal_closest))
+            bb_sb_roc_cut, bb_sb_threshold = \
+                graph_def.find_threshold(tpr_bb_sb, fpr_bb_sb, eff, cut_bb_sb,
+                                         is_target_closest=(not is_signal_closest))
             bb_sb_roc_cuts.append(bb_sb_roc_cut)
             targettarget_thresholds.append(norm.reverse_minmax(bb_sb_threshold, 0, d_max).item())
         else:
             if is_signal_closest:
-                ss_sb_roc_cut, ss_sb_threshold = graph_def.find_threshold(tpr_ss_sb, fpr_ss_sb, eff,
-                                                                          cut_ss_sb,
-                                                                          is_target_closest=is_signal_closest)
+                ss_sb_roc_cut, ss_sb_threshold = \
+                    graph_def.find_threshold(tpr_ss_sb, fpr_ss_sb, eff, cut_ss_sb,
+                                             is_target_closest=is_signal_closest)
                 ss_sb_roc_cuts.append(ss_sb_roc_cut)
                 ss_sb_thresholds.append(norm.reverse_minmax(ss_sb_threshold, 0, d_max))
-                ss_bb_roc_cut, ss_bb_threshold = graph_def.find_threshold(tpr_ss_bb, fpr_ss_bb, eff,
-                                                                          cut_ss_bb,
-                                                                          is_target_closest=is_signal_closest)
+                ss_bb_roc_cut, ss_bb_threshold = \
+                    graph_def.find_threshold(tpr_ss_bb, fpr_ss_bb, eff, cut_ss_bb,
+                                             is_target_closest=is_signal_closest)
                 ss_bb_roc_cuts.append(ss_bb_roc_cut)
-                targettarget_thresholds.append(norm.reverse_minmax(ss_bb_threshold, 0, d_max).item())
+                targettarget_thresholds.append(norm.reverse_minmax(ss_bb_threshold,
+                                                                   0, d_max).item())
             else:
                 targettarget_eff_label = "bkgbkg_eff"
-                bb_sb_roc_cut, bb_sb_threshold = graph_def.find_threshold(tpr_bb_sb, fpr_bb_sb, eff,
-                                                                          cut_bb_sb,
-                                                                          is_target_closest=(not is_signal_closest))
+                bb_sb_roc_cut, bb_sb_threshold = \
+                    graph_def.find_threshold(tpr_bb_sb, fpr_bb_sb, eff, cut_bb_sb,
+                                             is_target_closest=(not is_signal_closest))
                 bb_sb_roc_cuts.append(bb_sb_roc_cut)
                 bb_sb_thresholds.append(norm.reverse_minmax(bb_sb_threshold, 0, d_max))
-                bb_ss_roc_cut, bb_ss_threshold = graph_def.find_threshold(tpr_bb_ss, fpr_bb_ss, eff,
-                                                                          cut_bb_ss,
-                                                                          is_target_closest=(not is_signal_closest))
+                bb_ss_roc_cut, bb_ss_threshold = \
+                    graph_def.find_threshold(tpr_bb_ss, fpr_bb_ss, eff, cut_bb_ss,
+                                             is_target_closest=(not is_signal_closest))
                 bb_ss_roc_cuts.append(bb_ss_roc_cut)
-                targettarget_thresholds.append(norm.reverse_minmax(bb_ss_threshold, 0, d_max).item())
+                targettarget_thresholds.append(norm.reverse_minmax(bb_ss_threshold,
+                                                                   0, d_max).item())
 
     # saving linking lengths
     length_dict = {"targettarget_eff": targettarget_eff, "length": targettarget_thresholds}
-    misc.create_dirs(ll_path)
-    ll_path = ll_path + "targettarget_eff_" + variable + "_" + distance + cutstring + "_linking_length.json"
+    misc.create_dirs(user.ll_path)
+    ll_path = user.ll_path + "targettarget_eff_" + variable + "_" +\
+        distance + user.cutstring + "_linking_length.json"
 
     # plotting sig-sig and bkg-bkg distributions and the linking lengths
     # TODO: moving plotting to utils
     logging.info("Plotting linking lengths ...")
-    plotting.plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist, targettarget_thresholds,
-                                      signal_label, background_label, do_edge_frac, plot_path,
-                                      variable, distance, targettarget_eff,
+    plotting.plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
+                                      targettarget_thresholds, signal_label, background_label,
+                                      do_edge_frac, plot_path, variable, distance, targettarget_eff,
                                       target_eff_label=targettarget_eff_label)
 
     logging.info("Plotting ROC curves ...")

@@ -8,6 +8,7 @@ import utils.torch_distances as dis
 import utils.misc as misc
 import utils.plotting as plotting
 import utils.adj_mat as adj
+import utils.user_config as uconfig
 
 import numpy as np
 import torch
@@ -55,32 +56,18 @@ parser.add_argument(
 start_time = time.time()
 
 args = parser.parse_args()
+user_config_path = str(args.userconfig)
+user = uconfig.UserConfig.from_yaml(user_config_path)
 
 variable = str(args.variable)
 distance = str(args.distance)
 
-user_config_path = str(args.userconfig)
-user_config = misc.load_config(user_config_path)
-feature_h5_path = str(user_config["feature_h5_path"])
-plot_path = str(user_config["plot_path"])
-dist_path = str(user_config["dist_path"])
-
-signal = str(user_config["signal"])
-signal_mass = str(user_config["signal_mass"])
-signal_label, background_label = plotting.get_plot_labels(signal)
-distance_items = user_config["distance"]
-feature_dim = user_config["feature_dim"]
-assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
-cuts = user_config["cuts"]
-cutstring = misc.get_cutstring(cuts)
+signal_label, background_label = plotting.get_plot_labels(user.signal)
+#cutstring = misc.get_cutstring(user.cuts)
 
 logging.info("distance metric: %s", distance)
-logging.info("signal: %s", signal)
 logging.info("variable set: %s", variable)
-logging.info("input data path: %s", feature_h5_path)
-logging.info("input distances path: %s", dist_path)
-logging.info("output plot path: %s", plot_path)
-kinematics = misc.get_kinematics(variable, feature_dim)
+kinematics = misc.get_kinematics(variable, user.feature_dim)
 
 # load in input files
 logging.info('Importing signal and background files...')
@@ -92,24 +79,23 @@ if distance == "emd":
     if "LowLevel" not in variable:
         raise Exception("need to use low level variables for the EMD")
     standardise = False
-    objects = distance_items[distance]['objects']
 
 full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels, _, _ = \
-    adj.data_loader(feature_h5_path, kinematics, ex=cutstring, signal=signal,
-                    signal_mass=signal_mass, standardisation=standardise)
+    adj.data_loader(user.feature_h5_path, kinematics, ex=user.cutstring, signal=user.signal,
+                    signal_mass=user.signal_mass, standardisation=standardise)
 
 
 # option to weight events, atm only relevant for HHH.
 global_bkg_wgt = 1.0
-if signal == "hhh":
+if user.signal == "hhh":
     SF_4b5b = 0.07 # placeholder value for HHH data-driven background
     global_bkg_wgt = SF_4b5b
 bkg_wgt = bkg_wgt*global_bkg_wgt
 
 batch_size = args.batchsize
 
-save_path = dist_path + "/batched_" + str(batch_size) + "_" + \
-    variable + "_" + distance + cutstring + "_distances/"
+save_path = user.dist_path + "/batched_" + str(batch_size) + "_" +\
+    variable + "_" + distance + user.cutstring + "_distances/"
 misc.create_dirs(save_path)
 
 def calc_a_b_batched_distances(species_a, species_b, full_a, full_b, kinematics_list,
@@ -184,7 +170,8 @@ def calc_a_b_batched_distances(species_a, species_b, full_a, full_b, kinematics_
 
             # save all the wgts and distances for this batch to a torch tensor .pt file.
             batch_dict = {'distance': batch_ab, 'weight': batch_ab_wgt}
-            torch.save(batch_dict, save_path + f'{species_a}{species_b}_distances_batch_{i:02d}_{j:02d}.pt')
+            torch.save(batch_dict, save_path +
+                       f'{species_a}{species_b}_distances_batch_{i:02d}_{j:02d}.pt')
             del batch_dict
             logging.debug("saved file")
 
@@ -229,7 +216,7 @@ del full_bkg, bkg_wgt
 
 # Plot the distance distributions for the subset.
 logging.info("Plotting ... ")
-plot_path = plot_path + "/" + variable + "/"
+plot_path = user.plot_path + "/" + variable + "/"
 misc.create_dirs(plot_path)
 plotting.plot_distances(sigsig_distance_subsample.numpy(),
                         sigbkg_distance_subsample.numpy(),

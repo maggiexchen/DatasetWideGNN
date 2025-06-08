@@ -10,6 +10,7 @@ import time
 import utils.normalisation as norm
 import utils.adj_mat as adj
 import utils.misc as misc
+import utils.user_config as uconfig
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -53,6 +54,9 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+user_config_path = args.userconfig
+user = uconfig.UserConfig.from_yaml(user_config_path)
+
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 print(torch.cuda.mem_get_info())
@@ -61,24 +65,9 @@ batch_size = args.batchsize
 train_config_path = args.MLconfig
 train_config = misc.load_config(train_config_path)
 
-user_config_path = args.userconfig
-user_config = misc.load_config(user_config_path)
-print(user_config)
-feature_h5_path = user_config["feature_h5_path"]
-kinematic_h5_path = user_config["kinematic_h5_path"]
-plot_path = user_config["plot_path"]
-ll_path = user_config["ll_path"]
-adj_path = user_config["adj_path"]
-dist_path = user_config["dist_path"]
 friend_graph = train_config["friend_graph"]
 bool_edge_wgt = train_config["edge_weights"]
-os.makedirs(adj_path, exist_ok=True)
-signal = user_config["signal"]
-signal_mass = user_config["signal_mass"]
-feature_dim = user_config["feature_dim"]
-assert signal in ["hhh", "LQ", "stau"], f"Invalid signal type: {signal}"
-cuts = user_config["cuts"]
-cutstring = misc.get_cutstring(cuts)
+os.makedirs(user.adj_path, exist_ok=True)
 
 kinematic_variable = train_config["kinematic_variable"]
 embedding_variable = train_config["embedding_variable"]
@@ -97,13 +86,13 @@ linking_length = train_config["linking_length"]
 edge_frac = train_config["edge_frac"]
 targettarget_eff = train_config["targettarget_eff"]
 
-os.makedirs(ll_path, exist_ok=True)
+os.makedirs(user.ll_path, exist_ok=True)
 
 # TODO support edge_frac or target_eff
 if linking_length is not None:
     logging.info("linking length is given in config,\
                  IGNORING edge_frac/targettarget_eff if present!")
-    adj_path = adj_path + "/" + str(distance) + "_" + "linking_length_" + \
+    adj_path = user.adj_path + "/" + str(distance) + "_" + "linking_length_" + \
         str(linking_length).replace(".","p") + "/"
 
 elif edge_frac is not None and targettarget_eff is not None:
@@ -115,8 +104,8 @@ elif edge_frac is not None:
     if edge_frac not in [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]:
         raise ValueError("""not given a supported edge fraction,
                          (0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5)""")
-    ll_path = ll_path + "edge_frac"
-    adj_path = adj_path + "/" + str(distance) + "_" + "edge_frac_" + \
+    ll_path = user.ll_path + "edge_frac"
+    adj_path = user.adj_path + "/" + str(distance) + "_" + "edge_frac_" + \
         str(edge_frac).replace(".","p") + "/"
 
 elif targettarget_eff is not None:
@@ -126,14 +115,14 @@ elif targettarget_eff is not None:
         raise ValueError("""not given a supported sig-sig efficiency,
                          (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)""")
 
-    ll_path = ll_path + "targettarget_eff_"
-    adj_path = adj_path + "/" + str(distance) + "_" + "targettarget_eff_" + \
+    ll_path = user.ll_path + "targettarget_eff_"
+    adj_path = user.adj_path + "/" + str(distance) + "_" + "targettarget_eff_" + \
         str(targettarget_eff).replace(".","p") + "/"
 
 else:
     raise ValueError("Neither manual LL, edge_frac or targettarget_eff in ML config, pick one!")
 
-ll_path = ll_path + variable + "_" + distance + cutstring + "_linking_length.json"
+ll_path = user.ll_path + variable + "_" + distance + user.cutstring + "_linking_length.json"
 
 if linking_length is None:
     print("Saving linking length to ", ll_path)
@@ -148,18 +137,11 @@ if linking_length is None:
 
 misc.create_dirs(adj_path)
 
-kinematics = misc.get_kinematics(kinematic_variable, feature_dim)
+kinematics = misc.get_kinematics(kinematic_variable, user.feature_dim)
 input_size = len(kinematics)
 
-logging.info("signal: %s", signal)
 logging.info("kinematic variable set: %s", kinematic_variable)
 logging.info("embedding variable set: %s", embedding_variable)
-logging.info("input data distance path: %s", feature_h5_path)
-logging.info("input data kinematic path: %s", kinematic_h5_path)
-logging.info("input ll json path: %s", ll_path)
-logging.info("input distances path: %s", dist_path)
-logging.info("output plot path: %s", plot_path)
-logging.info("adj matrix storage path: %s", adj_path)
 logging.info("distance metric: %s", distance)
 if edge_frac is not None:
     logging.info("desired edge fraction: %s", str(edge_frac))
@@ -174,11 +156,11 @@ logging.info('Importing signal and background files...')
 # normalised signal and background kinematics
 logging.info('Importing signal and background files...')
 full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels, _, _ = adj.data_loader(
-    feature_h5_path,
+    user.feature_h5_path,
     kinematics,
-    ex=cutstring,
-    signal=signal,
-    signal_mass=signal_mass,
+    ex=user.cutstring,
+    signal=user.signal,
+    signal_mass=user.signal_mass,
     standardisation=True
     )
 
@@ -190,8 +172,8 @@ del sig_wgt, bkg_wgt
 ### load distances and apply linking length to receieve indices
 logging.info("Batch applying the linking length and getting non-zero indices ...")
 logging.info("For sigsig ...")
-sigsig_result = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "sigsig",
-                                                 linking_length, batch_size, cutstring,
+sigsig_result = adj.generate_batched_nonzero_ind(user.dist_path, variable, distance, "sigsig",
+                                                 linking_length, batch_size, user.cutstring,
                                                  friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
 if bool_edge_wgt:
     sigsig_ind, sigsig_edge_wgts = sigsig_result
@@ -201,8 +183,8 @@ print("sigsig: ",sigsig_ind.shape)
 print("fraction of egdes in sigsig: ", sigsig_ind.shape[0]/(len(full_sig)**2))
 
 logging.info("For sigbkg ...")
-sigbkg_result = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "sigbkg",
-                                                 linking_length, batch_size, cutstring,
+sigbkg_result = adj.generate_batched_nonzero_ind(user.dist_path, variable, distance, "sigbkg",
+                                                 linking_length, batch_size, user.cutstring,
                                                  friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
 if bool_edge_wgt:
     sigbkg_ind, sigbkg_edge_wgts = sigbkg_result
@@ -221,8 +203,8 @@ print("bgsig: ", bkgsig_ind.shape)
 print("fraction of egdes in bkgsig: ", bkgsig_ind.shape[0]/(len(full_bkg)*len(full_sig)))
 
 logging.info("For bkgbkg ...")
-bkgbkg_result = adj.generate_batched_nonzero_ind(dist_path, variable, distance, "bkgbkg",
-                                                 linking_length, batch_size, cutstring,
+bkgbkg_result = adj.generate_batched_nonzero_ind(user.dist_path, variable, distance, "bkgbkg",
+                                                 linking_length, batch_size, user.cutstring,
                                                  friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
 if bool_edge_wgt:
     bkgbkg_ind, bkgbkg_edge_wgts = bkgbkg_result

@@ -75,3 +75,12 @@ ml_<>.yaml
 user_<>.yaml
 - added the n_folds flag.
 - added Seb's 'run_with_cuda' flag.
+
+
+
+potential todos
+- check printing out full paths not just config ones
+- if no signal mass will anything crash?
+- ml config class
+- asserts into config classes
+- refactor utils into more helpfully named files
