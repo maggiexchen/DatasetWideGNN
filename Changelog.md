@@ -76,11 +76,16 @@ user_<>.yaml
 - added the n_folds flag.
 - added Seb's 'run_with_cuda' flag.
 
+added a utils/user_config.py
+- sets up a class to configure the user config
+- set types, does the signal check, and whatever else we wanted to check
+- saves a few lines in the other scripts and keeps consistency
 
 
 potential todos
 - check printing out full paths not just config ones
 - if no signal mass will anything crash?
 - ml config class
-- asserts into config classes
 - refactor utils into more helpfully named files
+- some more using the functions for plotting
+- look at apply_model and Z_score scripts.
