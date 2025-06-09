@@ -35,7 +35,12 @@ def get_plot_labels(signal_type, signal_mass = None):
     return signal, background
 
 
+<<<<<<< HEAD
 def add_text(ax, text, doATLAS=False, startx=0.04, starty=0.93, inc=0.05):
+=======
+
+def add_text(ax, text, doATLAS=False, startx=0.04, starty=0.93):
+>>>>>>> 3c28afbcf252cdd86509740ccae207810de65cf1
     """
     Function to add text to figures
     

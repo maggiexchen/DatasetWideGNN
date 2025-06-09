@@ -8,7 +8,7 @@ signal_mass: 1000
 backgrounds: ["singletop", "ttbar"]
 cuts:
   met:
-    threshold: 200
+    threshold: 2000
     operation: ">"
 feature_dim:
 distance:
@@ -18,14 +18,14 @@ distance:
     objects: ["bjet1", "bjet2", "lep1", "lep2"]
 
 # input paths
-ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
-feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
-kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
-ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_HighLevelKinematics/linking_lengths/ 
-dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_HighLevelKinematics/distances/
-score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_HighLevelKinematics/output_scores/
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_140325/
+feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/TEST/
+kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/TEST/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/TEST/linking_lengths/ 
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/TEST/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/TEST/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_HighLevelKinematics/plots/ 
-adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_HighLevelKinematics/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_HighLevelKinematics/models/
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/TEST/plots/ 
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/TEST/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/TEST/models/
