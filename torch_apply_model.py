@@ -7,14 +7,15 @@ import utils.plotting as plotting
 import utils.adj_mat as adj
 from utils.gcn_model import GCNClassifier
 import utils.user_config as uconfig
+import utils.ml_config as mlconfig
 import json
-from torch_geometric.data import Data 
+from torch_geometric.data import Data
 from torch_geometric.loader import NeighborLoader
 import time
 st = time.time()
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, auc
 import gc
-import logging 
+import logging
 
 logging.getLogger().setLevel(logging.INFO)
 torch.cuda.empty_cache()
@@ -37,7 +38,8 @@ def GetParser():
         "-u",
         type=str,
         required=True,
-        help="Specify the config for the user e.g. paths to store all the input/output data and results, signal model to look at",
+        help="""Specify the config for the user e.g. paths to store all the input/output data and
+        results, signal model to look at""",
     )
 
     return parser
@@ -49,6 +51,10 @@ args = parser.parse_args()
 user_config_path = args.userconfig
 user = uconfig.UserConfig.from_yaml(user_config_path)
 
+### load training config
+ml_config_path = args.MLconfig
+ml = mlconfig.MLConfig.from_yaml(ml_config_path)
+
 ### rename signal to include mass
 signal = user.signal + "_" + str(user.signal_mass)
 
@@ -56,122 +62,90 @@ signal_label, background_label = plotting.get_plot_labels(signal)
 
 ### set up CUDA/CPU device settings
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
-device = torch.device('cuda') if (torch.cuda.is_available() & user.run_with_cuda) else torch.device('cpu') 
+device = torch.device('cuda') if (torch.cuda.is_available() & user.run_with_cuda) else torch.device('cpu')
 cpu = torch.device('cpu')
 
 # set random seed for training
 torch.manual_seed(42)
 
-### load training config 
-train_config_path = args.MLconfig
-train_config = misc.load_config(train_config_path)
-print("Using training config ",train_config)
-hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
-if len(hidden_sizes_gcn) > 0:
-    gnn = True
-else:
-    gnn = False
-hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
-LR = train_config["LR"]
-dropout_rates = train_config["dropout_rates"]
-epochs = train_config["epochs"]
-num_nb_list = train_config["num_nb_list"] 
-batch_size = train_config["batch_size"]
-gnn_type = train_config["gnn_type"]
-single_fold = train_config["single_fold"]
-plot_conv_kins = train_config["plot_conv_kinematics"]
-bool_edge_wgt = train_config["edge_weights"]
 
+do_gnn = True if len(ml.hidden_sizes_gcn) > 0 else False
 
-kinematic_variable = train_config["kinematic_variable"]
-embedding_variable = train_config["embedding_variable"]
-if kinematic_variable is None:
-    print("Need to specify a type of kinematic variable in the config")
-
-if embedding_variable is None:
-    embedding_variable = kinematic_variable
-
-distance = train_config["distance"]
-if distance is None:
-    print("Need to specify a type of distance metric for the adjacency matrix in the config")
-
-linking_length = train_config["linking_length"]
-eff = train_config["sigsig_eff"]
-if linking_length is None:
-    if eff is None:
+if ml.linking_length is None:
+    if ml.targettarget_eff is None:
         raise Exception("Need to specify a sig-sig efficiency for the adjacency matrix when training a gcn in the config")
-    elif eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
+    elif ml.targettarget_eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
         raise Exception("not given a supported efficiency, (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)")
     else:
-        ll_str = "_LLEff" + str(eff).replace(".", "p")
-        adj_path = user.adj_path + "/" + f"sigsig_eff_{eff}/"
+        ll_str = "_LLEff" + str(ml.targettarget_eff).replace(".", "p")
+        adj_path = user.adj_path + "/" + f"sigsig_eff_{ml.targettarget_eff}/"
 else:
-    if eff is not None:
+    if ml.targettarget_eff is not None:
         # when both linking length and sigsig eff are specified, use the linking length at specified sigsig efficiency
-        ll_str = "_LLEff" + str(eff).replace(".", "p")
-        adj_path = user.adj_path + "/" + f"sigsig_eff_{eff}/"
+        ll_str = "_LLEff" + str(ml.targettarget_eff).replace(".", "p")
+        adj_path = user.adj_path + "/" + f"sigsig_eff_{ml.targettarget_eff}/"
     else:
         print("linking length is given in config, IGNORING the sigsig_eff in the config!")
-        ll_str = "_LL" + str(linking_length).replace(".", "p")
-        adj_path = user.adj_path + "/" + f"linking_length_{linking_length}/"
+        ll_str = "_LL" + str(ml.linking_length).replace(".", "p")
+        adj_path = user.adj_path + "/" + f"linking_length_{ml.linking_length}/"
 
 ### str for train/val split label. If single fold, then val_frac is 1/num_folds. Otherwise, nf is num_folds
-if single_fold == True:
+if ml.single_fold:
     val_frac = 1/user.n_folds
     nf_str = f"_val_frac{val_frac:.2f}"
 else:
     nf_str = "_nf" + str(user.n_folds)
 
 ### create model label and result plot path
-if len(hidden_sizes_gcn) == 0:
+if len(ml.hidden_sizes_gcn) == 0:
     model_label = signal\
-          + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
-          + "_lr" + str(LR).replace(".", "p")\
-          + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
-          + "_bs" + str(batch_size)\
-          + "_e" + str(epochs)\
+          + "_MLP" + "-".join(map(str, ml.hidden_sizes_mlp)).replace(".", "p")\
+          + "_lr" + str(ml.LR).replace(".", "p")\
+          + "_dr" + "-".join(map(str, ml.dropout_rates)).replace(".", "p")\
+          + "_bs" + str(ml.batch_size)\
+          + "_e" + str(ml.epochs)\
           + nf_str
 else:
     model_label = signal\
-            + f"_{gnn_type}" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
-            + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
-            + "_nb" + "-".join(map(str, num_nb_list))\
-            + "_lr" + str(LR).replace(".", "p")\
+            + f"_{ml.gnn_type}" + "-".join(map(str, ml.hidden_sizes_gcn)).replace(".", "p")\
+            + "_MLP" + "-".join(map(str, ml.hidden_sizes_mlp)).replace(".", "p")\
+            + "_nb" + "-".join(map(str, ml.num_nb_list))\
+            + "_lr" + str(ml.LR).replace(".", "p")\
             + ll_str\
-            + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
-            + "_bs" + str(batch_size)\
-            + "_e" + str(epochs)\
+            + "_dr" + "-".join(map(str, ml.dropout_rates)).replace(".", "p")\
+            + "_bs" + str(ml.batch_size)\
+            + "_e" + str(ml.epochs)\
             + nf_str\
-            + "_edge_wgt_seed_fold" 
-    
-if gnn == False:
+            + "_edge_wgt_seed_fold"
+
+if do_gnn == False:
     plot_path = user.plot_path + "/MLP/" + model_label + "/"
 plot_path = user.plot_path + model_label + "/"
 misc.create_dirs(plot_path)
 
 if signal == "stau":
-    kinematics = misc.get_kinematics_staus(kinematic_variable)
+    kinematics = misc.get_kinematics_staus(ml.kinematic_variable)
 else:
-    kinematics = misc.get_kinematics(kinematic_variable)
+    kinematics = misc.get_kinematics(ml.kinematic_variable)
 input_size = len(kinematics)
 
 logging.info("signal: "+signal)
 logging.info("chosen model: "+model_label)
-logging.info("kinematic variable set: "+kinematic_variable)
-logging.info("embedding variable set: "+embedding_variable)
+logging.info("kinematic variable set: "+ml.kinematic_variable)
+logging.info("embedding variable set: "+ml.embedding_variable)
 logging.info("input data path: "+user.feature_h5_path)
 logging.info("input ll json path: "+user.ll_path)
 logging.info("input distances path: "+user.dist_path)
 logging.info("output plot path: "+user.plot_path)
 logging.info("adj matrix storage path: "+user.adj_path)
 logging.info("model storage path: "+user.model_path)
-model_path = user.model_path + model_label + "/" + gnn_type + "/"
+model_path = user.model_path + model_label + "/" + ml.gnn_type + "/"
 
-logging.info("distance metric: "+distance)
-if eff is not None:    
-    logging.info("desired efficieny: "+str(eff))
-elif linking_length is not None:
-    logging.info("linking length: "+str(linking_length))
+logging.info("distance metric: "+ml.distance)
+if ml.targettarget_eff is not None:    
+    logging.info("desired efficieny: "+str(ml.targettarget_eff))
+elif ml.linking_length is not None:
+    logging.info("linking length: "+str(ml.linking_length))
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
@@ -206,11 +180,11 @@ fold_assignment = np.concatenate((sig_fold, bkg_fold), axis=0)
 
 
 logging.info("Loaded signal and background data.")
-logging.info("Time taken so far: "+str(time.time()-st))    
+logging.info("Time taken so far: "+str(time.time()-st))
 
-### load edge indices if gnn layers are used
+### load edge indices if do_gnn layers are used
 edge_ind = None
-if gnn:
+if do_gnn:
     print("constructing sparse adjacency matrix ...")
     print("loading row indices ...")
     row_ind = torch.load(adj_path+'row_ind.pt')
@@ -222,21 +196,21 @@ if gnn:
     del row_ind
     del col_ind
     print("Edge fraciton: ", edge_ind.shape[1] / (len(full_y)* (len(full_y)-1))/2)
-    if bool_edge_wgt:
+    if ml.edge_weights:
         print("loading edge weights ...")
         edge_wgts = torch.load(adj_path+'edge_wgts.pt')
         print("edge_index size: ", len(edge_ind[0]))
         edge_weights_from_MC = full_wgts[edge_ind[0]] ### edge weights from MC source node
         edge_wgts = edge_wgts * edge_weights_from_MC
 
-if plot_conv_kins:
+if ml.plot_conv_kins:
     edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
     sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edges, size=(len(full_y), len(full_y)))
     adj_mat = sparse_adj_matrix.to_dense()
     del sparse_adj_matrix
     print(adj_mat)
     for nconv in range(3):
-        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, kinematics, signal, eff, plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv)
+        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, kinematics, signal, ml.targettarget_eff, plot_path, normalisation="D_half_inv", standardise=False, nconv=nconv)
     del edges, adj_mat
 misc.print_mem_info()
 
@@ -244,7 +218,7 @@ gc.collect()
 torch.cuda.empty_cache()
 
 ### create data object, train and val loaders
-if bool_edge_wgt:
+if ml.edge_weights:
     data = Data(x = full_x, y = full_y, edge_index = edge_ind, node_weight = full_wgts, edge_weight = edge_wgts)
     del edge_ind, edge_wgts
 else:
@@ -270,12 +244,12 @@ for fold_no in range(user.n_folds):
     val_loader = NeighborLoader(
         data_standardised,
         input_nodes = val_idx,
-        num_neighbors = num_nb_list,
+        num_neighbors = ml.num_nb_list,
         shuffle = False,
-        batch_size = batch_size,
+        batch_size = ml.batch_size,
     )
 
-    model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn, hidden_sizes_mlp = hidden_sizes_mlp, output_size=1, dropout_rates=dropout_rates, gnn_type=gnn_type)
+    model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=ml.hidden_sizes_gcn, hidden_sizes_mlp = ml.hidden_sizes_mlp, output_size=1, dropout_rates=ml.dropout_rates, gnn_type=ml.gnn_type)
     model.load_state_dict(model_state_dict["model_state"])
     model.eval()
     model.to(device)
@@ -287,7 +261,7 @@ for fold_no in range(user.n_folds):
     for batch in val_loader:
         batch = batch.to(device)
         batch_size = batch.batch_size
-        if bool_edge_wgt:
+        if ml.edge_weights:
             outputs = model(batch.x, batch.edge_index, batch.edge_weight)
         else:
             outputs = model(batch.x, batch.edge_index)
@@ -337,28 +311,29 @@ np.save(score_path+"val_sig_wgts_reduced_sample.npy", val_sig_wgts.detach().cpu(
 np.save(score_path+"val_bkg_pred_reduced_sample.npy", val_bkg_pred.detach().cpu().numpy())
 np.save(score_path+"val_bkg_wgts_reduced_sample.npy", val_bkg_wgts.detach().cpu().numpy())
 
-if gnn:
-    if eff is not None:
-        linking_length_label = "Linking length at "+str(eff)+" sig-sig efficiency"
-    elif linking_length is not None:
-        linking_length_label = "Linking length "+str(linking_length)
+text = ""
+if do_gnn:
+    if ml.targettarget_eff is not None:
+        linking_length_label = "Linking length at "+str(ml.targettarget_eff)+" sig-sig efficiency"
+    elif ml.linking_length is not None:
+        linking_length_label = "Linking length "+str(ml.linking_length)
 else:
     linking_length_label = ""
 signal_label, background_label = plotting.get_plot_labels(signal)
 if user.signal == "hhh":
-    if eff is not None:
+    if ml.targettarget_eff is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-    elif linking_length is not None:
+    elif ml.linking_length is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
 elif user.signal == "stau":
-    if eff is not None:
+    if ml.targettarget_eff is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-    elif linking_length is not None:
+    elif ml.linking_length is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
 elif "LQ" in user.signal:
-    if eff is not None:
+    if ml.targettarget_eff is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
-    elif linking_length is not None:
+    elif ml.linking_length is not None:
         text = ["Validation AUC = {:.3f}".format(val_auc), signal_label, background_label, linking_length_label]
 
 plotting.add_text(ax, text, do_atlas=False, startx=0.02, starty=0.95)

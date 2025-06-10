@@ -13,6 +13,7 @@ import utils.performance as perf
 import utils.plotting as plotting
 import utils.training as training
 import utils.user_config as uconfig
+import utils.ml_config as mlconfig
 from utils.gcn_model import GCNClassifier
 #from utils.dnn_model import DNNClassifier
 
@@ -55,6 +56,10 @@ args = parser.parse_args()
 user_config_path = args.userconfig
 user = uconfig.UserConfig.from_yaml(user_config_path)
 
+### load training config
+ml_config_path = args.MLconfig
+ml = mlconfig.MLConfig.from_yaml(ml_config_path)
+
 ### set up CUDA/CPU device settings
 print("CUDA is available? ", torch.cuda.is_available())
 cpu = torch.device('cpu')
@@ -65,125 +70,99 @@ if torch.cuda.is_available() and user.run_with_cuda:
 # set random seed for training
 torch.manual_seed(42)
 
-### load training config
-train_config_path = args.MLconfig
-train_config = misc.load_config(train_config_path)
-print("Using training config ",train_config)
-hidden_sizes_gcn = train_config["hidden_sizes_gcn"]
-do_gnn = True if len(hidden_sizes_gcn) > 0 else False
+do_gnn = True if len(ml.hidden_sizes_gcn) > 0 else False
 
-hidden_sizes_mlp = train_config["hidden_sizes_mlp"]
-LR = train_config["LR"]
-patience_LR = train_config["patience_LR"]
-dropout_rates = train_config["dropout_rates"]
-epochs = train_config["epochs"]
-num_nb_list = train_config["num_nb_list"]
-batch_size = train_config["batch_size"]
-gnn_type = train_config["gnn_type"]
-patience_early_stopping = train_config["patience_early_stopping"]
-single_fold = train_config["single_fold"]
-plot_conv_kins = train_config["plot_conv_kinematics"]
-do_edge_wgt = train_config["edge_weights"]
+do_edge_wgt = ml.edge_weights
 
 ## LR scheduler patience should be less than early stopping patience,
 #  so that the LR can be reduced before training stops
-assert patience_LR < patience_early_stopping, \
+assert ml.patience_LR < ml.patience_early_stopping, \
     "LR scheduler patience should be less than early stopping patience"
 
-
-kinematic_variable = train_config["kinematic_variable"]
-embedding_variable = train_config["embedding_variable"]
-if kinematic_variable is None:
-    raise ValueError("Need to specify a type of kinematic variable in the ML config")
-
-if embedding_variable is None:
-    embedding_variable = kinematic_variable
-
-distance = str(train_config["distance"])
-if distance is None:
+if ml.distance is None:
     raise ValueError("Need to specify a distance metric for the adjacency matrix in the ML config")
 
 # TODO resupport target_eff option
-linking_length = train_config["linking_length"]
 edge_frac_list = [0.1, 0.2, 0.3, 0.4, 0.5]
-frac = train_config["edge_frac"]
-if linking_length is None:
-    if frac is None:
+if ml.linking_length is None:
+    if ml.edge_frac is None:
         raise ValueError("Need to specify an edge_frac for the adjacency matrix in the ML config")
-    elif frac not in edge_frac_list:
+    elif ml.edge_frac not in edge_frac_list:
         raise ValueError(f"not given a supported edge fraction, {edge_frac_list}")
     else:
-        ll_str = "_LLFrac" + str(frac).replace(".", "p")
-        adj_path = user.adj_path + "/" + distance + "_edge_frac_" + str(frac).replace(".", "p") + "/"
+        ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
+        adj_path = user.adj_path + "/" + ml.distance + "_edge_frac_" + \
+            str(ml.edge_frac).replace(".", "p") + "/"
 else:
-    if frac is not None:
+    if ml.edge_frac is not None:
         # when both linking length and edge fraction are specified,
         # use the linking length at specified edge fraction
-        ll_str = "_LLFrac" + str(frac).replace(".", "p")
-        adj_path = user.adj_path + "/" + distance + "_edge_frac_" + str(frac).replace(".", "p") + "/"
+        ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
+        adj_path = user.adj_path + "/" + ml.distance + "_edge_frac_" + \
+            str(ml.edge_frac).replace(".", "p") + "/"
     else:
         print("linking length is given in config, IGNORING the edge fraction in the config")
-        ll_str = "_LL" + str(linking_length).replace(".", "p")
-        adj_path = user.adj_path + "/" + distance + "_linking_length_" + \
-            str(linking_length).replace(".", "p") + "/"
+        ll_str = "_LL" + str(ml.linking_length).replace(".", "p")
+        adj_path = user.adj_path + "/" + ml.distance + "_linking_length_" + \
+            str(ml.linking_length).replace(".", "p") + "/"
 
 ### str for train/val split label. If single fold, then val_frac is 1/num_folds.
 # Otherwise, nf is num_folds
-if single_fold is True:
+if ml.single_fold is True:
     val_frac = 1/user.n_folds
     nf_str = f"_val_frac{val_frac:.2f}"
 else:
     nf_str = "_nf" + str(user.n_folds)
 
 ### create model label and result plot path
-if len(hidden_sizes_gcn) == 0:
+if len(ml.hidden_sizes_gcn) == 0:
     model_label = user.signal\
-          + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
-          + "_lr" + str(LR).replace(".", "p")\
-          + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
-          + "_bs" + str(batch_size)\
-          + "_e" + str(epochs)\
+          + "_MLP" + "-".join(map(str, ml.hidden_sizes_mlp)).replace(".", "p")\
+          + "_lr" + str(ml.LR).replace(".", "p")\
+          + "_dr" + "-".join(map(str, ml.dropout_rates)).replace(".", "p")\
+          + "_bs" + str(ml.batch_size)\
+          + "_e" + str(ml.epochs)\
           + nf_str
 else:
     model_label = user.signal\
-            + f"_{gnn_type}" + "-".join(map(str, hidden_sizes_gcn)).replace(".", "p")\
-            + "_MLP" + "-".join(map(str, hidden_sizes_mlp)).replace(".", "p")\
-            + "_nb" + "-".join(map(str, num_nb_list))\
-            + "_lr" + str(LR).replace(".", "p")\
+            + f"_{ml.gnn_type}" + "-".join(map(str, ml.hidden_sizes_gcn)).replace(".", "p")\
+            + "_MLP" + "-".join(map(str, ml.hidden_sizes_mlp)).replace(".", "p")\
+            + "_nb" + "-".join(map(str, ml.num_nb_list))\
+            + "_lr" + str(ml.LR).replace(".", "p")\
             + ll_str\
-            + "_dr" + "-".join(map(str, dropout_rates)).replace(".", "p")\
-            + "_bs" + str(batch_size)\
-            + "_e" + str(epochs)\
+            + "_dr" + "-".join(map(str, ml.dropout_rates)).replace(".", "p")\
+            + "_bs" + str(ml.batch_size)\
+            + "_e" + str(ml.epochs)\
             + nf_str
 
-kinematic_plot_path = user.plot_path + "/training_kinematics/"+distance+"_frac" + str(frac) + "/"
+kinematic_plot_path = user.plot_path + "/training_kinematics/" + \
+    ml.distance + "_frac" + str(ml.edge_frac) + "/"
 if not do_gnn:
     plot_path = user.plot_path + "/MLP/" + model_label + "/"
-plot_path = user.plot_path + distance + "_models/" + model_label + "/"
+plot_path = user.plot_path + ml.distance + "_models/" + model_label + "/"
 misc.create_dirs(plot_path)
 
 if user.signal == "stau":
-    kinematics = misc.get_kinematics_staus(kinematic_variable)
+    kinematics = misc.get_kinematics_staus(ml.kinematic_variable)
 else:
-    kinematics = misc.get_kinematics(kinematic_variable)
+    kinematics = misc.get_kinematics(ml.kinematic_variable)
 input_size = len(kinematics)
 
 logging.info("chosen model: %s", model_label)
-logging.info("kinematic variable set: %s", kinematic_variable)
-logging.info("embedding variable set: %s", embedding_variable)
+logging.info("embedding variable set: %s", ml.embedding_variable)
 logging.info("input data path: %s", user.feature_h5_path)
 logging.info("input ll json path: %s", user.ll_path)
 logging.info("input distances path: %s", user.dist_path)
 logging.info("output plot path: %s", plot_path)
 logging.info("adj matrix storage path: %s", adj_path)
-model_path = user.model_path + distance + "_models/" + model_label + "/" + gnn_type + "/"
+model_path = user.model_path + ml.distance + "_models/" + model_label + "/" + ml.gnn_type + "/"
 logging.info("model storage path: %s", model_path)
 
-logging.info("distance metric: %s", distance)
-if frac is not None:
-    logging.info("desired edge fraction: %s", str(frac))
-elif linking_length is not None:
-    logging.info("linking length: %s", str(linking_length))
+logging.info("distance metric: %s", ml.distance)
+if ml.edge_frac is not None:
+    logging.info("desired edge fraction: %s", str(ml.edge_frac))
+elif ml.linking_length is not None:
+    logging.info("linking length: %s", str(ml.linking_length))
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
@@ -193,7 +172,8 @@ full_sig, full_bkg, full_x, \
 full_sig_wgts, full_bkg_wgts, \
 full_sig_labels, full_bkg_labels, \
 sig_fold, bkg_fold = adj.data_loader(user.kinematic_h5_path, kinematics, ex=user.cutstring,
-                                     signal=user.signal, signal_mass=user.signal_mass, num_folds=user.n_folds)
+                                     signal=user.signal, signal_mass=user.signal_mass,
+                                     num_folds=user.n_folds)
 
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
@@ -249,12 +229,12 @@ if do_gnn:
         edge_wgts = torch.load(adj_path+'edge_wgts.pt').to(device)
         # edge weights from MC source node:
         edge_weights_from_MC = full_wgts[edge_ind[0]]
-        if gnn_type != "GAT":
+        if ml.gnn_type != "GAT":
             edge_wgts = edge_wgts * edge_weights_from_MC
             edge_weights_from_MC = None
 
 
-if plot_conv_kins:
+if ml.plot_conv_kins:
     if do_edge_wgt:
         sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edge_wgts,
                                                     size=(len(full_y), len(full_y)))
@@ -270,7 +250,7 @@ if plot_conv_kins:
     del sparse_adj_matrix
 #    for nconv in range(3):
 #        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, kinematics,
-#                                      signal, frac, kinematic_plot_path,
+#                                      signal, ml.edge_frac, kinematic_plot_path,
 #                                      normalisation="D_half_inv", standardise=False,
 #                                      nconv=nconv, edge_wgts=do_edge_wgt)
 #    del adj_mat
@@ -279,7 +259,7 @@ misc.print_mem_info()
 logging.info("Training ...")
 print("full x", len(full_x))
 print("full y", len(full_y))
-if len(hidden_sizes_gcn) > 0:
+if len(ml.hidden_sizes_gcn) > 0:
     print("Checking edge indices dim: ", len(edge_ind))
 
 gc.collect()
@@ -289,7 +269,7 @@ torch.cuda.empty_cache()
 if do_edge_wgt and do_gnn:
     data = Data(x=full_x, y=full_y, edge_index=edge_ind,
                 node_weight=full_wgts, edge_weight=edge_wgts,
-                mc_weight=edge_weights_from_MC if gnn_type == "GAT" else \
+                mc_weight=edge_weights_from_MC if ml.gnn_type == "GAT" else \
                           torch.tensor([], device=full_wgts.device))
     del edge_ind, edge_wgts
 else:
@@ -326,15 +306,15 @@ try:
         data_standardised = data.clone()
         data_standardised.x = misc.torch_standardise(data_standardised.x, means, stds)
         means, stds = means.to(cpu), stds.to(cpu)
-        model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=hidden_sizes_gcn,
-                              hidden_sizes_mlp=hidden_sizes_mlp, output_size=1,
-                              dropout_rates=dropout_rates, gnn_type=gnn_type)
+        model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=ml.hidden_sizes_gcn,
+                              hidden_sizes_mlp=ml.hidden_sizes_mlp, output_size=1,
+                              dropout_rates=ml.dropout_rates, gnn_type=ml.gnn_type)
         model = model.to(device)
 
-        optimiser = torch.optim.Adam(model.parameters(), lr=LR)
+        optimiser = torch.optim.Adam(model.parameters(), lr=ml.LR)
         ### NOTE: patience for the scheculer is different from the early stopping patience
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode='min',
-                                                         patience=patience_LR)
+                                                         patience=ml.patience_LR)
 
         train_loss = []
         val_loss = []
@@ -353,22 +333,22 @@ try:
         train_loader = NeighborLoader(
             data_standardised,
             input_nodes=train_idx,
-            num_neighbors=num_nb_list,
+            num_neighbors=ml.num_nb_list,
             shuffle=True,
-            batch_size=batch_size,
+            batch_size=ml.batch_size,
         )
         val_loader = NeighborLoader(
             data_standardised,
             input_nodes=val_idx,
-            num_neighbors=num_nb_list,
+            num_neighbors=ml.num_nb_list,
             shuffle=False,
-            batch_size=batch_size,
+            batch_size=ml.batch_size,
         )
 
         best_val_loss = float('inf')
         patience_counter = 0
         logging.info("Starting training ...")
-        for epoch in range(epochs):
+        for epoch in range(ml.epochs):
 
             ### start training loop in the epoch
             model.train()
@@ -423,7 +403,7 @@ try:
                 if do_edge_wgt and do_gnn:
                     outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weight)
                 else:
-                    outputs = model(batch.x, batch.edge_index, gnn_type)
+                    outputs = model(batch.x, batch.edge_index, ml.gnn_type)
 
                 ### NOTE only consider predictions and labels of seed nodes
                 y = batch.y[:tmp_batch_size]
@@ -457,10 +437,10 @@ try:
                 patience_counter += 1
                 print(f"No improvement in validation loss for {patience_counter} epoch(s).")
 
-            print(f'Epoch {epoch + 1}/{epochs}, Train Loss: {avg_tr_loss:.6f}, \
+            print(f'Epoch {epoch + 1}/{ml.epochs}, Train Loss: {avg_tr_loss:.6f}, \
                   Validation Loss: {avg_vl_loss:.6f}')
 
-            if patience_counter >= patience_early_stopping:
+            if patience_counter >= ml.patience_early_stopping:
                 print(f"Early stopping after {epoch+1} epochs.")
                 break
 
@@ -468,7 +448,7 @@ try:
         val_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = val_outputs_fold.flatten()
 
         logging.info("Finished fold %s/%s", fold_no, user.n_folds)
-        logging.info("Number of epochs: %s/%s", str(epoch+1), str(epochs))
+        logging.info("Number of epochs: %s/%s", str(epoch+1), str(ml.epochs))
         logging.info("Final train Loss: %s", avg_tr_loss)
         logging.info("Final validation Loss: %s", avg_vl_loss)
         logging.info("Time taken so far: %s", str(time.time()-st))
@@ -495,7 +475,7 @@ try:
         torch.cuda.empty_cache()
         gc.collect()
 
-        if single_fold is True:
+        if ml.single_fold is True:
             print("Single fold training, breaking loop ...")
             break
 
@@ -559,12 +539,12 @@ finally:
     perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc,
                           val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
     perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), user.n_folds,
-                             hidden_sizes_gcn, hidden_sizes_mlp, LR, dropout_rates,
-                             epochs, model_path)
+                             ml.hidden_sizes_gcn, ml.hidden_sizes_mlp, ml.LR, ml.dropout_rates,
+                             ml.epochs, model_path)
 
     logging.info("Plotting training/validation losses ...")
     fig_loss, ax_loss = plt.subplots()
-    x_epoch = np.arange(1,epochs+1,1)
+    x_epoch = np.arange(1,ml.epochs+1,1)
     for loss_loop, (train_loss, val_loss) in enumerate(zip(train_losses, val_losses)):
         train_line, = ax_loss.plot(np.arange(len(train_loss)), train_loss,
                                    label="Fold " + str(loss_loop) + " (Train)")
@@ -573,15 +553,15 @@ finally:
                      label="Fold " + str(loss_loop) + " (Val)", color=colour, linestyle="-.")
     ax_loss.legend(loc='upper right', fontsize=9)
     if do_gnn:
-        model_text = [str(gnn_type)+" model",
-                      "GNN layers "+ str(hidden_sizes_gcn),
-                      "MLP layers "+ str(hidden_sizes_mlp),
-                      "Batchsize " + str(batch_size), 
-                      "Neighbour sampling " + str(num_nb_list)]
+        model_text = [str(ml.gnn_type)+" model",
+                      "GNN layers "+ str(ml.hidden_sizes_gcn),
+                      "MLP layers "+ str(ml.hidden_sizes_mlp),
+                      "Batchsize " + str(ml.batch_size), 
+                      "Neighbour sampling " + str(ml.num_nb_list)]
     else:
-        model_text = [str(gnn_type) + " model",
-                      "MLP layers "+ str(hidden_sizes_mlp),
-                      "Batchsize " + str(batch_size)]
+        model_text = [str(ml.gnn_type) + " model",
+                      "MLP layers "+ str(ml.hidden_sizes_mlp),
+                      "Batchsize " + str(ml.batch_size)]
     plotting.add_text(ax_loss, model_text, do_atlas=False, startx=0.02, starty=0.95)
 
     ymin, ymax = ax_loss.get_ylim()
@@ -594,10 +574,10 @@ finally:
     logging.info("Plotting model outputs ...")
     linking_length_label = ""
     if do_gnn:
-        if frac is not None:
-            linking_length_label = "Linking length at "+str(frac)+" edge fraction"
-        elif linking_length is not None:
-            linking_length_label = "Linking length "+str(linking_length)
+        if ml.edge_frac is not None:
+            linking_length_label = "Linking length at "+str(ml.edge_frac)+" edge fraction"
+        elif ml.linking_length is not None:
+            linking_length_label = "Linking length "+str(ml.linking_length)
     signal_label, background_label = plotting.get_plot_labels(user.signal, user.signal_mass)
     text = [f"Training AUC = {train_auc:.3f}", f"Validation AUC = {val_auc:.3f}",
             signal_label, background_label, linking_length_label]

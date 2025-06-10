@@ -19,3 +19,4 @@ pip install fsspec
 pip install torchinfo
 pip install torcheval
 pip install energyflow
+pip install pydantic

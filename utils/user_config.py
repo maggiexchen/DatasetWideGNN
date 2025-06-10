@@ -67,11 +67,9 @@ class UserConfig(BaseModel):
 
         if data["signal_mass"] is not None:
             data["signal_mass"] = str(data["signal_mass"])
-        assert data["signal"] in ["hhh", "LQ", "stau"], f"Invalid signal type: {data["signal"]}"
+        assert data["signal"] in ["hhh", "LQ", "stau"], "Invalid signal type"
 
         data["cutstring"] = misc.get_cutstring(data["cuts"])
-
-        # TODO add some asserts to check e.g. signal is supported, paths exist.
 
         for key, val in data.items():
             logging.info("%s: %s", key, str(val))

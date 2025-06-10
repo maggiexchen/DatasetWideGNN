@@ -12,6 +12,8 @@ import utils.plotting as plotting
 import utils.performance as perf
 import utils.graph_definition as graph_def
 import utils.user_config as uconfig
+import utils.ml_config as mlconfig
+
 
 import numpy as np
 import torch
@@ -70,32 +72,28 @@ args = parser.parse_args()
 user_config_path = args.userconfig
 user = uconfig.UserConfig.from_yaml(user_config_path)
 
+ml_config_path = args.MLconfig
+ml = mlconfig.MLConfig.from_yaml(ml_config_path)
+
 variable = str(args.variable)
 distance = str(args.distance)
 batch_size = args.batchsize
 
 signal_label, background_label = plotting.get_plot_labels(user.signal)
 
-train_config_path = args.MLconfig
-train_config = misc.load_config(train_config_path)
-friend_graph = train_config["friend_graph"]
-
-edge_frac = train_config["edge_frac"]
-targettarget_eff = train_config["targettarget_eff"]
-
-if targettarget_eff is not None and edge_frac is not None:
+if ml.targettarget_eff is not None and ml.edge_frac is not None:
     raise ValueError("edge_frac and targettarget_eff in ML config, pick just one!")
-if targettarget_eff is None and edge_frac is None:
+if ml.targettarget_eff is None and ml.edge_frac is None:
     raise ValueError("Neither edge_frac or sigsig_eff in ML config, pick one!")
-do_edge_frac = True if edge_frac is not None else False
+do_edge_frac = True if ml.edge_frac is not None else False
 
 do_same_class = True if variable == "embedding" else False
-do_friend_graph = friend_graph
+do_friend_graph = ml.friend_graph
 
 logging.info("variable set: %s", variable)
 logging.info("distance metric: %s", distance)
 logging.info("variable set: %s", variable)
-logging.info("making a friend graph? %s", str(friend_graph))
+logging.info("making a friend graph? %s", str(ml.friend_graph))
 
 
 logging.info("Loading sigbkg distances in batches")

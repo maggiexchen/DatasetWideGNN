@@ -11,6 +11,7 @@ import utils.normalisation as norm
 import utils.adj_mat as adj
 import utils.misc as misc
 import utils.user_config as uconfig
+import utils.ml_config as mlconfig
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -57,98 +58,82 @@ args = parser.parse_args()
 user_config_path = args.userconfig
 user = uconfig.UserConfig.from_yaml(user_config_path)
 
+### load training config
+ml_config_path = args.MLconfig
+ml = mlconfig.MLConfig.from_yaml(ml_config_path)
+
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 print(torch.cuda.mem_get_info())
 batch_size = args.batchsize
 
-train_config_path = args.MLconfig
-train_config = misc.load_config(train_config_path)
-
-friend_graph = train_config["friend_graph"]
-bool_edge_wgt = train_config["edge_weights"]
 os.makedirs(user.adj_path, exist_ok=True)
 
-kinematic_variable = train_config["kinematic_variable"]
-embedding_variable = train_config["embedding_variable"]
-if kinematic_variable is None:
-    print("Need to specify a type of kinematic variable in the config")
-
-variable = kinematic_variable if embedding_variable is None else embedding_variable
-if embedding_variable is None:
-    embedding_variable = kinematic_variable
-
-distance = train_config["distance"]
-if distance is None:
-    print("Need to specify a type of distance metric for the adjacency matrix in the config")
-
-linking_length = train_config["linking_length"]
-edge_frac = train_config["edge_frac"]
-targettarget_eff = train_config["targettarget_eff"]
+variable = ml.kinematic_variable if ml.embedding_variable==ml.embedding_variable \
+    else ml.embedding_variable
+do_edge_wgt = ml.edge_weights
 
 os.makedirs(user.ll_path, exist_ok=True)
 
 # TODO support edge_frac or target_eff
-if linking_length is not None:
+if ml.linking_length is not None:
     logging.info("linking length is given in config,\
                  IGNORING edge_frac/targettarget_eff if present!")
-    adj_path = user.adj_path + "/" + str(distance) + "_" + "linking_length_" + \
-        str(linking_length).replace(".","p") + "/"
+    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + "linking_length_" + \
+        str(ml.linking_length).replace(".","p") + "/"
 
-elif edge_frac is not None and targettarget_eff is not None:
+elif ml.edge_frac is not None and ml.targettarget_eff is not None:
     raise ValueError("edge_frac and targettarget_eff in ML config, pick just one!")
 
-elif edge_frac is not None:
+elif ml.edge_frac is not None:
     logging.info("Will try to use edge_frac to define linking length....")
-    edge_frac = train_config["edge_frac"]
-    if edge_frac not in [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]:
+    if ml.edge_frac not in [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]:
         raise ValueError("""not given a supported edge fraction,
                          (0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5)""")
     ll_path = user.ll_path + "edge_frac"
-    adj_path = user.adj_path + "/" + str(distance) + "_" + "edge_frac_" + \
-        str(edge_frac).replace(".","p") + "/"
+    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + "edge_frac_" + \
+        str(ml.edge_frac).replace(".","p") + "/"
 
-elif targettarget_eff is not None:
+elif ml.targettarget_eff is not None:
     logging.info("Will try to use targettarget_eff to define linking length....")
-    targettarget_eff = train_config["targettarget_eff"]
-    if targettarget_eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+    if ml.targettarget_eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
         raise ValueError("""not given a supported sig-sig efficiency,
                          (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)""")
 
     ll_path = user.ll_path + "targettarget_eff_"
-    adj_path = user.adj_path + "/" + str(distance) + "_" + "targettarget_eff_" + \
-        str(targettarget_eff).replace(".","p") + "/"
+    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + "targettarget_eff_" + \
+        str(ml.targettarget_eff).replace(".","p") + "/"
 
 else:
     raise ValueError("Neither manual LL, edge_frac or targettarget_eff in ML config, pick one!")
 
-ll_path = user.ll_path + variable + "_" + distance + user.cutstring + "_linking_length.json"
+ll_path = user.ll_path + variable + "_" + ml.distance + user.cutstring + "_linking_length.json"
 
-if linking_length is None:
+if ml.linking_length is None:
     print("Saving linking length to ", ll_path)
     with open(ll_path, 'r', encoding="utf-8") as lfile:
         length_dict = json.load(lfile)
         lengths = length_dict["length"]
-        if edge_frac is not None:
-            linking_length = lengths[length_dict["edge_frac"].index(edge_frac)]
+        if ml.edge_frac is not None:
+            linking_length = lengths[length_dict["edge_frac"].index(ml.edge_frac)]
         else:
-            linking_length = lengths[length_dict["bkgbkg_eff"].index(targettarget_eff)]
+            linking_length = lengths[length_dict["bkgbkg_eff"].index(ml.targettarget_eff)]
         logging.info("linking length = %s", str(linking_length))
 
 misc.create_dirs(adj_path)
 
-kinematics = misc.get_kinematics(kinematic_variable, user.feature_dim)
+kinematics = misc.get_kinematics(ml.kinematic_variable, user.feature_dim)
 input_size = len(kinematics)
 
-logging.info("kinematic variable set: %s", kinematic_variable)
-logging.info("embedding variable set: %s", embedding_variable)
-logging.info("distance metric: %s", distance)
-if edge_frac is not None:
-    logging.info("desired edge fraction: %s", str(edge_frac))
-elif targettarget_eff is not None:
-    logging.info("desired edge fraction: %s", str(targettarget_eff))
+logging.info("kinematic variable set: %s", ml.kinematic_variable)
+logging.info("embedding variable set: %s", ml.embedding_variable)
+logging.info("distance metric: %s", ml.distance)
+if ml.edge_frac is not None:
+    logging.info("desired edge fraction: %s", str(ml.edge_frac))
+elif ml.targettarget_eff is not None:
+    logging.info("desired edge fraction: %s", str(ml.targettarget_eff))
 else:
-    logging.info("linking length: %s", str(linking_length))
+    logging.info("linking length: %s", str(ml.linking_length))
 
 # load training data file and kinematics
 logging.info('Importing signal and background files...')
@@ -172,10 +157,10 @@ del sig_wgt, bkg_wgt
 ### load distances and apply linking length to receieve indices
 logging.info("Batch applying the linking length and getting non-zero indices ...")
 logging.info("For sigsig ...")
-sigsig_result = adj.generate_batched_nonzero_ind(user.dist_path, variable, distance, "sigsig",
+sigsig_result = adj.generate_batched_nonzero_ind(user.dist_path, variable, ml.distance, "sigsig",
                                                  linking_length, batch_size, user.cutstring,
-                                                 friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
-if bool_edge_wgt:
+                                                 friend_graph=ml.friend_graph, edge_wgt=do_edge_wgt)
+if do_edge_wgt:
     sigsig_ind, sigsig_edge_wgts = sigsig_result
 else:
     sigsig_ind = sigsig_result
@@ -183,10 +168,10 @@ print("sigsig: ",sigsig_ind.shape)
 print("fraction of egdes in sigsig: ", sigsig_ind.shape[0]/(len(full_sig)**2))
 
 logging.info("For sigbkg ...")
-sigbkg_result = adj.generate_batched_nonzero_ind(user.dist_path, variable, distance, "sigbkg",
+sigbkg_result = adj.generate_batched_nonzero_ind(user.dist_path, variable, ml.distance, "sigbkg",
                                                  linking_length, batch_size, user.cutstring,
-                                                 friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
-if bool_edge_wgt:
+                                                 friend_graph=ml.friend_graph, edge_wgt=do_edge_wgt)
+if do_edge_wgt:
     sigbkg_ind, sigbkg_edge_wgts = sigbkg_result
 else:
     sigbkg_ind = sigbkg_result
@@ -197,16 +182,16 @@ print("fraction of egdes in sigbkg: ", sigbkg_ind.shape[0]/(len(full_sig)*len(fu
 logging.info("For bkgsig ...")
 bkgsig_ind = torch.clone(sigbkg_ind)
 bkgsig_ind = bkgsig_ind[:, [1, 0]]
-if bool_edge_wgt:
+if do_edge_wgt:
     bkgsig_edge_wgts = torch.clone(sigbkg_edge_wgts)
 print("bgsig: ", bkgsig_ind.shape)
 print("fraction of egdes in bkgsig: ", bkgsig_ind.shape[0]/(len(full_bkg)*len(full_sig)))
 
 logging.info("For bkgbkg ...")
-bkgbkg_result = adj.generate_batched_nonzero_ind(user.dist_path, variable, distance, "bkgbkg",
+bkgbkg_result = adj.generate_batched_nonzero_ind(user.dist_path, variable, ml.distance, "bkgbkg",
                                                  linking_length, batch_size, user.cutstring,
-                                                 friend_graph=friend_graph, edge_wgt=bool_edge_wgt)
-if bool_edge_wgt:
+                                                 friend_graph=ml.friend_graph, edge_wgt=do_edge_wgt)
+if do_edge_wgt:
     bkgbkg_ind, bkgbkg_edge_wgts = bkgbkg_result
 else:
     bkgbkg_ind = bkgbkg_result
@@ -221,7 +206,7 @@ bkgbkg_ind += len(full_sig)
 logging.info("Concatenating the indices ...")
 full_ind = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind)).to(torch.int32)
 
-if bool_edge_wgt:
+if do_edge_wgt:
     full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts,
                                 bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
 
@@ -298,10 +283,10 @@ if bool_edge_wgt:
 
 total_edges = sigsig_ind.shape[0]+sigbkg_ind.shape[0]+bkgbkg_ind.shape[0]
 total_pairs = (len(full_sig)+len(full_bkg))**2
-if edge_frac is not None:
-    print("Linking length at edge fraction ", edge_frac)
+if ml.edge_frac is not None:
+    print("Linking length at edge fraction ", ml.edge_frac)
 else:
-    print("Linking length at targettarget_eff ", targettarget_eff)
+    print("Linking length at targettarget_eff ", ml.targettarget_eff)
 print("The fraction of edges in graph is ", total_edges / total_pairs)
 del sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind
 
@@ -314,6 +299,6 @@ print("full ind cols: ", full_ind[:,1], full_ind[:,1].shape)
 torch.save(full_ind[:,0], adj_path+'row_ind.pt')
 torch.save(full_ind[:,1], adj_path+'col_ind.pt')
 del full_ind
-if bool_edge_wgt:
+if do_edge_wgt:
     print("full edge wgts: ", full_edge_wgts, full_edge_wgts.shape)
     torch.save(full_edge_wgts, adj_path+'edge_wgts.pt')
