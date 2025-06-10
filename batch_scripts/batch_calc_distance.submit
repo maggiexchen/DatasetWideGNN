@@ -1,4 +1,11 @@
 executable = batch_calc_distance.sh
+
+# adjust arguments as needed.... e.g. 
+arguments = "10000 euclidean LQ_HighLevel"
+#arguments = "10000 cityblock"
+#arguments = "10000 cosine LQ_HighLevel"
+#arguments = "10000 emd LQ_LowLevel"
+
 getenv = true
 output = ../logs/batch_calc_distance_$(ClusterID).out
 error = ../logs/batch_calc_distance_$(ClusterID).err

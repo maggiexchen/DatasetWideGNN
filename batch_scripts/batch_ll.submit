@@ -1,10 +1,13 @@
 executable = batch_ll.sh
+
+# adjust arguments as needed....
 arguments = "10000 euclidean LQ_HighLevel"
+
 getenv = true
 output = ../logs/batch_ll_$(ClusterID).out
 error = ../logs/batch_ll_$(ClusterID).err
 log = ../logs/batch_ll_$(ClusterID).log
 
-request_memory = 10000
+request_memory = 20000
 queue 1
 

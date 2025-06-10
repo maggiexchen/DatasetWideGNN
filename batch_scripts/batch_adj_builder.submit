@@ -1,4 +1,8 @@
 executable = batch_adj_builder.sh
+
+# adjust arguments as needed....
+arguments = "10000 config/ml_LQ.yaml config/user_Holly.yaml"
+
 getenv = true
 output = ../logs/batch_adj_builder_$(ClusterID).out
 error = ../logs/batch_adj_builder_$(ClusterID).err
