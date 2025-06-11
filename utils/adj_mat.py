@@ -310,8 +310,6 @@ def generate_batched_nonzero_ind(dist_path, variable, distance, species,
                 del edge_wgts_tmp
             logging.info("CPU allocated after %s, GB", str(process.memory_info().rss/(1024 ** 3)))
 
-    print("max indices: ", torch.max(indices[0]), torch.max(indices[1]))
-    # Minmax normalise the edge weights
     if edge_wgt:
         return indices, edge_wgts
     else:
