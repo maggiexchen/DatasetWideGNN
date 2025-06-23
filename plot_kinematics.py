@@ -38,8 +38,7 @@ args = parser.parse_args()
 user_config_path = args.userconfig
 user = uconfig.UserConfig.from_yaml(user_config_path)
 
-cutstring = misc.get_cutstring(user.cuts)
-logging.info("Cutstring: %s", cutstring)
+logging.info("Cutstring: %s", user.cutstring)
 variable = str(args.variable)
 logging.info("variable set: %s", variable)
 kinematics = misc.get_kinematics(variable, user.feature_dim)
@@ -72,10 +71,10 @@ if user.signal == "stau":
             tmp_df_bkg = pd.concat([tmp_df_bkg, tmp_df_bkg_camp], ignore_index=True, axis=0)
         df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
 else:
-    df_sig = pd.read_hdf(user.feature_h5_path + user.signal + "_" + user.signal_mass + cutstring + ".h5",
+    df_sig = pd.read_hdf(user.feature_h5_path + user.signal + "_" + user.signal_mass + user.cutstring + ".h5",
                          key=user.signal)
     for bkg in bkg_types:
-        tmp_df_bkg = pd.read_hdf(user.feature_h5_path + bkg + cutstring + ".h5", key=bkg)
+        tmp_df_bkg = pd.read_hdf(user.feature_h5_path + bkg + user.cutstring + ".h5", key=bkg)
         df_bkg = pd.concat([df_bkg, tmp_df_bkg], ignore_index=True, axis=0)
 
 ### get event weights
@@ -100,11 +99,11 @@ for v, var in enumerate(kinematics):
     plotting.plot_kinematics(df_sig, df_bkg, signal_label, background_label,
                                   var, user.plot_path, standardised=False, normalise=False,
                                   log_scale=True, sig_wgts=df_sig["eventWeight"],
-                                  bkg_wgts=df_bkg["eventWeight"], ex=cutstring)
+                                  bkg_wgts=df_bkg["eventWeight"], ex=user.cutstring)
     print("-----> Normed:")
     plotting.plot_kinematics(df_sig, df_bkg, signal_label, background_label,
                                   var, user.plot_path, standardised=False, normalise=True,
-                                  log_scale=True, ex=cutstring)
+                                  log_scale=True, ex=user.cutstring)
     # Standardising kinematics
     print("-----> Standardising + plotting")
     standardised_values = norm.standardise(df_all.loc[:, var])
@@ -112,4 +111,4 @@ for v, var in enumerate(kinematics):
     df_sig = df_all.iloc[:len(df_sig)]
     df_bkg = df_all.iloc[len(df_sig):]
     plotting.plot_kinematics(df_sig, df_bkg, signal_label, background_label, var, user.plot_path,
-                                  standardised=True, normalise=True, log_scale=True, ex=cutstring)
+                                  standardised=True, normalise=True, log_scale=True, ex=user.cutstring)

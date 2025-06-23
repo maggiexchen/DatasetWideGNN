@@ -40,7 +40,6 @@ user = uconfig.UserConfig.from_yaml(user_config_path)
 
 plot_event_weights = args.plotEventWeights
 os.makedirs(user.kinematic_h5_path, exist_ok=True)
-cutstring = misc.get_cutstring(user.cuts)
 
 # load in input files
 lumi_Run3 = 370.
@@ -76,7 +75,7 @@ if user.cuts is not None:
     print("Total ", user.signal, " events after cuts: ", len(df_sig[user.signal]))
 
 df_sig[user.signal].to_hdf(user.kinematic_h5_path + str(user.signal) + "_" + user.signal_mass +\
-                           cutstring + ".h5", key=str(user.signal), mode="w")
+                           user.cutstring + ".h5", key=str(user.signal), mode="w")
 
 logging.info('Importing and writing background ')
 df_bkgs = {}
@@ -110,11 +109,11 @@ for background in user.backgrounds:
         df_bkgs[background] = misc.cut_operation(df_bkgs[background], user.cuts)
         print("Total ", background, " events after cuts: ", len(df_bkgs[background]))
 
-    df_bkgs[background].to_hdf(user.kinematic_h5_path + str(background) + cutstring + ".h5",
+    df_bkgs[background].to_hdf(user.kinematic_h5_path + str(background) + user.cutstring + ".h5",
                                key=str(background), mode="w")
 
 if plot_event_weights:
 
     logging.info("Plotting eventWeights ...")
     plotting.plot_event_weights(df_sig, user.signal, df_bkgs, user.backgrounds,
-                                user.kinematic_h5_path, user.signal_mass, cutstring)
+                                user.kinematic_h5_path, user.signal_mass, uesr.cutstring)

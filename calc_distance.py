@@ -63,7 +63,6 @@ variable = str(args.variable)
 distance = str(args.distance)
 
 signal_label, background_label = plotting.get_plot_labels(user.signal)
-#cutstring = misc.get_cutstring(user.cuts)
 
 logging.info("distance metric: %s", distance)
 logging.info("variable set: %s", variable)
