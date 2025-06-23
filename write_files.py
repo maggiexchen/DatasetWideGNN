@@ -116,4 +116,4 @@ if plot_event_weights:
 
     logging.info("Plotting eventWeights ...")
     plotting.plot_event_weights(df_sig, user.signal, df_bkgs, user.backgrounds,
-                                user.kinematic_h5_path, user.signal_mass, uesr.cutstring)
+                                user.kinematic_h5_path, user.signal_mass, user.cutstring)
