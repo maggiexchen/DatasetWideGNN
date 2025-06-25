@@ -64,7 +64,8 @@ ml = mlconfig.MLConfig.from_yaml(ml_config_path)
 
 print("CUDA is available? ", torch.cuda.is_available())  # Outputs True if GPU is available
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-print(torch.cuda.mem_get_info())
+if torch.cuda.is_available():
+    print(torch.cuda.mem_get_info())
 batch_size = args.batchsize
 
 os.makedirs(user.adj_path, exist_ok=True)
@@ -90,7 +91,7 @@ elif ml.edge_frac is not None:
     if ml.edge_frac not in [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]:
         raise ValueError("""not given a supported edge fraction,
                          (0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5)""")
-    ll_path = user.ll_path + "edge_frac"
+    ll_path = user.ll_path + "edge_frac_"
     adj_path = user.adj_path + "/" + str(ml.distance) + "_" + "edge_frac_" + \
         str(ml.edge_frac).replace(".","p") + "/"
 
@@ -107,7 +108,7 @@ elif ml.targettarget_eff is not None:
 else:
     raise ValueError("Neither manual LL, edge_frac or targettarget_eff in ML config, pick one!")
 
-ll_path = user.ll_path + variable + "_" + ml.distance + user.cutstring + "_linking_length.json"
+ll_path = ll_path + variable + "_" + ml.distance + user.cutstring + "_linking_length.json"
 
 if ml.linking_length is None:
     print("Saving linking length to ", ll_path)
