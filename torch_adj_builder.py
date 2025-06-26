@@ -210,30 +210,30 @@ full_ind = torch.cat((sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind)).to(torch.
 if do_edge_wgt:
     full_edge_wgts = torch.cat((sigsig_edge_wgts, sigbkg_edge_wgts,
                                 bkgsig_edge_wgts, bkgbkg_edge_wgts)).to(torch.float32)
-
+    del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
     ### define indices for plotting random subsets of the edge weights
-    sigsig_plot_ind = torch.randperm(len(sigsig_edge_wgts))[:2000]
-    sigbkg_plot_ind = torch.randperm(len(sigbkg_edge_wgts))[:1000]
-    bkgsig_plot_ind = torch.randperm(len(bkgsig_edge_wgts))[:1000]
-    bkgbkg_plot_ind = torch.randperm(len(bkgbkg_edge_wgts))[:2000]
+    # sigsig_plot_ind = torch.randperm(len(sigsig_edge_wgts))[:2000]
+    # sigbkg_plot_ind = torch.randperm(len(sigbkg_edge_wgts))[:1000]
+    # bkgsig_plot_ind = torch.randperm(len(bkgsig_edge_wgts))[:1000]
+    # bkgbkg_plot_ind = torch.randperm(len(bkgbkg_edge_wgts))[:2000]
 
     ### plot the edge weights before minmax normalisation (1/d)
-    fig, ax = plt.subplots()
-    _, binning, _ = ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind],
-                                       bkgsig_edge_wgts[bkgsig_plot_ind])),
-                            bins=70, color="darkorange", alpha=0.5, label="sig-bkg")
-    ax.hist(sigsig_edge_wgts[sigsig_plot_ind], bins=binning,
-            color="steelblue", alpha=0.5, label="sig-sig")
-    ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind], bkgsig_edge_wgts[bkgsig_plot_ind])),
-            bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
-    ax.hist(bkgbkg_edge_wgts[bkgbkg_plot_ind],
-            bins=binning, color="forestgreen", alpha=0.5, label="bkg-bkg")
-    ax.set_xlabel("Edge weights (excluding event weights)", loc="right")
-    ax.set_ylabel("Edges / Bin", loc="top")
-    ax.legend(loc="upper right")
-    ax.set_yscale("log")
-    fig.tight_layout()
-    fig.savefig(adj_path+"Unnormed_edge_wgts_no_EventWeights.pdf", transparent=True)
+    # fig, ax = plt.subplots()
+    # _, binning, _ = ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind],
+    #                                    bkgsig_edge_wgts[bkgsig_plot_ind])),
+    #                         bins=70, color="darkorange", alpha=0.5, label="sig-bkg")
+    # ax.hist(sigsig_edge_wgts[sigsig_plot_ind], bins=binning,
+    #         color="steelblue", alpha=0.5, label="sig-sig")
+    # ax.hist(torch.cat((sigbkg_edge_wgts[sigbkg_plot_ind], bkgsig_edge_wgts[bkgsig_plot_ind])),
+    #         bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
+    # ax.hist(bkgbkg_edge_wgts[bkgbkg_plot_ind],
+    #         bins=binning, color="forestgreen", alpha=0.5, label="bkg-bkg")
+    # ax.set_xlabel("Edge weights (excluding event weights)", loc="right")
+    # ax.set_ylabel("Edges / Bin", loc="top")
+    # ax.legend(loc="upper right")
+    # ax.set_yscale("log")
+    # fig.tight_layout()
+    # fig.savefig(adj_path+"Unnormed_edge_wgts_no_EventWeights.pdf", transparent=True)
 
     ### min_max normalise the edge weights
     inf_mask = torch.isinf(full_edge_wgts)
@@ -243,23 +243,23 @@ if do_edge_wgt:
     full_edge_wgts[inf_mask] = 1
 
     ### plot the edge weights after minmax normalisation (1/d)
-    fig, ax = plt.subplots()
-    binning = np.linspace(0, 1, 70)
-    ax.hist(full_edge_wgts[sigsig_plot_ind], bins=binning,
-            color="steelblue", alpha=0.5, label="sig-sig")
-    ax.hist(torch.cat((full_edge_wgts[sigbkg_plot_ind+len(sigsig_edge_wgts)],
-                       full_edge_wgts[bkgsig_plot_ind+len(sigsig_edge_wgts)+\
-                                      len(sigbkg_edge_wgts)])),
-            bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
-    ax.hist(full_edge_wgts[bkgbkg_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)+\
-                           len(bkgsig_edge_wgts)],
-            bins=binning, color="forestgreen", alpha=0.5, label="bkg-bkg")
-    ax.set_xlabel("Edge weights (including event weights)", loc="right")
-    ax.set_ylabel("Edges / Bin", loc="top")
-    ax.legend(loc="upper right")
-    ax.set_yscale("log")
-    fig.tight_layout()
-    fig.savefig(adj_path+"Normed_edge_wgts_no_EventWeights.pdf", transparent=True)
+    # fig, ax = plt.subplots()
+    # binning = np.linspace(0, 1, 70)
+    # ax.hist(full_edge_wgts[sigsig_plot_ind], bins=binning,
+    #         color="steelblue", alpha=0.5, label="sig-sig")
+    # ax.hist(torch.cat((full_edge_wgts[sigbkg_plot_ind+len(sigsig_edge_wgts)],
+    #                    full_edge_wgts[bkgsig_plot_ind+len(sigsig_edge_wgts)+\
+    #                                   len(sigbkg_edge_wgts)])),
+    #         bins=binning, color="darkorange", alpha=0.5, label="sig-bkg")
+    # ax.hist(full_edge_wgts[bkgbkg_plot_ind+len(sigsig_edge_wgts)+len(sigbkg_edge_wgts)+\
+    #                        len(bkgsig_edge_wgts)],
+    #         bins=binning, color="forestgreen", alpha=0.5, label="bkg-bkg")
+    # ax.set_xlabel("Edge weights (including event weights)", loc="right")
+    # ax.set_ylabel("Edges / Bin", loc="top")
+    # ax.legend(loc="upper right")
+    # ax.set_yscale("log")
+    # fig.tight_layout()
+    # fig.savefig(adj_path+"Normed_edge_wgts_no_EventWeights.pdf", transparent=True)
 
     ### we are only combining the MC events later, in torch_train.py,
     # depending on the gnn model type
@@ -280,7 +280,7 @@ if do_edge_wgt:
     # fig.tight_layout()
     # fig.savefig(adj_path+"Normed_edge_wgts_with_EventWeights.pdf", transparent=True)
 
-    del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
+    # del sigsig_edge_wgts, sigbkg_edge_wgts, bkgsig_edge_wgts, bkgbkg_edge_wgts
 
 total_edges = sigsig_ind.shape[0]+sigbkg_ind.shape[0]+bkgbkg_ind.shape[0]
 total_pairs = (len(full_sig)+len(full_bkg))**2
@@ -291,9 +291,7 @@ else:
 print("The fraction of edges in graph is ", total_edges / total_pairs)
 del sigsig_ind, sigbkg_ind, bkgsig_ind, bkgbkg_ind
 
-misc.print_mem_info()
 logging.info("Saving sparse adjacency matrix ... to %s", adj_path)
-
 ### saving the adjaceny matrix indices as edge indices
 print("full ind rows: ", full_ind[:,0], full_ind[:,0].shape)
 print("full ind cols: ", full_ind[:,1], full_ind[:,1].shape)
@@ -303,3 +301,6 @@ del full_ind
 if do_edge_wgt:
     print("full edge wgts: ", full_edge_wgts, full_edge_wgts.shape)
     torch.save(full_edge_wgts, adj_path+'edge_wgts.pt')
+
+if torch.cuda.is_available():
+    misc.print_mem_info()

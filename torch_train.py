@@ -83,7 +83,7 @@ if ml.distance is None:
     raise ValueError("Need to specify a distance metric for the adjacency matrix in the ML config")
 
 # TODO resupport target_eff option
-edge_frac_list = [0.1, 0.2, 0.3, 0.4, 0.5]
+edge_frac_list = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 if ml.linking_length is None:
     if ml.edge_frac is None:
         raise ValueError("Need to specify an edge_frac for the adjacency matrix in the ML config")
@@ -254,7 +254,9 @@ if ml.plot_conv_kins:
 #                                      normalisation="D_half_inv", standardise=False,
 #                                      nconv=nconv, edge_wgts=do_edge_wgt)
 #    del adj_mat
-misc.print_mem_info()
+
+if torch.cuda.is_available():
+    misc.print_mem_info()
 
 logging.info("Training ...")
 print("full x", len(full_x))
