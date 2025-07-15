@@ -130,6 +130,8 @@ def get_kinematics(variable, dim=None):
                       "aplan3dv2b","theta3dv2b"]
     elif variable == "LQ_HighLevel":
         kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
+    elif variable == "LQ_HighLevel2":
+        kinematics = ['met', 'metsigHt', 'mindPhiMETl',  'mtl1', 'mtl2', 'invsumdRlb']
     elif variable == "LQ_LowLevel":
         kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
                       'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta',
@@ -177,6 +179,7 @@ def get_kinematics_labels(variable):
         "mass and angular": "HHH mass and angular variables",
         "mass and shape": "HHH mass and kinematic shape variables",
         "LQ_HighLevel": "LQ High-level kinematic variables",
+        "LQ_HighLevel2": "LQ High-level 2 kinematic variables",
         "LQ_LowLevel": "LQ Low-level kinematic variables",
         "embedding": "Latent space variables",
         "stau": "stau variables"

@@ -438,8 +438,8 @@ def plot_roc(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_
     """
     fig, _ = plt.subplots()
     plt.style.use(hep.style.ROOT)
-    plt.plot(fpr_ss_sb, tpr_ss_sb, label='sig-sig sig-bkg (AUC = {roc_auc_ss_sb:.3f})')
-    plt.plot(fpr_bb_sb, tpr_bb_sb, label='bkg-bkg sig-bkg (AUC = {roc_auc_bb_sb:.3f})')
+    plt.plot(fpr_ss_sb, tpr_ss_sb, label=f'sig-sig sig-bkg (AUC = {roc_auc_ss_sb:.3f})')
+    plt.plot(fpr_bb_sb, tpr_bb_sb, label=f'bkg-bkg sig-bkg (AUC = {roc_auc_bb_sb:.3f})')
     plt.scatter(np.array(ss_sb_roc_cuts)[:,1], np.array(ss_sb_roc_cuts)[:,0], marker='x',
                 s=50, label="linking lengths",color="red")
     plt.scatter(np.array(bb_sb_roc_cuts)[:,1], np.array(bb_sb_roc_cuts)[:,0], marker='x',
@@ -477,8 +477,8 @@ def plot_roc_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb
     """
     fig, _ = plt.subplots()
     plt.style.use(hep.style.ROOT)
-    plt.plot(fpr_ss_sb, tpr_ss_sb, label='sig-sig sig-bkg (AUC = {roc_auc_ss_sb:.3f})')
-    plt.plot(fpr_bb_sb, tpr_bb_sb, label='bkg-bkg sig-bkg (AUC = {roc_auc_bb_sb:.3f})')
+    plt.plot(fpr_ss_sb, tpr_ss_sb, label=f'sig-sig sig-bkg (AUC = {roc_auc_ss_sb:.3f})')
+    plt.plot(fpr_bb_sb, tpr_bb_sb, label=f'bkg-bkg sig-bkg (AUC = {roc_auc_bb_sb:.3f})')
     ss_sb_ind = []
     bb_sb_ind = []
     for l in linking_lengths:
