@@ -6,6 +6,7 @@ import utils.normalisation as norm
 import utils.misc as misc
 import utils.plotting as plotting
 import utils.user_config as uconfig
+import utils.variables as varconfig
 
 import torch
 import pandas as pd
@@ -92,8 +93,8 @@ df_bkg = df_all.iloc[len(df_sig):]
 print("signal weights: ",df_sig_wgts.min())
 print("bkg weights: ",df_bkg_wgts.min())
 
-kinematics=['met']
 for v, var in enumerate(kinematics):
+    if var=="nbjets": continue
     print(f"Plotting {var}")
     print("-----> Weighted:")
     plotting.plot_kinematics(df_sig, df_bkg, signal_label, background_label,
@@ -107,7 +108,8 @@ for v, var in enumerate(kinematics):
     # Standardising kinematics
     print("-----> Standardising + plotting")
     standardised_values = norm.standardise(df_all.loc[:, var])
-    df_all.loc[:, var] = standardised_values.astype('float32')  # convert to float32
+    print(varconfig.var_dict[var])
+    df_all.loc[:, var] = standardised_values.astype(varconfig.var_dict[var]["dtype"])  # convert to float32
     df_sig = df_all.iloc[:len(df_sig)]
     df_bkg = df_all.iloc[len(df_sig):]
     plotting.plot_kinematics(df_sig, df_bkg, signal_label, background_label, var, user.plot_path,

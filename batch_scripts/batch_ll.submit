@@ -1,13 +1,16 @@
 executable = batch_ll.sh
 
 # adjust arguments as needed....
-arguments = "10000 cosine LQ_HighLevel"
-
+arguments = "10000 euclidean LQ_HighLevel2"
+#arguments = "10000 braycurtis LQ_HighLevel"
+#arguments = "10000 cosine LQ_HighLevel2"
+#arguments = "10000 cityblock LQ_HighLevel"
+#a
 getenv = true
 output = ../logs/batch_ll_$(ClusterID).out
 error = ../logs/batch_ll_$(ClusterID).err
 log = ../logs/batch_ll_$(ClusterID).log
 
-request_memory = 40000
+request_memory = 100000
 queue 1
 

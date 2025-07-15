@@ -513,7 +513,7 @@ def plot_distances(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_wgt, v
         sigbkg_wgt (numpy.ndarray): array of product of eventWeights for each sig-bkg event pair
         bkgbkg_wgt (numpy.ndarray): array of product of eventWeights for each bkg-bkg event pair
         var (str): Kinematic variable
-        distance (str): Distance metric (euclidean, cosine, cityblock)
+        distance (str): Distance metric (euclidean, cosine, cityblock, braycurtis)
         path (str): base dir to store output
         label (str): extra str for filename
     """
@@ -562,7 +562,7 @@ def plot_full_distances_hist(sigsig_hists, sigbkg_hists, bkgbkg_hists, sig_label
         sigbkg_hists (list(numpy.hist)): list of distance hists for each batch of sig-bkg events
         bkgbkg_hists (list(numpy.hist)): list of distance hists for each batch of bkg-bkg events
         var (str): Kinematic variable
-        distance (str): Distance metric (euclidean, cosine, cityblock)
+        distance (str): Distance metric (euclidean, cosine, cityblock, braycurtis)
         path (str): base dir to store output
         label (str): extra str for filename
         standardised (bool): whether the distances have been min-max normed
@@ -625,7 +625,7 @@ def plot_distances_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist, var, distance,
         sigbkg_hist (numpy.hist): histogram ofthe distances for each pair of sig-bkg events
         bkgbkg_hist (numpy.hist): histogram ofthe distances for each pair of bkg-bkg events
         var (str): Kinematic variable
-        distance (str): Distance metric (euclidean, cosine, cityblock)
+        distance (str): Distance metric (euclidean, cosine, cityblock, braycurtis)
         sig_label (str): label for signal to draw on plot
         bkg_label (str): label for background to draw on plot
         path (str): base dir to store output
@@ -715,7 +715,7 @@ def plot_linking_length(sigsig, sigbkg, bkgbkg, sigsig_wgt, sigbkg_wgt, bkgbkg_w
         do_edge_frac (bool): do edge fraction values or target species self-connection eff values?
         plot_path (str): base dir to store plot
         variable (str): Kinematic variableset
-        distance (str): Distance metric (euclidean, cosine, cityblock)
+        distance (str): Distance metric (euclidean, cosine, cityblock, braycurtis)
         sigsig_eff (list(float)): list of eff. values to plot
         target_eff_label (str): label of target species efficiencies e.g. "sigsig_eff" default ""
     """
@@ -780,7 +780,7 @@ def plot_linking_length_hist(sigsig_hist, sigbkg_hist, bkgbkg_hist,
         do_edge_frac (bool): do edge fraction values or target species self-connection eff values?
         plot_path (str): base dir to store plot
         variable (str): Kinematic variableset
-        distance (str): Distance metric (euclidean, cosine, cityblock)
+        distance (str): Distance metric (euclidean, cosine, cityblock, braycurtis)
         sigsig_eff (list(float)): list of eff. values to plot
         standardised (bool): whether to indicate the distance metric was
             standardised to 0-1 (default false)

@@ -28,4 +28,3 @@ ntuples/
 GraphBuilder/config/*
 compare.py
 *logs/
-batch*/

@@ -137,7 +137,7 @@ def get_kinematics(variable, dim=None):
                       'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta',
                       'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi',
                       'met', 'metphi']
-    elif variable == "LQ-All":
+    elif variable == "LQ_All":
         kinematics = ['xsec', 'genWeight', 'njets', 'nbjets',
                       'bjet1eta', 'bjet1phi', 'bjet1pt', 'bjet2eta', 'bjet2phi', 'bjet2pt',
                       'lep1eta', 'lep1phi', 'lep1pt', 'lep2eta', 'lep2phi', 'lep2pt',
