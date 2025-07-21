@@ -245,7 +245,7 @@ if do_edge_frac:
 
     del norm_sigsig, norm_sigbkg, norm_bkgbkg
 
-    edge_frac = [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
+    edge_frac = [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
     linking_lengths = graph_def.find_threshold_edge_frac(sigsig_distance, sigbkg_distance,
                                                          bkgbkg_distance,
                                                          edge_frac, x_max,

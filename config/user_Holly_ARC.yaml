@@ -1,0 +1,28 @@
+#######################
+# user config for Holly
+#######################
+
+# signal model hhh, LQ, stau
+signal: LQ
+signal_mass: 1000
+backgrounds: ["singletop", "ttbar"]
+cuts:
+  met:
+    threshold: 200
+    operation: ">"
+feature_dim:
+run_with_cuda: False
+n_folds: 2
+
+# input paths
+ntuple_path: /data/dtce-schmidt/phys2472/GNN/ntuples/LQs_140325/
+feature_h5_path: /data/dtce-schmidt/phys2472/GNN/data/sliced/
+kinematic_h5_path: /data/dtce-schmidt/phys2472/GNN/data/sliced/
+ll_path: /data/dtce-schmidt/phys2472/GNN/linking_lengths/
+dist_path: /data/dtce-schmidt/phys2472/GNN/distances/
+
+# output paths
+plot_path: /data/dtce-schmidt/phys2472/GNN/plots/ 
+adj_path: /data/dtce-schmidt/phys2472/GNN/graph/
+model_path: /data/dtce-schmidt/phys2472/GNN/models/
+score_path: /data/dtce-schmidt/phys2472/GNN/scores/ 
