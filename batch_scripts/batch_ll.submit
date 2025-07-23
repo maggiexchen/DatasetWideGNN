@@ -1,4 +1,14 @@
 executable = batch_ll.sh
+
+# adjust arguments as needed....
+#arguments = "10000 euclidean LQ_metsigHt"
+#arguments = "10000 euclidean LQ_HighLevel3"
+#arguments = "10000 chebyshev LQ_HighLevel3"
+#arguments = "10000 emd LQ_LowLevel"
+#arguments = "10000 braycurtis LQ_HighLevel3"
+#arguments = "10000 cosine LQ_HighLevel3"
+arguments = "10000 cityblock LQ_HighLevel3"
+#a
 getenv = true
 output = ../logs/batch_ll_$(ClusterID).out
 error = ../logs/batch_ll_$(ClusterID).err

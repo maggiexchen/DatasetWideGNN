@@ -11,6 +11,8 @@ cuts:
     threshold: 0
     operation: ">"
 feature_dim:
+run_with_cuda: False
+n_folds: 2
 
 # input paths
 ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_140325/

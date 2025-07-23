@@ -1,0 +1,29 @@
+#######################
+# user config for Maggie
+#######################
+
+# signal model hhh, LQ, stau
+signal: LQ
+signal_mass: 1000
+backgrounds: ["singletop", "ttbar"]
+cuts:
+  met:
+    threshold: 200
+    operation: ">"
+feature_dim: 12
+objects: ["bjet1", "bjet2", "lep1", "lep2"]
+run_with_cuda: False
+n_folds: 2
+
+# input paths
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
+feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/GraphBuilder/embeddings/same_class_clustering/LowLevelKinematics_MetCut200/
+kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts/linking_lengths/ 
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts_hacka/output_scores/
+
+# output paths
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts_hacka/plots/
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts_hacka/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/embedding/same_class_clustering/Edge_wgts_hacka/models/ 

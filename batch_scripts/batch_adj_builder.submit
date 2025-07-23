@@ -1,4 +1,8 @@
 executable = batch_adj_builder.sh
+
+# adjust arguments as needed....
+arguments = "10000 config/ml_LQ.yaml config/user_Holly.yaml"
+
 getenv = true
 output = ../logs/batch_adj_builder_$(ClusterID).out
 error = ../logs/batch_adj_builder_$(ClusterID).err
@@ -6,6 +10,6 @@ log = ../logs/batch_adj_builder_$(ClusterID).log
 request_gpus = 1
 
 require_gpus = (Capability >= 8.0) && (GlobalMemoryMb >= 20000)
-request_memory = 20000
+request_memory = 80000
 queue 1
 
