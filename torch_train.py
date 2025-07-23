@@ -604,11 +604,7 @@ finally:
                                  yrange=[ymin, ymax], log_y=True)
     plotting.save_fig(fig_pred, plot_path+"training_validation_pred")
 
-<<<<<<< HEAD
     score_path = user.score_path + model_label + "/"
-=======
-    score_path = score_path + str(distance) + "_models/" + model_label + "/"
->>>>>>> 57d6c83b432c5bc08ba12d76c343b0e361f77454
     misc.create_dirs(score_path)
 
     np.save(score_path+"train_sig_pred.npy", train_sig_pred.detach().cpu().numpy())
