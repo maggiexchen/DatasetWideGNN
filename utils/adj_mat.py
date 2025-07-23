@@ -180,6 +180,8 @@ def generate_adj_mat(x, x_wgts, distance, linking_length):
         distance_matrix = dis.braycurtis(x, x)
     elif distance == "cosine":
         distance_matrix = dis.cosine(x, x)
+    elif distance == "chebyshev":
+        distance_matrix = dis.chebyshev(x, x)
     else:
         raise ValueError("not given a supported distance metric")
 

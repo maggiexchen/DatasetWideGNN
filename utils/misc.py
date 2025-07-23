@@ -128,10 +128,30 @@ def get_kinematics(variable, dim=None):
         kinematics = ["mH1","mH2","mH3","mHHH",
                       "sphere3dv2b","sphere3dv2btrans",
                       "aplan3dv2b","theta3dv2b"]
+    elif variable == "LQ_met":
+        kinematics = ['met']
+    elif variable == "LQ_metsigHt":
+        kinematics = ['metsigHt']
+    elif variable == "LQ_mtl1":
+        kinematics = ['mtl1']
+    elif variable == "LQ_mtl2":
+        kinematics = ['mtl2']
+    elif variable == "LQ_mtlmin":
+        kinematics = ['mtlmin']
+    elif variable == "LQ_mindPhiMETl":
+        kinematics = ['mindPhiMETl']
+    elif variable == "LQ_invsumdRlb":
+        kinematics = ['invsumdRlb']
+    elif variable == "LQ_sumptllbb":
+        kinematics = ['sumptllbb']
+    elif variable == "LQ_avedPhiMETl":
+        kinematics = ['avedPhiMETl']
     elif variable == "LQ_HighLevel":
-        kinematics = ['met', 'sumptllbb', 'mindPhiMETl',  'mtl1', 'mtl2']
+        kinematics = ['met', 'sumptllbb', 'mindPhiMETl', 'mtl1', 'mtl2']
     elif variable == "LQ_HighLevel2":
-        kinematics = ['met', 'metsigHt', 'mindPhiMETl',  'mtl1', 'mtl2', 'invsumdRlb']
+        kinematics = ['met', 'metsigHt', 'mindPhiMETl', 'mtl1', 'mtl2', 'invsumdRlb']
+    elif variable == "LQ_HighLevel3":
+        kinematics = ['met', 'mindPhiMETl', 'mtl1', 'mtl2', 'invsumdRlb']
     elif variable == "LQ_LowLevel":
         kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
                       'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta',

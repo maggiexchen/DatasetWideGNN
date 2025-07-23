@@ -1,10 +1,12 @@
 executable = batch_calc_distance.sh
 
 # adjust arguments as needed.... e.g. 
-#arguments = "10000 euclidean LQ_HighLevel2"
-#arguments = "10000 cityblock LQ_HighLevel2"
-#arguments = "10000 braycurtis LQ_HighLevel2"
-arguments = "10000 cosine LQ_HighLevel2"
+#arguments = "10000 euclidean LQ_avedPhiMETl"
+#arguments = "10000 euclidean LQ_HighLevel3"
+#arguments = "10000 cityblock LQ_HighLevel3"
+#arguments = "10000 braycurtis LQ_HighLevel3"
+#arguments = "10000 cosine LQ_HighLevel3"
+arguments = "10000 chebyshev LQ_HighLevel3"
 #arguments = "10000 emd LQ_LowLevel"
 
 getenv = true

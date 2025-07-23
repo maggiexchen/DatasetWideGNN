@@ -92,11 +92,13 @@ def distance_calc(a, b, metric):
         d = braycurtis(a,b)
     elif metric == "cosine":
         d = cosine(a,b)
+    elif metric == "chebyshev":
+        d = chebyshev(a,b)
     elif metric == "emd":
         d = emd(a,b)
     else:
         d = None
-        print("Please specify a valid distance metric, from euclidean, cityblock, braycurtis or cosine")
+        print("Please specify a valid distance metric, from euclidean, cityblock, braycurtis, chebyshev or cosine")
 
     if torch.sum(torch.isnan(d)).item() != 0:
         raise ArithmeticError("NaN present in distances")
@@ -125,6 +127,31 @@ def emd(a, b, r=1.0, gdim=2, n_jobs=-1):
     """
     emd_np = ef.emd.emds(a, b, R=r, gdim=gdim, n_jobs=n_jobs)
     return torch.tensor(emd_np)
+
+
+def correlation(a, b):
+    """
+    Function to obtain the correlation distance between two vectors
+
+    Args:
+        a (torch.tensor): first set of events
+        b (torch.tensor): second set of events
+
+    Returns:
+        (torch.tensor): matrix of axb distances
+    """
+    # WIP
+    a_expanded = torch.unsqueeze(a, dim=1).to(torch.float32)
+    b_expanded = torch.unsqueeze(b, dim=0).to(torch.float32)
+
+    a_mean = torch.mean(a_expanded, dim=-1)
+    b_mean = torch.mean(b_expanded, dim=-1)
+
+    numerator = torch.matmul(a, torch.transpose(b, 0, 1)).to(torch.float32)
+    denominator = torch.matmul(torch.unsqueeze(torch.norm(a, dim=1), 1),
+                               torch.unsqueeze(torch.norm(b, dim=1), 0)).to(torch.float32)
+
+    return (1 - numerator/denominator).to(torch.float32)
 
 
 def cosine(a, b):
@@ -176,6 +203,23 @@ def cityblock(a, b):
     b_expanded = torch.unsqueeze(b, dim=0).to(torch.float32)
 
     return torch.sum(torch.abs(a_expanded-b_expanded),dim=-1).to(torch.float32)
+
+
+def chebyshev(a, b):
+    """
+    Function to obtain the chebyshev distance between two sets of events
+
+    Args:
+        a (torch.tensor): first set of events
+        b (torch.tensor): second set of events
+
+    Returns:
+        (torch.tensor): matrix of axb distances
+    """
+    a_expanded = torch.unsqueeze(a, dim=1).to(torch.float32)
+    b_expanded = torch.unsqueeze(b, dim=0).to(torch.float32)
+
+    return torch.max(torch.abs(a_expanded-b_expanded), dim=-1).values
 
 
 def braycurtis(a, b):
