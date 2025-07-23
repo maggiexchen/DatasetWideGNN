@@ -248,14 +248,14 @@ def plot_embeddings(embeddings, labels, epoch, margin, feat, radius=1.0, pen=1.0
     sig_label = (labels == 1)
     bkg_label = (labels == 0)
     if feat==2:
-        ax.scatter(embeddings[:,0][bkg_label], embeddings[:,1][bkg_label], c='dodgerblue', label="Background")
-        ax.scatter(embeddings[:,0][sig_label], embeddings[:,1][sig_label], c='deeppink', label="Signal")
+        ax.scatter(embeddings[:,0][bkg_label], embeddings[:,1][bkg_label], c='dodgerblue', label="Background", facecolors='none')
+        ax.scatter(embeddings[:,0][sig_label], embeddings[:,1][sig_label], c='deeppink', label="Signal", facecolors='none')
     else:
         # embeddings_2d = tsne.fit_transform(embeddings)
         # ax.scatter(embeddings_2d[:,0][bkg_label], embeddings_2d[:,1][bkg_label], c='dodgerblue', label="Background")
         # ax.scatter(embeddings_2d[:,0][sig_label], embeddings_2d[:,1][sig_label], c='deeppink', label="Signal")
-        ax.scatter(embeddings[:,0][bkg_label], embeddings[:,1][bkg_label], c='dodgerblue', label="Background")
-        ax.scatter(embeddings[:,0][sig_label], embeddings[:,1][sig_label], c='deeppink', label="Signal")
+        ax.scatter(embeddings[:,0][bkg_label], embeddings[:,1][bkg_label], edgecolors='dodgerblue', label="Background", facecolors='none', s=60)
+        ax.scatter(embeddings[:,0][sig_label], embeddings[:,1][sig_label], edgecolors='deeppink', label="Signal", facecolors='none', s=60)
 
     ax.legend(loc="upper right", fontsize=16)
     ax.text(0.03, 0.95, r"\textbf{Signal} - Leptoquark, \textbf{Background} - $t\bar{t}$, Single top", size=16, transform=ax.transAxes)

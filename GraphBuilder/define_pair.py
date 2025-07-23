@@ -2,13 +2,14 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import random_split, Dataset, DataLoader
+# torch.manual_seed(42)
+
 import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(parent_dir)
 import utils.misc as misc
 import random
-
 class PairDataset(Dataset):
     def __init__(self, signal_events, background_events, num_sig_samples, num_bkg_samples, standardise=True):
         self.signal_events = signal_events

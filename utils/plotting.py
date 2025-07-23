@@ -6,8 +6,6 @@ import utils.normalisation as norm
 import utils.misc as misc
 from utils.variables import var_dict
 
-#from scipy import stats
-#from scipy.stats import entropy
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
@@ -79,7 +77,7 @@ def get_plot_labels(signal_type, signal_mass = None):
     return signal, background
 
 
-def add_text(ax, text, do_atlas=False, startx=0.04, starty=0.9):
+def add_text(ax, text, doATLAS=False, startx=0.04, starty=0.93, inc=0.05):
     """
     Function to add text to figures
 
@@ -90,7 +88,6 @@ def add_text(ax, text, do_atlas=False, startx=0.04, starty=0.9):
         startx (float): leftmost point to align text to, as a fraction of the axis width.
         starty (float): topmost point to align text to, as a fraction of the axis height.
     """
-    jump = 0.05
     ax.text(startx, starty, r"$\sqrt{s}=13.6$ TeV, 370 fb$^{-1}$", verticalalignment="bottom",\
                 transform=ax.transAxes)
     if do_atlas:
@@ -99,10 +96,9 @@ def add_text(ax, text, do_atlas=False, startx=0.04, starty=0.9):
         ax.text(startx + 0.1, starty, "Internal", verticalalignment="bottom",\
                 transform=ax.transAxes)
     for i,t in enumerate(text):
-        atlasdrop = 2*jump if do_atlas else jump
-        ax.text(startx, starty-jump*i-atlasdrop, t, verticalalignment="bottom",\
+        atlasdrop = 2*inc if do_atlas else inc
+        ax.text(startx, starty-inc*i-atlasdrop, t, verticalalignment="bottom",\
                 transform=ax.transAxes)
-
     return
 
 def draw_n_hists(ax, hists, wgts, binning, labels, normalise):
@@ -216,7 +212,6 @@ def plot_kinematics(df_sig, df_bkg, sig_label, bkg_label, var,
     """
     # plot
     fig, ax = plt.subplots()
-
     plot_text = []
     if standardised:
         plot_text.append("Standardised to (mean, std) = (0, 1)")
@@ -342,7 +337,10 @@ def plot_conv_kinematics(adj_mat, x, len_sig, kinematics,
 
     for v, var in enumerate(kinematics):
         fig, ax = plt.subplots()
-        binning = np.linspace(min(post_conv_bkg[:,v]),max(post_conv_bkg[:,v]), 50)
+        if nconv == 0:
+            binning = numpy.linspace(min(post_conv_bkg[:,v]),max(post_conv_bkg[:,v]), 50)
+        else: 
+            binning = numpy.linspace(min(post_conv_bkg[:,v]),max(post_conv_bkg[:,v])/2, 50)
         ax.hist(post_conv_sig[:,v], bins=binning, label="Signal", alpha=0.3,
                 density=True, color="red")
         ax.hist(post_conv_bkg[:,v], bins=binning, label="Background", alpha=0.3,
@@ -415,7 +413,6 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
         save_fig(fig, save_path + "/" + plot + "_sigsig_eff_" + str(eff).replace(".","p"))
 
     return
-
 
 
 def plot_roc(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_bb_sb,

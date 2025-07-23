@@ -172,13 +172,21 @@ if args.scan:
 
 if args.corr:
     print("Plotting correlation map")
-    tick_labels = ["Margin", "Penalty", "Radius", "Dimension", 
-                   "Avg. sig-sig dist", "Avg. sig-bkg dist", "Avg. bkg-bkg dist",
-                   "Edge fraction", "Same class efficiency", "Same class purity", "Sig-sig efficiency", "Sig-sig purity", "Bkg-bkg efficiency", "Bkg-bkg purity"]
-    correlation_matrix = df.corr()
-    
+    # tick_labels = ["Margin", "Penalty", "Radius", "Dimension", 
+    #                "Avg. sig-sig dist", "Avg. sig-bkg dist", "Avg. bkg-bkg dist",
+    #                "Edge fraction", "Same class efficiency", "Same class purity", "Sig-sig efficiency", "Sig-sig purity", "Bkg-bkg efficiency", "Bkg-bkg purity"]
+    tick_labels = ["Margin", "Penalty", "Dimension", 
+                   "Same-class efficiency", "Same-class purity", "Edge fraction"]
+    correlation_matrix = df[["loss_margin", "loss_penalty", "embedding_dim", "same_class_eff", "same_class_purity", "edge_fraction"]].corr()
+    col_names = correlation_matrix.columns
     corr_fig, corr_ax = plt.subplots(figsize=(11, 9), constrained_layout=True)
-    sns.heatmap(correlation_matrix, annot=True, cbar=True, xticklabels=tick_labels, yticklabels=tick_labels, cmap="coolwarm")
+    sns.heatmap(correlation_matrix.loc[col_names[-3:], col_names[:3]], annot=True, cbar=True, xticklabels=tick_labels[-3:], yticklabels=tick_labels[:3], cmap="coolwarm", cbar_kws={'label': 'Correlation'})
+    cbar = corr_ax.collections[0].colorbar
+    cbar.ax.yaxis.label.set_rotation(270)
+    cbar.ax.yaxis.labelpad = 20
+    cbar.ax.yaxis.label.set_fontsize(16)
+    corr_ax.tick_params(axis='x', labelsize=16)  # Set font size for x-axis tick labels
+    corr_ax.tick_params(axis='y', labelsize=16)
     os.makedirs(plot_path+"/corr/", exist_ok=True)
     corr_plot_name = plot_path+"/corr/corr.pdf"
     corr_fig.savefig(corr_plot_name)
