@@ -88,9 +88,9 @@ elif ml.edge_frac is not None and ml.targettarget_eff is not None:
 
 elif ml.edge_frac is not None:
     logging.info("Will try to use edge_frac to define linking length....")
-    if ml.edge_frac not in [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]:
+    if ml.edge_frac not in [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]:
         raise ValueError("""not given a supported edge fraction,
-                         (0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5)""")
+                         (0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5)""")
     ll_path = user.ll_path + "edge_frac_"
     adj_path = user.adj_path + "/" + str(ml.distance) + "_" + "edge_frac_" + \
         str(ml.edge_frac).replace(".","p") + "/"
