@@ -203,7 +203,7 @@ if do_gnn:
         edge_weights_from_MC = full_wgts[edge_ind[0]] ### edge weights from MC source node
         edge_wgts = edge_wgts * edge_weights_from_MC
 
-if ml.plot_conv_kins:
+if ml.plot_conv_kinematics:
     edges = torch.ones(edge_ind.shape[1], dtype=torch.float32)
     sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edges, size=(len(full_y), len(full_y)))
     adj_mat = sparse_adj_matrix.to_dense()

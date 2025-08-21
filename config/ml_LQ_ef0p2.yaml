@@ -3,7 +3,7 @@ embedding_variable:
 distance: "cosine"
 friend_graph: True
 edge_weights: True
-edge_frac: 0.25
+edge_frac: 0.2
 targettarget_eff: 
 linking_length:
 hidden_sizes_gcn: [12, 12]
@@ -19,4 +19,3 @@ epochs: 50
 patience_early_stopping: 20
 single_fold:
 plot_conv_kinematics: True
-
