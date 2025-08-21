@@ -19,4 +19,3 @@ epochs: 50
 patience_early_stopping: 20
 single_fold:
 plot_conv_kinematics: True
-

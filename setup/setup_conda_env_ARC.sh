@@ -28,3 +28,4 @@ pip install torchinfo
 pip install torcheval
 pip install energyflow
 pip install pydantic
+pip install pyg-lib -f https://data.pyg.org/whl/torch-2.3.0+cu121.html

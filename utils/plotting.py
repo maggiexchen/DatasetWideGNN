@@ -77,14 +77,14 @@ def get_plot_labels(signal_type, signal_mass = None):
     return signal, background
 
 
-def add_text(ax, text, doATLAS=False, startx=0.04, starty=0.93, inc=0.05):
+def add_text(ax, text, do_atlas=False, startx=0.04, starty=0.93, inc=0.05):
     """
     Function to add text to figures
 
     Args:
         ax (mpl axis): the axis of the figure to draw the text to.
         text (list[str]): the list of lines of text you want to write.
-        doATLAS (bool): flag to add ATLAS Internal labelling.
+        do_atlas (bool): flag to add ATLAS Internal labelling.
         startx (float): leftmost point to align text to, as a fraction of the axis width.
         starty (float): topmost point to align text to, as a fraction of the axis height.
     """

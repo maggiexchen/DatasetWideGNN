@@ -30,7 +30,7 @@ st = time.time()
 torch.cuda.empty_cache()
 
 parser = argparse.ArgumentParser(
-    description="Reading Ntuples command line options."
+            description="Reading Ntuples command line options."
 )
 
 parser.add_argument(
@@ -61,7 +61,7 @@ ml_config_path = args.MLconfig
 ml = mlconfig.MLConfig.from_yaml(ml_config_path)
 
 ### set up CUDA/CPU device settings
-print("CUDA is available? ", torch.cuda.is_available())
+logging.info("CUDA is available? %s", str(torch.cuda.is_available()))
 cpu = torch.device('cpu')
 device = torch.device('cpu')
 if torch.cuda.is_available() and user.run_with_cuda:
@@ -83,7 +83,7 @@ if ml.distance is None:
     raise ValueError("Need to specify a distance metric for the adjacency matrix in the ML config")
 
 # TODO resupport target_eff option
-edge_frac_list = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
+edge_frac_list = [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
 if ml.linking_length is None:
     if ml.edge_frac is None:
         raise ValueError("Need to specify an edge_frac for the adjacency matrix in the ML config")
@@ -101,7 +101,7 @@ else:
         adj_path = user.adj_path + "/" + ml.distance + "_edge_frac_" + \
             str(ml.edge_frac).replace(".", "p") + "/"
     else:
-        print("linking length is given in config, IGNORING the edge fraction in the config")
+        logging.info("linking length is given in config, IGNORING the edge fraction in the config")
         ll_str = "_LL" + str(ml.linking_length).replace(".", "p")
         adj_path = user.adj_path + "/" + ml.distance + "_linking_length_" + \
             str(ml.linking_length).replace(".", "p") + "/"
@@ -177,31 +177,31 @@ sig_fold, bkg_fold = adj.data_loader(user.kinematic_h5_path, kinematics, ex=user
 
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
-print("full sig size ", full_sig.size())
-print("full bkg size ", full_bkg.size())
-print("full sig wgt size ", full_sig_wgts.size())
-print("full bkg wgt size ", full_bkg_wgts.size())
+logging.info("full sig size %s", str(full_sig.size()))
+logging.info("full bkg size %s", str(full_bkg.size()))
+logging.info("full sig wgt size %s", str(full_sig_wgts.size()))
+logging.info("full bkg wgt size %s", str(full_bkg_wgts.size()))
 
 full_x = full_x.to(device)
 full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
 len_full = len(full_y)
 del full_sig, full_bkg, full_sig_labels, full_bkg_labels
 
-print("full sig yields ", full_sig_wgts.sum())
-print("full bkg yields ", full_bkg_wgts.sum())
+logging.info("full sig yields %s", str(full_sig_wgts.sum()))
+logging.info("full bkg yields %s", str(full_bkg_wgts.sum()))
 full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0).to(device)
-print("full wgt size ", full_wgts.size())
+logging.info("full wgt size %s", str(full_wgts.size()))
 del full_sig_wgts, full_bkg_wgts
 
-print("sig_fold count:")
+logging.info("sig_fold count:")
 values, counts = np.unique(sig_fold, return_counts=True)
 for val, count in zip(values, counts):
-    print(f"{val}: {count}")
+    logging.info("%s: %s", str(val), str(count))
 
-print("bkg_fold count:")
+logging.info("bkg_fold count:")
 values, counts = np.unique(bkg_fold, return_counts=True)
 for val, count in zip(values, counts):
-    print(f"{val}: {count}")
+    logging.info("%s: %s", str(val), str(count))
 
 fold_assignment = np.concatenate((sig_fold, bkg_fold), axis=0)
 
@@ -212,20 +212,20 @@ logging.info("Time taken so far: %s", str(time.time()-st))
 edge_ind = None
 edge_wgts = None
 if do_gnn:
-    print("constructing sparse adjacency matrix ...")
-    print("loading row indices ...")
+    logging.info("constructing sparse adjacency matrix ...")
+    logging.info("loading row indices ...")
     row_ind = torch.load(adj_path+'row_ind.pt')
-    print("loading col indices ...")
+    logging.info("loading col indices ...")
     col_ind = torch.load(adj_path+'col_ind.pt')
-    print("stacking row and col indices ...")
+    logging.info("stacking row and col indices ...")
     edge_ind = torch.stack((row_ind, col_ind)).to(device)
-    print("deleting row and col indices ...")
-    print(torch.max(row_ind), torch.max(col_ind), torch.max(edge_ind))
+    logging.info("deleting row and col indices ...")
+    logging.info(torch.max(row_ind), torch.max(col_ind), torch.max(edge_ind))
     del row_ind
     del col_ind
-    print("Edge fraction: ", edge_ind.shape[1] / len(full_y)**2)
+    logging.info("Edge fraction: %s", str(edge_ind.shape[1] / len(full_y)**2))
     if do_edge_wgt:
-        print("loading edge weights ...")
+        logging.info("loading edge weights ...")
         edge_wgts = torch.load(adj_path+'edge_wgts.pt').to(device)
         # edge weights from MC source node:
         edge_weights_from_MC = full_wgts[edge_ind[0]]
@@ -234,7 +234,7 @@ if do_gnn:
             edge_weights_from_MC = None
 
 
-if ml.plot_conv_kins:
+if ml.plot_conv_kinematics:
     if do_edge_wgt:
         sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edge_wgts,
                                                     size=(len(full_y), len(full_y)))
@@ -246,7 +246,7 @@ if ml.plot_conv_kins:
 ### commented out this dense adj for plotting -> takes up too much mem.
 # Will have to try and do some kind of subsampling for the plotting purpose.
 #    adj_mat = sparse_adj_matrix.to_dense()
-#    print("Adjacency Matrix: ", adj_mat)
+#    logging.info("Adjacency Matrix: ", adj_mat)
     del sparse_adj_matrix
 #    for nconv in range(3):
 #        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, kinematics,
@@ -256,13 +256,13 @@ if ml.plot_conv_kins:
 #    del adj_mat
 
 if torch.cuda.is_available():
-    misc.print_mem_info()
+    misc.logging.info_mem_info()
 
 logging.info("Training ...")
-print("full x", len(full_x))
-print("full y", len(full_y))
+logging.info("full x %s", str(len(full_x)))
+logging.info("full y %s", str(len(full_y)))
 if len(ml.hidden_sizes_gcn) > 0:
-    print("Checking edge indices dim: ", len(edge_ind))
+    logging.info("Checking edge indices dim: ", str(len(edge_ind)))
 
 gc.collect()
 torch.cuda.empty_cache()
@@ -299,9 +299,9 @@ try:
         train_idx = np.where(fold_assignment != fold_no)[0]
         val_idx = np.where(fold_assignment == fold_no)[0]
 
-        print("starting fold %s/%s", fold_no+1, user.n_folds)
-        print("train idx", len(train_idx))
-        print("val idx", len(val_idx))
+        logging.info("starting fold %s/%s", str(fold_no+1), str(user.n_folds))
+        logging.info("train idx %s", str(len(train_idx)))
+        logging.info("val idx %s", str(len(val_idx)))
 
         ### standardise input data to training set and move to cpu after standardisation
         means, stds = misc.get_train_mean_std(full_x[train_idx])
@@ -324,9 +324,9 @@ try:
         all_labels = data_standardised.y[train_idx].cpu().numpy()
         all_node_weights = data_standardised.node_weight[train_idx].cpu().numpy()
         class_weights = training.binary_class_weights(all_labels, all_node_weights).to(device)
-        print("Training class weights: ")
-        print("         signal: ", class_weights[1])
-        print("         backgrounds: ", class_weights[0])
+        logging.info("Training class weights: ")
+        logging.info("         signal: %s", str(class_weights[1]))
+        logging.info("         backgrounds: %s", str(class_weights[0]))
         if do_gnn:
             logging.info("Graph sub-sampling for training and validation ...")
         else:
@@ -430,29 +430,28 @@ try:
             scheduler.step(avg_vl_loss)
             new_lr = optimiser.param_groups[0]['lr']
             if new_lr < current_lr:
-                print(f"Learning rate reduced to: {new_lr}")
+                logging.info("Learning rate reduced to: %s", str(new_lr))
 
             if avg_vl_loss < best_val_loss:
                 best_val_loss = avg_vl_loss
                 patience_counter = 0
             else:
                 patience_counter += 1
-                print(f"No improvement in validation loss for {patience_counter} epoch(s).")
+                logging.info("No improvement in validation loss for %s epoch(s).", str(patience_counter))
 
-            print(f'Epoch {epoch + 1}/{ml.epochs}, Train Loss: {avg_tr_loss:.6f}, \
-                  Validation Loss: {avg_vl_loss:.6f}')
+            logging.info('Epoch %s/%s, Train Loss: %s, Validation Loss: %s', str(epoch+1), str(ml.epochs), str(ave_tr_loss), str(ave_vl_loss))
 
             if patience_counter >= ml.patience_early_stopping:
-                print(f"Early stopping after {epoch+1} epochs.")
+                logging.info("Early stopping after %s epochs.", str(epoch+1))
                 break
 
         train_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = train_outputs_fold.flatten()
         val_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = val_outputs_fold.flatten()
 
-        logging.info("Finished fold %s/%s", fold_no, user.n_folds)
+        logging.info("Finished fold %s/%s", str(fold_no), str(user.n_folds))
         logging.info("Number of epochs: %s/%s", str(epoch+1), str(ml.epochs))
-        logging.info("Final train Loss: %s", avg_tr_loss)
-        logging.info("Final validation Loss: %s", avg_vl_loss)
+        logging.info("Final train Loss: %s", str(avg_tr_loss))
+        logging.info("Final validation Loss: %s", str(avg_vl_loss))
         logging.info("Time taken so far: %s", str(time.time()-st))
         logging.info("Saving trained model and performance...")
         model_file_name = f"model_fold_{fold_no}.pth"
@@ -478,15 +477,15 @@ try:
         gc.collect()
 
         if ml.single_fold is True:
-            print("Single fold training, breaking loop ...")
+            logging.info("Single fold training, breaking loop ...")
             break
 
-    print("plotting model outputs per fold")
+    logging.info("plotting model outputs per fold")
     fig_fold, ax_fold = plt.subplots()
     fold_colours = ["steelblue", "darkorange", "forestgreen"]
     for k in range(user.n_folds):
-        print(f"Training Fold {str(k+1)}", train_outputs_per_fold["fold_"+str(k+1)+"_outputs"])
-        print(f"Validation Fold {str(k+1)}", val_outputs_per_fold["fold_"+str(k+1)+"_outputs"])
+        logging.info("Training Fold %s %s", str(k+1), str(train_outputs_per_fold["fold_"+str(k+1)+"_outputs"]))
+        logging.info("Validation Fold %s %s", str(k+1), str(val_outputs_per_fold["fold_"+str(k+1)+"_outputs"]))
         fig_fold, ax_fold = plt.subplots()
         hist, binning, _ = ax_fold.hist(train_outputs_per_fold["fold_"+str(k+1)+"_outputs"],
                                         bins=40, label="Train fold "+str(k), histtype='step',
@@ -500,8 +499,8 @@ try:
 
 finally:
     logging.info("Training complete.")
-    print("train truth labels", len(train_truth_labels))
-    print("val truth labels", len(val_truth_labels))
+    logging.info("train truth labels %s", str(len(train_truth_labels)))
+    logging.info("val truth labels %s", str(len(val_truth_labels)))
 
     ### compute ROC curve and AUC
     train_outputs = train_outputs.view(-1)
@@ -519,7 +518,7 @@ finally:
         train_fpr = np.clip(train_fpr, 0, 1)
         train_fpr = np.sort(train_fpr)
     train_auc = auc(train_fpr, train_tpr)
-    print("Training AUC", train_auc)
+    logging.info("Training AUC %s", str(train_auc))
 
     val_outputs = val_outputs.view(-1)
     val_label_bool = val_truth_labels.bool()
@@ -535,7 +534,7 @@ finally:
         val_fpr = np.clip(val_fpr, 0, 1)
         val_fpr = np.sort(val_fpr)
     val_auc = auc(val_fpr, val_tpr)
-    print("Validation AUC", val_auc)
+    logging.info("Validation AUC %s", str(val_auc))
 
     # save performance to json
     perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc,

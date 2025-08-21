@@ -115,7 +115,7 @@ binning = np.linspace(0,1,21)
 axs[0].hist(val_sig_pred, bins=binning, label="Signal (validation)", alpha=0.5, density=False, color="darkorange", weights=val_sig_wgts)
 axs[0].hist(val_bkg_pred, bins=binning, label="Background (validation)", alpha=0.5, density=False, color="steelblue", weights=val_bkg_wgts)
 
-# plotting.add_text(axs[0], text, doATLAS=False, startx=0.02, starty=0.95)
+# plotting.add_text(axs[0], text, do_atlas=False, startx=0.02, starty=0.95)
 axs[0].legend(loc='upper right', fontsize=9)
 # axs[0].set_xlabel("Output score", loc="right")
 axs[0].set_ylabel("No. Events", loc="top")
