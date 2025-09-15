@@ -68,11 +68,11 @@ df_sig = {str(user.signal):{}}
 df_sig[user.signal] = pd.concat(data_list, ignore_index=True)
 df_sig[user.signal]["target"] = [1]*len(df_sig[user.signal])
 df_sig[user.signal]["eventWeight"] = pd.concat(weight_list, ignore_index=True)
-print("Total ", user.signal, " events before cuts: ", len(df_sig[user.signal]))
+print("Total ", user.signal, " events before cuts: ", len(df_sig[user.signal]), " weigthed before cuts: ", df_sig[user.signal]["eventWeight"].sum())
 
 if user.cuts is not None:
     df_sig[user.signal] = misc.cut_operation(df_sig[user.signal], user.cuts)
-    print("Total ", user.signal, " events after cuts: ", len(df_sig[user.signal]))
+    print("Total ", user.signal, " events after cuts: ", len(df_sig[user.signal]), " weigthed after cuts: ", df_sig[user.signal]["eventWeight"].sum())
 
 df_sig[user.signal].to_hdf(user.kinematic_h5_path + str(user.signal) + "_" + user.signal_mass +\
                            user.cutstring + ".h5", key=str(user.signal), mode="w")
@@ -103,11 +103,11 @@ for background in user.backgrounds:
     df_bkgs[background] = pd.concat(data_list, ignore_index=True)
     df_bkgs[background]["target"] = [0]*len(df_bkgs[background])
     df_bkgs[background]["eventWeight"] = pd.concat(weight_list, ignore_index=True)
-    print("Total ", background, " events before cuts: ", len(df_bkgs[background]))
+    print("Total ", background, " events before cuts: ", len(df_bkgs[background]), " weigthed before cuts: ", df_bkgs[background]["eventWeight"].sum())
 
     if user.cuts is not None:
         df_bkgs[background] = misc.cut_operation(df_bkgs[background], user.cuts)
-        print("Total ", background, " events after cuts: ", len(df_bkgs[background]))
+        print("Total ", background, " events after cuts: ", len(df_bkgs[background]), " weigthed after cuts: ", df_bkgs[background]["eventWeight"].sum())
 
     df_bkgs[background].to_hdf(user.kinematic_h5_path + str(background) + user.cutstring + ".h5",
                                key=str(background), mode="w")
