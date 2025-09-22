@@ -205,6 +205,8 @@ logging.info("full bkg yields %s", str(full_bkg_wgts.sum()))
 full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0).to(device)
 logging.info("full wgt size %s", str(full_wgts.size()))
 del full_sig_wgts, full_bkg_wgts
+gc.collect()
+torch.cuda.empty_cache()
 
 logging.info("sig_fold count:")
 values, counts = np.unique(sig_fold, return_counts=True)
@@ -232,6 +234,8 @@ if do_gnn:
     edge_ind = torch.stack((row_ind, col_ind)).to(device)
     logging.info("deleting row and col indices ...")
     del row_ind, col_ind
+    if ml.gnn_type == "Graph":
+        edge_ind = edge_ind.to(torch.int64)
 
     logging.info("Edge fraction: %s", str(edge_ind.shape[1] / len(full_y)**2))
     if do_edge_wgt:
@@ -268,6 +272,8 @@ if ml.plot_conv_kinematics:
 #                                      nconv=nconv, edge_wgts=do_edge_wgt)
 #    del adj_mat
 
+gc.collect()
+torch.cuda.empty_cache()
 if torch.cuda.is_available():
     misc.print_mem_info()
 
@@ -276,9 +282,6 @@ logging.info("full x %s", str(len(full_x)))
 logging.info("full y %s", str(len(full_y)))
 if len(ml.hidden_sizes_gcn) > 0:
     logging.info("Checking edge indices dim: %s", str(len(edge_ind)))
-
-gc.collect()
-torch.cuda.empty_cache()
 
 ### create data object, train and val loaders
 if do_edge_wgt and do_gnn:
@@ -292,6 +295,8 @@ else:
     del edge_ind
 
 del full_y, full_wgts
+gc.collect()
+torch.cuda.empty_cache()
 
 try:
     train_losses = []
@@ -317,9 +322,10 @@ try:
         logging.info("train idx %s", str(len(train_idx)))
         logging.info("val idx %s", str(len(val_idx)))
 
-        ### standardise input data to training set and move to device after standardisation
+        ### calculating the mean and std of only the training data in each fold
         means, stds = misc.get_train_mean_std(full_x[train_idx])
-        data_standardised = data.clone()
+        ### standardise the entire dataset
+        data_standardised = data
         data_standardised.x = misc.torch_standardise(data_standardised.x, means, stds)
         means, stds = means.to(device), stds.to(device)
         model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=ml.hidden_sizes_gcn,
@@ -346,6 +352,7 @@ try:
         else:
             logging.info("Loading for training and validation ...")
 
+        ### load in the training and validation dataset for the fold using train_idx/val_idx
         train_loader = NeighborLoader(
             data_standardised,
             input_nodes=train_idx,
@@ -379,7 +386,7 @@ try:
                 optimiser.zero_grad()
                 batch = batch.to(device)
                 tmp_batch_size = batch.batch_size
-                if do_edge_wgt and do_gnn:
+                if do_edge_wgt and do_gnn: 
                     outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weight)
                 else:
                     outputs = model(batch.x, batch.edge_index)
@@ -402,10 +409,10 @@ try:
                 train_wgts_fold.append(event_wgts.detach().to(device))
                 train_x_fold.append(batch.x.detach().to(device))
 
-                wandb.log({
-                    f"train_batch_loss/fold_{fold_no}": float(loss) * tmp_batch_size},
-                    step=fold_no * ml.epochs * len(train_loader) + epoch * len(train_loader) + batch_idx
-                )
+                # wandb.log({
+                #     f"train_batch_loss/fold_{fold_no}": float(loss) * tmp_batch_size},
+                #     step=fold_no * ml.epochs * len(train_loader) + epoch * len(train_loader) + batch_idx
+                # )
                 
             train_outputs_fold = torch.cat(train_outputs_fold)
             train_truth_labels_fold = torch.cat(train_truth_labels_fold)
@@ -448,10 +455,10 @@ try:
                     val_wgts_fold.append(event_wgts.detach().to(device))
                     val_x_fold.append(batch.x.detach().to(device))
 
-                    wandb.log({
-                        f"val_batch_loss/fold_{fold_no}": float(loss) * tmp_batch_size},
-                        step=fold_no * ml.epochs * len(train_loader) + epoch * len(train_loader) + batch_idx
-                    )
+                    # wandb.log({
+                    #     f"val_batch_loss/fold_{fold_no}": float(loss) * tmp_batch_size},
+                    #     step=fold_no * ml.epochs * len(val_loader) + epoch * len(val_loader) + batch_idx
+                    # )
 
             val_outputs_fold = torch.cat(val_outputs_fold)
             val_truth_labels_fold = torch.cat(val_truth_labels_fold)
@@ -515,6 +522,7 @@ try:
         del train_loader, val_loader, model, optimiser, scheduler
         del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
         gc.collect()
+        torch.cuda.empty_cache()
 
         if ml.single_fold is True:
             logging.info("Single fold training, breaking loop ...")
@@ -612,7 +620,7 @@ finally:
         model_text = [str(ml.gnn_type) + " model",
                       "MLP layers "+ str(ml.hidden_sizes_mlp),
                       "Batchsize " + str(ml.batch_size)]
-    plotting.add_text(ax_loss, model_text, do_atlas=False, startx=0.02, starty=0.95)
+    plotting.add_text(ax_loss, model_text, do_atlas=False, startx=0.04, starty=0.95)
 
     ymin, ymax = ax_loss.get_ylim()
     plotting.draw_labels_legends(ax_loss, "Epoch", "Loss", yrange=[ymin, ymax*1.2])
@@ -633,7 +641,7 @@ finally:
             signal_label, background_label, linking_length_label]
 
     fig_pred, ax_pred = plt.subplots()
-    binning = np.linspace(0,1,51)
+    binning = np.linspace(0, 1, 51)
     ax_pred.hist(train_sig_pred.detach().to(device).numpy(), bins=binning,
                  label="Signal (training)", histtype='step', linestyle='--', density=True,
                  color="darkorange", weights=train_sig_wgts.detach().to(device).numpy())
@@ -672,7 +680,7 @@ finally:
     plt.plot(train_fpr, train_tpr, label=f'Training ROC curve (AUC = {train_auc:.3f})')
     plt.plot(val_fpr, val_tpr, label=f'Validation ROC curve (AUC = {val_auc:.3f})')
     plt.xlim(0,1)
-    plotting.add_text(ax_roc, model_text, do_atlas=False, startx=0.02, starty=0.2)
+    plotting.add_text(ax_roc, model_text, do_atlas=False, startx=0.04, starty=0.3)
     plotting.draw_labels_legends(ax_roc, "Background Efficiency", "Signal Efficiency",
                                  legendloc="upper left", yrange=[0., 1.2], log_y=False)
     plotting.save_fig(fig_roc, plot_path+"training_validation_ROC")
