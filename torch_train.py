@@ -442,7 +442,7 @@ try:
                     if do_edge_wgt and do_gnn:
                         outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weight)
                     else:
-                        outputs = model(batch.x, batch.edge_index, ml.gnn_type)
+                        outputs = model(batch.x, batch.edge_index)
 
                     ### NOTE only consider predictions and labels of seed nodes (transductive learning)
                     y = batch.y[:tmp_batch_size]
