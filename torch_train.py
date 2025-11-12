@@ -7,7 +7,6 @@ import gc
 import logging
 import time
 from tqdm import tqdm
-import wandb
 
 import utils.adj_mat as adj
 import utils.misc as misc
@@ -61,6 +60,10 @@ user = uconfig.UserConfig.from_yaml(user_config_path)
 ### load training config
 ml_config_path = args.MLconfig
 ml = mlconfig.MLConfig.from_yaml(ml_config_path)
+
+if user.wandb_project is not None and user.wandb_entity is not None:
+    import wandb
+
 
 ### set up CUDA/device device settings
 logging.info("CUDA is available? %s", str(torch.cuda.is_available()))
@@ -140,13 +143,14 @@ else:
             + nf_str
 
 # Set up wandb
-logging.info("Setting up wandb ...")
-wandb.init(
-            project="Dataset-wide GNN",
-            entity="maggiechen0622-university-of-oxford",
-            config=ml,
-            name=model_label,
-        )
+if user.wandb_project is not None and user.wandb_entity is not None:
+    logging.info("Setting up wandb ...")
+    wandb.init(
+                project=user.wandb_project,
+                entity=user.wandb_entity,
+                config=ml,
+                name=model_label,
+            )
 
 kinematic_plot_path = user.plot_path + "/training_kinematics/" + \
     ml.distance + "_frac" + str(ml.edge_frac) + "/"
@@ -487,11 +491,12 @@ try:
                 logging.info("Early stopping after %s epochs.", str(epoch+1))
                 break
 
-            wandb.log({
-                f"train_epoch_loss/fold_{fold_no}": avg_tr_loss,
-                f"val_epoch_loss/fold_{fold_no}": avg_vl_loss,
-                "epoch": epoch,
-            })
+            if user.wandb_project is not None and user.wandb_entity is not None:
+                wandb.log({
+                    f"train_epoch_loss/fold_{fold_no}": avg_tr_loss,
+                    f"val_epoch_loss/fold_{fold_no}": avg_vl_loss,
+                    "epoch": epoch,
+                })
 
         train_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = train_outputs_fold.flatten()
         val_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = val_outputs_fold.flatten()

@@ -17,6 +17,9 @@ distance:
   emd:
     objects: ["bjet1", "bjet2", "lep1", "lep2"]
 run_with_cuda: True
+n_folds: 5
+wandb_project: "Dataset-wide GNN"
+wandb_entity: "staus_ml"
 
 # input paths
 ntuple_path: /home/srutherford/GNN_shared/hhhgraph/ntuples/sliced_samples/
