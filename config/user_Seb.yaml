@@ -19,14 +19,14 @@ distance:
 run_with_cuda: True
 
 # input paths
-ntuple_path: /home/srutherford/GNN_shared/hhhgraph/ntuples/
-feature_h5_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/
-kinematic_h5_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/
-ll_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/linking_lengths/ 
-dist_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/distances/
-score_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/output_scores/
+ntuple_path: /home/srutherford/GNN_shared/hhhgraph/ntuples/sliced_samples/
+feature_h5_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_slice_files/MetCut200/
+kinematic_h5_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_slice_files/MetCut200/
+ll_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_slice_files/MetCut200/linking_lengths/ 
+dist_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_slice_files/MetCut200/distances/
+score_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_slice_files/MetCut200/output_scores/
 
 # output paths
-plot_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/plots/
-adj_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/graph/
-model_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_my_files/MetCut200/models/
+plot_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_slice_files/MetCut200/plots/
+adj_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_slice_files/MetCut200/graph/
+model_path: /home/srutherford/GNN_shared/hhhgraph/data/LQ_slice_files/MetCut200/models/
