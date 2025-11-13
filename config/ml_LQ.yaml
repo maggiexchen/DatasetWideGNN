@@ -1,22 +1,21 @@
 kinematic_variable: "LQ_HighLevel"
 embedding_variable:
-distance: "cosine"
-friend_graph: True
-edge_weights: True
-edge_frac: 0.25
+distance: 
+friend_graph: 
+edge_weights: 
+edge_frac: 
 targettarget_eff: 
 linking_length:
-hidden_sizes_gcn: [12, 12]
+hidden_sizes_gcn: []
 hidden_sizes_mlp: [12, 12]
-dropout_rates: [0, 0, 0, 0]
+dropout_rates: [0, 0]
 LR: 0.01
 patience_LR: 3
-num_nb_list: [10, 10, 10]
-#[120, 120, 120]
-batch_size: 128
-gnn_type: "GCN"
+num_nb_list: []
+batch_size: 256
+gnn_type:
 epochs: 50
 patience_early_stopping: 20
 single_fold:
-plot_conv_kinematics: True
+plot_conv_kinematics: False
 
