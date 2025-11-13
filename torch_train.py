@@ -70,10 +70,11 @@ logging.info("CUDA is available? %s", str(torch.cuda.is_available()))
 if torch.cuda.is_available() and user.run_with_cuda:
     logging.info("      Using cuda")
     device = torch.device('cuda')
+    cpu = torch.device('cpu')
 else:
     logging.info("      Using cpu")
     device = torch.device('cpu')
-
+    cpu = device
 # set random seed for training
 torch.manual_seed(42)
 
@@ -86,12 +87,12 @@ do_edge_wgt = ml.edge_weights
 assert ml.patience_LR < ml.patience_early_stopping, \
     "LR scheduler patience should be less than early stopping patience"
 
-if ml.distance is None:
+if do_gnn and (ml.distance is None):
     raise ValueError("Need to specify a distance metric for the adjacency matrix in the ML config")
 
 # TODO resupport target_eff option
 edge_frac_list = [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
-if ml.linking_length is None:
+if do_gnn and (ml.linking_length is None):
     if ml.edge_frac is None:
         raise ValueError("Need to specify an edge_frac for the adjacency matrix in the ML config")
     elif ml.edge_frac not in edge_frac_list:
@@ -100,7 +101,7 @@ if ml.linking_length is None:
         ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
         adj_path = user.adj_path + "/" + ml.distance + "_edge_frac_" + \
             str(ml.edge_frac).replace(".", "p") + "/"
-else:
+elif do_gnn and (ml.linking_length is not None):
     if ml.edge_frac is not None:
         # when both linking length and edge fraction are specified,
         # use the linking length at specified edge fraction
@@ -112,7 +113,7 @@ else:
         ll_str = "_LL" + str(ml.linking_length).replace(".", "p")
         adj_path = user.adj_path + "/" + ml.distance + "_linking_length_" + \
             str(ml.linking_length).replace(".", "p") + "/"
-
+        
 ### str for train/val split label. If single fold, then val_frac is 1/num_folds.
 # Otherwise, nf is num_folds
 if ml.single_fold is True:
@@ -152,11 +153,14 @@ if user.wandb_project is not None and user.wandb_entity is not None:
                 name=model_label,
             )
 
-kinematic_plot_path = user.plot_path + "/training_kinematics/" + \
-    ml.distance + "_frac" + str(ml.edge_frac) + "/"
-if not do_gnn:
+kinematic_plot_path = user.plot_path + "/training_kinematics/" 
+if do_gnn:
+    kinematic_plot_path += ml.distance + "_frac" + str(ml.edge_frac) + "/"
+
+if do_gnn:
+    plot_path = user.plot_path + ml.distance + "_models/" + model_label + "/"
+else:
     plot_path = user.plot_path + "/MLP/" + model_label + "/"
-plot_path = user.plot_path + ml.distance + "_models/" + model_label + "/"
 misc.create_dirs(plot_path)
 
 if user.signal == "stau":
@@ -171,8 +175,11 @@ logging.info("input data path: %s", user.feature_h5_path)
 logging.info("input ll json path: %s", user.ll_path)
 logging.info("input distances path: %s", user.dist_path)
 logging.info("output plot path: %s", plot_path)
-logging.info("adj matrix storage path: %s", adj_path)
-model_path = user.model_path + ml.distance + "_models/" + model_label + "/" + ml.gnn_type + "/"
+if do_gnn:
+    logging.info("adj matrix storage path: %s", adj_path)
+    model_path = user.model_path + ml.distance + "_models/" + model_label + "/" + ml.gnn_type + "/"
+else:
+    model_path = user.model_path + "dnn_models/" + model_label + "/"
 logging.info("model storage path: %s", model_path)
 
 logging.info("distance metric: %s", ml.distance)
@@ -199,14 +206,14 @@ logging.info("full bkg size %s", str(full_bkg.size()))
 logging.info("full sig wgt size %s", str(full_sig_wgts.size()))
 logging.info("full bkg wgt size %s", str(full_bkg_wgts.size()))
 
-full_x = full_x.to(device)
-full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(device)
+full_x = full_x.to(cpu)
+full_y = torch.cat((full_sig_labels, full_bkg_labels), dim=0).to(cpu)
 len_full = len(full_y)
 del full_sig, full_bkg, full_sig_labels, full_bkg_labels
 
 logging.info("full sig yields %s", str(full_sig_wgts.sum()))
 logging.info("full bkg yields %s", str(full_bkg_wgts.sum()))
-full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0).to(device)
+full_wgts = torch.cat((full_sig_wgts, full_bkg_wgts), dim=0).to(cpu)
 logging.info("full wgt size %s", str(full_wgts.size()))
 del full_sig_wgts, full_bkg_wgts
 gc.collect()
@@ -235,7 +242,7 @@ if do_gnn:
     logging.info("loading col indices ...")
     col_ind = torch.load(adj_path+'col_ind.pt')
     logging.info("stacking row and col indices ...")
-    edge_ind = torch.stack((row_ind, col_ind)).to(device)
+    edge_ind = torch.stack((row_ind, col_ind)).to(cpu)
     logging.info("deleting row and col indices ...")
     del row_ind, col_ind
     if ml.gnn_type == "Graph":
@@ -244,7 +251,7 @@ if do_gnn:
     logging.info("Edge fraction: %s", str(edge_ind.shape[1] / len(full_y)**2))
     if do_edge_wgt:
         logging.info("loading edge weights ...")
-        edge_wgts = torch.load(adj_path+'edge_wgts.pt').to(device)
+        edge_wgts = torch.load(adj_path+'edge_wgts.pt').to(cpu)
         # edge weights from MC source node:
         edge_weights_from_MC = full_wgts[edge_ind[0]]
         if ml.gnn_type != "GAT":
@@ -331,7 +338,7 @@ try:
         ### standardise the entire dataset
         data_standardised = data
         data_standardised.x = misc.torch_standardise(data_standardised.x, means, stds)
-        means, stds = means.to(device), stds.to(device)
+        means, stds = means.to(cpu), stds.to(cpu)
         model = GCNClassifier(input_size=input_size, hidden_sizes_gcn=ml.hidden_sizes_gcn,
                               hidden_sizes_mlp=ml.hidden_sizes_mlp, output_size=1,
                               dropout_rates=ml.dropout_rates, gnn_type=ml.gnn_type)
@@ -345,8 +352,8 @@ try:
         train_loss = []
         val_loss = []
 
-        all_labels = data_standardised.y[train_idx].to(device).numpy()
-        all_node_weights = data_standardised.node_weight[train_idx].to(device).numpy()
+        all_labels = data_standardised.y[train_idx].to(cpu).numpy()
+        all_node_weights = data_standardised.node_weight[train_idx].to(cpu).numpy()
         class_weights = training.binary_class_weights(all_labels, all_node_weights).to(device)
         logging.info("Training class weights: ")
         logging.info("         signal: %s", str(class_weights[1]))
@@ -363,6 +370,8 @@ try:
             num_neighbors=ml.num_nb_list,
             shuffle=True,
             batch_size=ml.batch_size,
+            num_workers=4,
+            pin_memory=torch.cuda.is_available(),
         )
         val_loader = NeighborLoader(
             data_standardised,
@@ -370,6 +379,8 @@ try:
             num_neighbors=ml.num_nb_list,
             shuffle=False,
             batch_size=ml.batch_size,
+            num_workers=4,
+            pin_memory=torch.cuda.is_available(),
         )
 
         best_val_loss = float('inf')
@@ -388,7 +399,7 @@ try:
             logging.info("Training ...")
             for batch_idx, batch in tqdm(enumerate(train_loader), total=len(train_loader)):
                 optimiser.zero_grad()
-                batch = batch.to(device)
+                batch = batch.to(device, non_blocking=True)
                 tmp_batch_size = batch.batch_size
                 if do_edge_wgt and do_gnn: 
                     outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weight)
@@ -408,20 +419,20 @@ try:
                 torch.cuda.empty_cache()
                 total_examples += tmp_batch_size
                 total_loss += float(loss) * tmp_batch_size
-                train_outputs_fold.append(outputs.detach().to(device))
-                train_truth_labels_fold.append(y.detach().to(device))
-                train_wgts_fold.append(event_wgts.detach().to(device))
-                train_x_fold.append(batch.x.detach().to(device))
+                train_outputs_fold.append(outputs.detach())
+                train_truth_labels_fold.append(y.detach())
+                train_wgts_fold.append(event_wgts.detach())
+                train_x_fold.append(batch.x.detach())
 
                 # wandb.log({
                 #     f"train_batch_loss/fold_{fold_no}": float(loss) * tmp_batch_size},
                 #     step=fold_no * ml.epochs * len(train_loader) + epoch * len(train_loader) + batch_idx
                 # )
                 
-            train_outputs_fold = torch.cat(train_outputs_fold)
-            train_truth_labels_fold = torch.cat(train_truth_labels_fold)
-            train_wgts_fold = torch.cat(train_wgts_fold)
-            train_x_fold = torch.cat(train_x_fold)
+            train_outputs_fold = torch.cat(train_outputs_fold).detach().to(cpu)
+            train_truth_labels_fold = torch.cat(train_truth_labels_fold).detach().to(cpu)
+            train_wgts_fold = torch.cat(train_wgts_fold).detach().to(cpu)
+            train_x_fold = torch.cat(train_x_fold).detach().to(cpu)
 
             avg_tr_loss = total_loss / total_examples
             train_loss.append(avg_tr_loss)
@@ -437,7 +448,7 @@ try:
             logging.info("Validating ...")
             with torch.no_grad():
                 for batch_idx, batch in tqdm(enumerate(val_loader), total=len(val_loader)):
-                    batch = batch.to(device)
+                    batch = batch.to(device, non_blocking=True)
                     tmp_batch_size = batch.batch_size
                     if do_edge_wgt and do_gnn:
                         outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weight)
@@ -454,20 +465,20 @@ try:
 
                     total_examples += tmp_batch_size
                     total_loss += float(loss) * tmp_batch_size
-                    val_outputs_fold.append(outputs.detach().to(device))
-                    val_truth_labels_fold.append(y.detach().to(device))
-                    val_wgts_fold.append(event_wgts.detach().to(device))
-                    val_x_fold.append(batch.x.detach().to(device))
+                    val_outputs_fold.append(outputs.detach())
+                    val_truth_labels_fold.append(y.detach())
+                    val_wgts_fold.append(event_wgts.detach())
+                    val_x_fold.append(batch.x.detach())
 
                     # wandb.log({
                     #     f"val_batch_loss/fold_{fold_no}": float(loss) * tmp_batch_size},
                     #     step=fold_no * ml.epochs * len(val_loader) + epoch * len(val_loader) + batch_idx
                     # )
 
-            val_outputs_fold = torch.cat(val_outputs_fold)
-            val_truth_labels_fold = torch.cat(val_truth_labels_fold)
-            val_wgts_fold = torch.cat(val_wgts_fold)
-            val_x_fold = torch.cat(val_x_fold)
+            val_outputs_fold = torch.cat(val_outputs_fold).detach().to(cpu)
+            val_truth_labels_fold = torch.cat(val_truth_labels_fold).detach().to(cpu)
+            val_wgts_fold = torch.cat(val_wgts_fold).detach().to(cpu)
+            val_x_fold = torch.cat(val_x_fold).detach().to(cpu)
 
             avg_vl_loss = total_loss / total_examples
             val_loss.append(avg_vl_loss)
@@ -498,8 +509,8 @@ try:
                     "epoch": epoch,
                 })
 
-        train_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = train_outputs_fold.flatten()
-        val_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = val_outputs_fold.flatten()
+        train_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = train_outputs_fold.flatten().numpy()
+        val_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = val_outputs_fold.flatten().numpy()
 
         logging.info("Finished fold %s/%s", str(fold_no), str(user.n_folds))
         logging.info("Number of epochs: %s/%s", str(epoch+1), str(ml.epochs))
@@ -518,12 +529,12 @@ try:
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
-        train_outputs.append(train_outputs_fold.detach().to(device))
-        train_truth_labels.append(train_truth_labels_fold.detach().to(device))
-        train_wgts.append(train_wgts_fold.detach().to(device))
-        val_outputs.append(val_outputs_fold.detach().to(device))
-        val_truth_labels.append(val_truth_labels_fold.detach().to(device))
-        val_wgts.append(val_wgts_fold.detach().to(device))
+        train_outputs.append(train_outputs_fold)
+        train_truth_labels.append(train_truth_labels_fold)
+        train_wgts.append(train_wgts_fold)
+        val_outputs.append(val_outputs_fold)
+        val_truth_labels.append(val_truth_labels_fold)
+        val_wgts.append(val_wgts_fold)
         del train_loader, val_loader, model, optimiser, scheduler
         del train_outputs_fold, val_outputs_fold, train_truth_labels_fold, val_truth_labels_fold
         gc.collect()
@@ -572,9 +583,9 @@ finally:
     train_bkg_pred = train_outputs[torch.logical_not(train_label_bool)]
     train_bkg_wgts = train_wgts[torch.logical_not(train_label_bool)]
 
-    train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().to(device).numpy(),
-                                                train_outputs.detach().to(device).numpy(),
-                                                sample_weight=train_wgts.detach().to(device).numpy())
+    train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().to(cpu).numpy(),
+                                                train_outputs.detach().to(cpu).numpy(),
+                                                sample_weight=train_wgts.detach().to(cpu).numpy())
     if user.signal == "stau":
         # stau fpr needs to be clipped and sorted due to rounding errors
         train_fpr = np.clip(train_fpr, 0, 1)
@@ -589,9 +600,9 @@ finally:
     val_bkg_pred = val_outputs[torch.logical_not(val_label_bool)]
     val_bkg_wgts = val_wgts[torch.logical_not(val_label_bool)]
 
-    val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().to(device).numpy(),
-                                          val_outputs.detach().to(device).numpy(),
-                                          sample_weight=val_wgts.detach().to(device).numpy())
+    val_fpr, val_tpr, val_cut = roc_curve(val_truth_labels.detach().to(cpu).numpy(),
+                                          val_outputs.detach().to(cpu).numpy(),
+                                          sample_weight=val_wgts.detach().to(cpu).numpy())
     if user.signal == "stau": ### stau fpr needs to be clipped and sorted due to rounding errors
         val_fpr = np.clip(val_fpr, 0, 1)
         val_fpr = np.sort(val_fpr)
@@ -647,18 +658,18 @@ finally:
 
     fig_pred, ax_pred = plt.subplots()
     binning = np.linspace(0, 1, 51)
-    ax_pred.hist(train_sig_pred.detach().to(device).numpy(), bins=binning,
+    ax_pred.hist(train_sig_pred.detach().to(cpu).numpy(), bins=binning,
                  label="Signal (training)", histtype='step', linestyle='--', density=True,
-                 color="darkorange", weights=train_sig_wgts.detach().to(device).numpy())
-    ax_pred.hist(train_bkg_pred.detach().to(device).numpy(), bins=binning,
+                 color="darkorange", weights=train_sig_wgts.detach().to(cpu).numpy())
+    ax_pred.hist(train_bkg_pred.detach().to(cpu).numpy(), bins=binning,
                  label="Background (training)", histtype='step', linestyle='--', density=True,
-                 color="steelblue", weights=train_bkg_wgts.detach().to(device).numpy())
-    ax_pred.hist(val_sig_pred.detach().to(device).numpy(), bins=binning,
+                 color="steelblue", weights=train_bkg_wgts.detach().to(cpu).numpy())
+    ax_pred.hist(val_sig_pred.detach().to(cpu).numpy(), bins=binning,
                  label="Signal (validation)", alpha=0.5, density=True,
-                 color="darkorange", weights=val_sig_wgts.detach().to(device).numpy())
-    ax_pred.hist(val_bkg_pred.detach().to(device).numpy(), bins=binning,
+                 color="darkorange", weights=val_sig_wgts.detach().to(cpu).numpy())
+    ax_pred.hist(val_bkg_pred.detach().to(cpu).numpy(), bins=binning,
                  label="Background (validation)", alpha=0.5, density=True,
-                 color="steelblue", weights=val_bkg_wgts.detach().to(device).numpy())
+                 color="steelblue", weights=val_bkg_wgts.detach().to(cpu).numpy())
     plotting.add_text(ax_pred, text, do_atlas=False, startx=0.02, starty=0.95)
     ymin, ymax = ax_pred.get_ylim()
     plotting.draw_labels_legends(ax_pred, "Output score", "Normalised # Events",
@@ -668,18 +679,16 @@ finally:
     score_path = user.score_path + model_label + "/"
     misc.create_dirs(score_path)
 
-    np.save(score_path+"train_sig_pred.npy", train_sig_pred.detach().to(device).numpy())
-    np.save(score_path+"train_sig_wgts.npy", train_sig_wgts.detach().to(device).numpy())
+    np.save(score_path+"train_sig_pred.npy", train_sig_pred.detach().to(cpu).numpy())
+    np.save(score_path+"train_sig_wgts.npy", train_sig_wgts.detach().to(cpu).numpy())
 
-    np.save(score_path+"train_bkg_pred.npy", train_bkg_pred.detach().to(device).numpy())
-    np.save(score_path+"train_bkg_wgts.npy", train_bkg_wgts.detach().to(device).numpy())
+    np.save(score_path+"train_bkg_pred.npy", train_bkg_pred.detach().to(cpu).numpy())
+    np.save(score_path+"train_bkg_wgts.npy", train_bkg_wgts.detach().to(cpu).numpy())
+    np.save(score_path+"val_sig_pred.npy", val_sig_pred.detach().to(cpu).numpy())
+    np.save(score_path+"val_sig_wgts.npy", val_sig_wgts.detach().to(cpu).numpy())
 
-    np.save(score_path+"val_sig_pred.npy", val_sig_pred.detach().to(device).numpy())
-    np.save(score_path+"val_sig_wgts.npy", val_sig_wgts.detach().to(device).numpy())
-
-    np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().to(device).numpy())
-    np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().to(device).numpy())
-
+    np.save(score_path+"val_bkg_pred.npy", val_bkg_pred.detach().to(cpu).numpy())
+    np.save(score_path+"val_bkg_wgts.npy", val_bkg_wgts.detach().to(cpu).numpy())
     logging.info("Plotting ROC curves ...")
     fig_roc, ax_roc = plt.subplots()
     plt.plot(train_fpr, train_tpr, label=f'Training ROC curve (AUC = {train_auc:.3f})')
