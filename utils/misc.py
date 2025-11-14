@@ -619,3 +619,6 @@ def assign_fold_det(event_id, n_folds):
     seed = stable_int_from_string(str(event_id)) % (2**32)
     rng = np.random.RandomState(seed)
     return rng.randint(n_folds)
+
+def assign_fold_randomly(n_folds):
+    return np.random.randint(n_folds)
