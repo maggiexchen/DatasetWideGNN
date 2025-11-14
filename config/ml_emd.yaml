@@ -2,7 +2,9 @@ kinematic_variable: "LQ_LowLevel"
 embedding_variable:
 distance: "emd"
 flip: True
+friend_graph: True
 edge_weights: True
+targettarget_eff: 
 edge_frac: 0.1
 linking_length:
 hidden_sizes_gcn: [32, 32, 32, 32]
