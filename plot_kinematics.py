@@ -114,3 +114,24 @@ for v, var in enumerate(kinematics):
     df_bkg = df_all.iloc[len(df_sig):]
     plotting.plot_kinematics(df_sig, df_bkg, signal_label, background_label, var, user.plot_path,
                                   standardised=True, normalise=True, log_scale=True, ex=user.cutstring)
+    
+    nfolds = user.n_folds
+    print(nfolds)
+    dfs_sig = [df_sig[df_sig["fold_number_evnum"] == i] for i in range(0, nfolds)]
+    dfs_bkg = [df_bkg[df_bkg["fold_number_evnum"] == i] for i in range(0, nfolds)]
+    sig_wgts = [df_sig["eventWeight"] for df_sig in dfs_sig]
+    bkg_wgts = [df_bkg["eventWeight"] for df_bkg in dfs_bkg]
+    print("raw yields: ")
+    print("num_fold,num_sig,num_bkg")
+    for i in range(0, nfolds):
+        print("{0},{1},{2}".format(i, len(sig_wgts[i]), len(bkg_wgts[i])))
+    
+    print("weighted yields: ")
+    print("num_fold,num_sig,num_bkg")
+    for i in range(0, nfolds):
+        print("{0},{1:.2f},{2:.2f}".format(i, sig_wgts[i].sum(), bkg_wgts[i].sum()))
+    signal_labels = [ "f" + str(i) + " " + signal_label for i in range(0, nfolds)]
+    background_labels = [ "f" + str(i) + " " + background_label for i in range(0, nfolds)]
+    plotting.plot_kinematics_nfolds(dfs_sig, dfs_bkg, signal_labels, background_labels, var,
+                         user.plot_path, standardised=False, normalise=False,
+                         log_scale=True, sig_wgts=sig_wgts, bkg_wgts=bkg_wgts, ex=user.cutstring)

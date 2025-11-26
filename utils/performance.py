@@ -105,12 +105,11 @@ def save_performance(train_loss, train_fpr, train_tpr, train_threshold, train_au
         'train_fpr': train_fpr.tolist(),
         'train_tpr': train_tpr.tolist(),
         'train_threshold': train_threshold.tolist(),
-        'train_auc': train_auc.tolist(),
-        'val_loss': val_loss,
+        'train_auc': train_auc,
         'val_fpr': val_fpr.tolist(),
         'val_tpr': val_tpr.tolist(),
         'val_threshold': val_threshold.tolist(),
-        'val_auc': val_auc.tolist(),
+        'val_auc': val_auc,
     }
     save_path = path+"performance.json"
     with open(save_path, "w", encoding="utf-8") as outfile:

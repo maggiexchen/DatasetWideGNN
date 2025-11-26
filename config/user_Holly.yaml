@@ -12,12 +12,12 @@ cuts:
     operation: ">"
 feature_dim:
 run_with_cuda: False
-n_folds: 2
+n_folds: 3
 
 # input paths
-ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_140325/
-feature_h5_path: /data/atlas/users/pacey/GNN/data/sliced/
-kinematic_h5_path: /data/atlas/users/pacey/GNN/data/sliced/
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_080925/
+feature_h5_path: /data/atlas/users/pacey/GNN/data/sliced_2/
+kinematic_h5_path: /data/atlas/users/pacey/GNN/data/sliced_2/
 ll_path: /data/atlas/users/pacey/GNN/linking_lengths/
 dist_path: /data/atlas/users/pacey/GNN/distances/
 

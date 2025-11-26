@@ -60,6 +60,7 @@ for signal_root_file in signal_file_paths:
     print("Reading ", signal_root_file)
     signal_file = uproot.open(signal_root_file+":tree")
     x_pd = signal_file.arrays(library="pd")
+    x_pd["event_number"] = range(len(x_pd))
     data_list.append(x_pd)
     sig_initialWeights_arr = misc.get_hist_initial_weights(signal_root_file)
     weight_list.append(misc.calc_event_weight(x_pd, sig_initialWeights_arr, lumi_Run3))
@@ -69,6 +70,7 @@ df_sig[user.signal] = pd.concat(data_list, ignore_index=True)
 df_sig[user.signal]["target"] = [1]*len(df_sig[user.signal])
 df_sig[user.signal]["eventWeight"] = pd.concat(weight_list, ignore_index=True)
 print("Total ", user.signal, " events before cuts: ", len(df_sig[user.signal]), " weigthed before cuts: ", df_sig[user.signal]["eventWeight"].sum())
+df_sig[user.signal]["target"] = [1]*len(df_sig[user.signal])
 
 if user.cuts is not None:
     df_sig[user.signal] = misc.cut_operation(df_sig[user.signal], user.cuts)
@@ -96,6 +98,7 @@ for background in user.backgrounds:
         print("Reading ", background_root_file)
         background_file = uproot.open(background_root_file+":tree")
         x_pd = background_file.arrays(library="pd")
+        x_pd["event_number"] = range(len(x_pd))
         data_list.append(x_pd)
         bkg_initialWeights_arr = misc.get_hist_initial_weights(background_root_file)
         weight_list.append(misc.calc_event_weight(x_pd, bkg_initialWeights_arr, lumi_Run3))
@@ -107,7 +110,7 @@ for background in user.backgrounds:
 
     if user.cuts is not None:
         df_bkgs[background] = misc.cut_operation(df_bkgs[background], user.cuts)
-        print("Total ", background, " events after cuts: ", len(df_bkgs[background]), " weigthed after cuts: ", df_bkgs[background]["eventWeight"].sum())
+        print("Total ", background, " events after cuts: ", len(df_bkgs[background]), " weighted after cuts: ", df_bkgs[background]["eventWeight"].sum())
 
     df_bkgs[background].to_hdf(user.kinematic_h5_path + str(background) + user.cutstring + ".h5",
                                key=str(background), mode="w")
