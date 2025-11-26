@@ -22,7 +22,7 @@ class MLConfig(BaseModel):
     linking_length: Optional[int]
     hidden_sizes_gcn: list[int]
     hidden_sizes_mlp: list[int]
-    dropout_rates: list[int]
+    dropout_rates: list[float]
     LR: float
     patience_LR: int
     num_nb_list: list[int]

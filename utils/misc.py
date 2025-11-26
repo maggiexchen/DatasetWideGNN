@@ -607,7 +607,8 @@ def stable_int_from_string(s):
 
 def assign_fold_det(event_id, n_folds):
     """
-    Function to assign k-fold fold for given event.
+    Function to assign k-fold fold for given event
+    using some random id vairables (e.g. metphi).
 
     Args:
         event_id (float): id key for event
@@ -619,3 +620,21 @@ def assign_fold_det(event_id, n_folds):
     seed = stable_int_from_string(str(event_id)) % (2**32)
     rng = np.random.RandomState(seed)
     return rng.randint(n_folds)
+
+
+def assign_fold_eventNum(event_id, n_folds):
+    """
+    Function to assign k-fold fold for given event
+    using event numbers.
+
+    Args:
+        event_id (float): event number for event
+        n_folds (int): number of k-folds to split between
+
+    Returns:
+        (int): fold number
+    """
+    # subtract 1 just because eventnumber starts from 1 not 0 and
+    #  we want the first event to be in fold 0 for prettiness :p
+    fold = (event_id-1) % n_folds
+    return fold

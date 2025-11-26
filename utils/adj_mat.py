@@ -99,9 +99,15 @@ def data_loader(h5_path, kinematics, ex="", signal="LQ", signal_mass="",
             df_bkg = df_all.iloc[len(df_sig):]
 
     if num_folds is not None:
-        fold_var = 'eventNumber' if signal=="HHH" else "metphi"
-        sig_folds = df_sig[fold_var].apply(lambda x: misc.assign_fold_det(x, n_folds=num_folds))
-        bkg_folds = df_bkg[fold_var].apply(lambda x: misc.assign_fold_det(x, n_folds=num_folds))
+
+        # default eventNumber based folding
+        fold_var = 'eventNumber' if signal=="HHH" else "event_number"
+        sig_folds = df_sig[fold_var].apply(lambda x: misc.assign_fold_eventNum(x, n_folds=num_folds))
+        bkg_folds = df_bkg[fold_var].apply(lambda x: misc.assign_fold_eventNum(x, n_folds=num_folds))
+        # alternative metphi random seed based folding
+#        fold_var = 'eventNumber' if signal=="HHH" else "metphi"
+#        sig_folds = df_sig[fold_var].apply(lambda x: misc.assign_fold_det(x, n_folds=num_folds))
+#        bkg_folds = df_bkg[fold_var].apply(lambda x: misc.assign_fold_det(x, n_folds=num_folds))
 
     # filter out un-needed variables and convert pd dataframes to torch tensors
     df_sig = df_sig[kinematics]

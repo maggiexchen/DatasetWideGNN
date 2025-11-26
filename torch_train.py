@@ -122,7 +122,7 @@ else:
 if len(ml.hidden_sizes_gcn) == 0:
     model_label = user.signal\
           + "_MLP" + "-".join(map(str, ml.hidden_sizes_mlp)).replace(".", "p")\
-          + "_lr" + str(ml.LR).replace(".", "p")\
+          + "_lr" + str(ml.LR).replace(".", "p") + "P" + str(ml.patience_LR)\
           + "_dr" + "-".join(map(str, ml.dropout_rates)).replace(".", "p")\
           + "_bs" + str(ml.batch_size)\
           + "_e" + str(ml.epochs)\
@@ -132,7 +132,7 @@ else:
             + f"_{ml.gnn_type}" + "-".join(map(str, ml.hidden_sizes_gcn)).replace(".", "p")\
             + "_MLP" + "-".join(map(str, ml.hidden_sizes_mlp)).replace(".", "p")\
             + "_nb" + "-".join(map(str, ml.num_nb_list))\
-            + "_lr" + str(ml.LR).replace(".", "p")\
+            + "_lr" + str(ml.LR).replace(".", "p") + "P" + str(ml.patience_LR)\
             + ll_str\
             + "_dr" + "-".join(map(str, ml.dropout_rates)).replace(".", "p")\
             + "_bs" + str(ml.batch_size)\
@@ -250,7 +250,7 @@ else:
     edge_ind = None
     edge_wgts = None
 
-
+# note this is throwing a bug :( need to fix!
 if ml.plot_conv_kinematics:
     if do_edge_wgt:
         sparse_adj_matrix = torch.sparse_coo_tensor(edge_ind, edge_wgts,
@@ -336,7 +336,7 @@ try:
         optimiser = torch.optim.Adam(model.parameters(), lr=ml.LR)
         ### NOTE: patience for the scheculer is different from the early stopping patience
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode='min',
-                                                         patience=ml.patience_LR)
+                                                         patience=ml.patience_LR, factor = 0.5)
 
         train_loss = []
         val_loss = []
@@ -380,6 +380,8 @@ try:
             train_truth_labels_fold = []
             train_wgts_fold = []
             train_x_fold = []
+            epoch_wloss_sum = 0
+            epoch_w_sum = 0
 
             logging.info("Training ...")
             for batch_idx, batch in tqdm(enumerate(train_loader), total=len(train_loader)):
@@ -395,15 +397,22 @@ try:
                 outputs = outputs[:tmp_batch_size]
                 event_wgts = batch.node_weight[:tmp_batch_size]
 
-                loss = training.weighted_bce_loss(outputs.squeeze(), y.squeeze().float(),
-                                                  class_weights, event_wgts)
+                pos_w, neg_w = class_weights[1], class_weights[0]
+                sample_w = torch.where(y.squeeze() > 0.5, pos_w, neg_w) * event_wgts.squeeze() #multiply by class and event weights
+
+                loss = training.weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
+
                 loss.backward()
+
+                batch_w_sum = sample_w.sum()
+                epoch_wloss_sum += loss.detach() * batch_w_sum
+                epoch_w_sum += batch_w_sum
+                
+
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimiser.step()
 
                 torch.cuda.empty_cache()
-                total_examples += tmp_batch_size
-                total_loss += float(loss) * tmp_batch_size
                 train_outputs_fold.append(outputs.detach().to(device))
                 train_truth_labels_fold.append(y.detach().to(device))
                 train_wgts_fold.append(event_wgts.detach().to(device))
@@ -419,7 +428,7 @@ try:
             train_wgts_fold = torch.cat(train_wgts_fold)
             train_x_fold = torch.cat(train_x_fold)
 
-            avg_tr_loss = total_loss / total_examples
+            avg_tr_loss = (epoch_wloss_sum / (epoch_w_sum + 1e-12)).item() #no div by 0, .item() to convert to float
             train_loss.append(avg_tr_loss)
 
             ### start validation loop in the epoch
@@ -429,6 +438,8 @@ try:
             val_truth_labels_fold = []
             val_wgts_fold = []
             val_x_fold = []
+            epoch_wloss_sum = 0
+            epoch_w_sum = 0
 
             logging.info("Validating ...")
             with torch.no_grad():
@@ -438,18 +449,25 @@ try:
                     if do_edge_wgt and do_gnn:
                         outputs = model(batch.x, batch.edge_index, batch.edge_weight, batch.mc_weight)
                     else:
-                        outputs = model(batch.x, batch.edge_index, ml.gnn_type)
+                        outputs = model(batch.x, batch.edge_index)#, ml.gnn_type)
 
                     ### NOTE only consider predictions and labels of seed nodes (transductive learning)
                     y = batch.y[:tmp_batch_size]
                     outputs = outputs[:tmp_batch_size]
                     event_wgts = batch.node_weight[:tmp_batch_size]
 
-                    loss = training.weighted_bce_loss(outputs.squeeze(), y.squeeze().float(),
-                                                    class_weights, event_wgts)
+                    
+                    pos_w, neg_w = class_weights[1], class_weights[0]
+                    sample_w = torch.where(y.squeeze() > 0.5, pos_w, neg_w) * event_wgts.squeeze() #multiply class and event weights
 
-                    total_examples += tmp_batch_size
-                    total_loss += float(loss) * tmp_batch_size
+
+                    loss = training.weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
+
+                    batch_w_sum = sample_w.sum()
+                    epoch_wloss_sum += loss.detach() * batch_w_sum
+                    epoch_w_sum += batch_w_sum
+                    
+
                     val_outputs_fold.append(outputs.detach().to(device))
                     val_truth_labels_fold.append(y.detach().to(device))
                     val_wgts_fold.append(event_wgts.detach().to(device))
@@ -465,7 +483,7 @@ try:
             val_wgts_fold = torch.cat(val_wgts_fold)
             val_x_fold = torch.cat(val_x_fold)
 
-            avg_vl_loss = total_loss / total_examples
+            avg_vl_loss = (epoch_wloss_sum / (epoch_w_sum + 1e-12)).item() #no div by 0, .item() to convert to float
             val_loss.append(avg_vl_loss)
 
             current_lr = optimiser.param_groups[0]['lr']
@@ -491,6 +509,7 @@ try:
                 f"train_epoch_loss/fold_{fold_no}": avg_tr_loss,
                 f"val_epoch_loss/fold_{fold_no}": avg_vl_loss,
                 "epoch": epoch,
+                "learning_rate": current_lr
             })
 
         train_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = train_outputs_fold.flatten()
@@ -619,7 +638,8 @@ finally:
     else:
         model_text = [str(ml.gnn_type) + " model",
                       "MLP layers "+ str(ml.hidden_sizes_mlp),
-                      "Batchsize " + str(ml.batch_size)]
+                      "Batchsize " + str(ml.batch_size),
+                      "LR " + str(ml.LR) + ", patience " + str(ml.patience_LR)]
     plotting.add_text(ax_loss, model_text, do_atlas=False, startx=0.04, starty=0.95)
 
     ymin, ymax = ax_loss.get_ylim()
@@ -641,7 +661,7 @@ finally:
             signal_label, background_label, linking_length_label]
 
     fig_pred, ax_pred = plt.subplots()
-    binning = np.linspace(0, 1, 51)
+    binning = np.linspace(0, 1, 41)
     ax_pred.hist(train_sig_pred.detach().to(device).numpy(), bins=binning,
                  label="Signal (training)", histtype='step', linestyle='--', density=True,
                  color="darkorange", weights=train_sig_wgts.detach().to(device).numpy())
@@ -656,8 +676,9 @@ finally:
                  color="steelblue", weights=val_bkg_wgts.detach().to(device).numpy())
     plotting.add_text(ax_pred, text, do_atlas=False, startx=0.02, starty=0.95)
     ymin, ymax = ax_pred.get_ylim()
+    ax_pred.set_ylim(0.5*ymin, 10*ymax)
     plotting.draw_labels_legends(ax_pred, "Output score", "Normalised # Events",
-                                 yrange=[ymin, ymax], log_y=True)
+                                 yrange=[0.5*ymin, 10*ymax], log_y=True)
     plotting.save_fig(fig_pred, plot_path+"training_validation_pred")
 
     score_path = user.score_path + model_label + "/"
