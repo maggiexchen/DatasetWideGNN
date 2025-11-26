@@ -14,9 +14,9 @@ class MLConfig(BaseModel):
 
     kinematic_variable: str
     embedding_variable: Optional[str]
-    distance: str
-    friend_graph: bool
-    edge_weights: bool
+    distance: Optional[str]
+    friend_graph: Optional[bool]
+    edge_weights: Optional[bool]
     edge_frac: Optional[float]
     targettarget_eff: Optional[float]
     linking_length: Optional[int]
@@ -27,7 +27,7 @@ class MLConfig(BaseModel):
     patience_LR: int
     num_nb_list: list[int]
     batch_size: int
-    gnn_type: str
+    gnn_type: Optional[str]
     epochs: int
     patience_early_stopping: int
     single_fold: Optional[bool]
@@ -57,8 +57,17 @@ class MLConfig(BaseModel):
         if data["embedding_variable"] is None:
             data["embedding_variable"] = data["kinematic_variable"]
 
-        if data["distance"] is None:
-            raise ValueError("Need to specify a type of distance metric in the ML config")
+        do_gnn = len(data.get("hidden_sizes_gcn", [])) > 0
+        # Require gnn config inputs unless explicitly told do_gnn is False
+        if (do_gnn is None or do_gnn):
+            if data.get("distance") is None:
+                raise ValueError("Need to specify a type of distance metric in the ML config")
+            if data.get("friend_graph") is None:
+                raise ValueError("Need to specify whether to use a friend graph in the ML config")
+            if data.get("edge_weights") is None:
+                raise ValueError("Need to specify whether to use edge weights in the ML config")
+            if data.get("gnn_type") is None:
+                raise ValueError("Need to specify a GNN type in the ML config")
 
         for key, val in data.items():
             logging.info("%s: %s", key, str(val))

@@ -50,6 +50,10 @@ class UserConfig(BaseModel):
     # Pydantic type settings
     model_config = {"coerce_numbers_to_str": True}
 
+    # wandb settings
+    wandb_project: Optional[str] = None
+    wandb_entity: Optional[str] = None
+
     @classmethod
     def from_yaml(cls, yaml_path:str) -> "UserConfig":
         """
