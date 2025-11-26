@@ -28,3 +28,4 @@ ntuples/
 GraphBuilder/config/*
 compare.py
 *logs/
+wandb/

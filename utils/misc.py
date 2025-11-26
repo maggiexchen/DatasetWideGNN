@@ -621,7 +621,6 @@ def assign_fold_det(event_id, n_folds):
     rng = np.random.RandomState(seed)
     return rng.randint(n_folds)
 
-
 def assign_fold_eventNum(event_id, n_folds):
     """
     Function to assign k-fold fold for given event
@@ -638,3 +637,6 @@ def assign_fold_eventNum(event_id, n_folds):
     #  we want the first event to be in fold 0 for prettiness :p
     fold = (event_id-1) % n_folds
     return fold
+
+def assign_fold_randomly(n_folds):
+    return np.random.randint(n_folds)
