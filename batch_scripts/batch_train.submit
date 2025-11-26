@@ -1,16 +1,15 @@
 executable = batch_train.sh
 
 # adjust arguments as needed....
-# arguments = "config/ml_LQ.yaml config/user_Holly.yaml"
-arguments = "config/ml_LQ_ef0p01_simple.yaml config/user_Ruben.yaml"
+arguments = "config/ml_LQ.yaml config/user_Holly.yaml"
+
 getenv = true
 output = ../logs/batch_train_$(ClusterID).out
 error = ../logs/batch_train_$(ClusterID).err
 log = ../logs/batch_train_$(ClusterID).log
-# request_gpus = 1
-# require_gpus = (Capability >= 8.0) && (GlobalMemoryMb >= 20000)
+request_gpus = 1
 
-
-request_memory = 100000
+require_gpus = (Capability >= 8.0) && (GlobalMemoryMb >= 20000)
+request_memory = 80000
 queue 1
 
