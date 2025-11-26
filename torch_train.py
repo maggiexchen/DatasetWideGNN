@@ -7,6 +7,7 @@ import gc
 import logging
 import time
 from tqdm import tqdm
+import sys
 
 import utils.adj_mat as adj
 import utils.misc as misc
@@ -389,8 +390,6 @@ try:
             logging.info("Epoch %s", str(epoch))
             ### start training loop in the epoch
             model.train()
-            total_examples = 0
-            total_loss = 0
             train_outputs_fold = []
             train_truth_labels_fold = []
             train_wgts_fold = []
@@ -428,8 +427,6 @@ try:
                 optimiser.step()
 
                 torch.cuda.empty_cache()
-                total_examples += tmp_batch_size
-                total_loss += float(loss) * tmp_batch_size
                 train_outputs_fold.append(outputs.detach())
                 train_truth_labels_fold.append(y.detach())
                 train_wgts_fold.append(event_wgts.detach())
@@ -450,7 +447,6 @@ try:
 
             ### start validation loop in the epoch
             model.eval()
-            total_examples = total_loss = 0
             val_outputs_fold= []
             val_truth_labels_fold = []
             val_wgts_fold = []
@@ -473,20 +469,15 @@ try:
                     outputs = outputs[:tmp_batch_size]
                     event_wgts = batch.node_weight[:tmp_batch_size]
 
-                    
                     pos_w, neg_w = class_weights[1], class_weights[0]
                     sample_w = torch.where(y.squeeze() > 0.5, pos_w, neg_w) * event_wgts.squeeze() #multiply class and event weights
-
 
                     loss = training.weighted_bce_loss(outputs.squeeze(), y.squeeze().float(), class_weights, event_wgts)
 
                     batch_w_sum = sample_w.sum()
                     epoch_wloss_sum += loss.detach() * batch_w_sum
                     epoch_w_sum += batch_w_sum
-                    
 
-                    total_examples += tmp_batch_size
-                    total_loss += float(loss) * tmp_batch_size
                     val_outputs_fold.append(outputs.detach())
                     val_truth_labels_fold.append(y.detach())
                     val_wgts_fold.append(event_wgts.detach())
@@ -591,13 +582,20 @@ try:
                                      log_y=True)
         plotting.save_fig(fig_fold, plot_path+"outputs_fold_"+str(k))
 
+## Print errors occurring in the block above
+## Abort training in case of error
+except Exception as e:
+    print("**ERROR - An error occurred during training: \n")
+    print("Error message: ", e)
+
 finally:
+
+    # TODO: save model outputs and move ROC plotting elsewhere
+    ### compute ROC curve and AUC
     logging.info("Training complete.")
     logging.info("train truth labels %s", str(len(train_truth_labels)))
     logging.info("val truth labels %s", str(len(val_truth_labels)))
 
-    # TODO: save model outputs and move ROC plotting elsewhere
-    ### compute ROC curve and AUC
     train_outputs = train_outputs.view(-1)
     train_label_bool = train_truth_labels.bool()
     train_sig_pred = train_outputs[train_label_bool]
@@ -608,6 +606,7 @@ finally:
     train_fpr, train_tpr, train_cut = roc_curve(train_truth_labels.detach().to(cpu).numpy(),
                                                 train_outputs.detach().to(cpu).numpy(),
                                                 sample_weight=train_wgts.detach().to(cpu).numpy())
+
     if user.signal == "stau":
         # stau fpr needs to be clipped and sorted due to rounding errors
         train_fpr = np.clip(train_fpr, 0, 1)
