@@ -1,0 +1,28 @@
+#######################
+# user config for Ruben
+#######################
+
+# signal model hhh, LQ, stau
+signal: LQ
+signal_mass: 1000
+backgrounds: ["singletop", "ttbar"]
+cuts:
+  met:
+    threshold: 200
+    operation: ">"
+feature_dim:
+run_with_cuda: False
+n_folds: 3
+# input paths
+# ntuple_path: /data/atlas/atlasdata3/maggiechen/HHH6b_pairing/post-processing/20231008/
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_080925/
+feature_h5_path: /data/atlas/users/honscheid/HHH_GNN/h5/
+kinematic_h5_path: /data/atlas/users/honscheid/HHH_GNN/h5/
+ll_path: /data/atlas/users/honscheid/HHH_GNN/linking_lengths/
+dist_path: /data/atlas/users/honscheid/HHH_GNN/distances/
+score_path: /data/atlas/users/honscheid/HHH_GNN/trained_models/output_scores/
+
+# output paths
+plot_path: /data/atlas/users/honscheid/HHH_GNN/trained_models/subsampling/plots/ 
+adj_path: /data/atlas/users/honscheid/HHH_GNN/trained_models/graph/
+model_path: /data/atlas/users/honscheid/HHH_GNN/trained_models/models/ 
