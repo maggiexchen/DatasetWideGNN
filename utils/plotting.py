@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
 import torch
+import statistics
+
 
 plt.style.use(hep.style.ATLAS)
 
@@ -103,7 +105,7 @@ def add_text(ax, text, do_atlas=False, startx=0.04, starty=0.93, inc=0.05):
 
 def draw_n_hists(ax, hists, wgts, binning, labels, normalise):
     """
-    Function to draw 3 histograms
+    Function to draw n histograms
 
     Args:
         ax (mpl.pyplot axis): axes to draw on
@@ -115,14 +117,22 @@ def draw_n_hists(ax, hists, wgts, binning, labels, normalise):
     """
     assert len(hists) == len(wgts), "hists and wgts not the same length"
     assert len(hists) == len(labels), "hists and labels not the same length"
+    
 
     ys = []
     xs = []
     for i,hist in enumerate(hists):
-        tmpy, tmpx, _ = ax.hist(hist, bins=binning, label=labels[i], weights=wgts[i],
+#        tmpy, tmpx, _ = ax.hist(hist, bins=binning, label=labels[i], weights=wgts[i],
+        tmpy, tmpx, _ = ax.hist(hist, bins=binning, label="{0} Ave: {1:.2f}, Stdv: {2:.2f}".format(labels[i], statistics.mean(hist), statistics.stdev(hist))
+, weights=wgts[i],
             alpha=0.5, density=normalise)
         ys.append(tmpy)
         xs.append(tmpx)
+        if not normalise:
+            bin_centre = (binning[1:]+binning[:-1])/2
+            err = np.sqrt(np.histogram(hist, bins=binning, weights=wgts[i]**2)[0])
+            ax.fill_between(bin_centre, tmpy-err, tmpy+err, step='mid',hatch="\\\\\\\\",alpha=0.5)
+
 
     return ys, xs
 
@@ -227,11 +237,11 @@ def plot_kinematics(df_sig, df_bkg, sig_label, bkg_label, var,
     if xmin == xmax:
         print("trying to plot "+var+" that just has the same value for everything, skipping")
         return
-    binning = np.linspace(xmin, xmax, 25) #rounding to nearest integer, nicer in most cases
-    legend_entries = [sig_label, bkg_label]
+    binning = np.linspace(xmin, xmax, 21) #rounding to nearest integer, nicer in most cases
+    legend_entries = [bkg_label, sig_label]
 
-    [ys, yb], [xs, xb] = draw_n_hists(ax, [df_sig.loc[:, var], df_bkg.loc[:, var]],
-                                      [sig_wgts, bkg_wgts], binning, legend_entries, normalise)
+    [yb, ys], [xb, xs] = draw_n_hists(ax, [df_bkg.loc[:, var], df_sig.loc[:, var]],
+                                      [bkg_wgts, sig_wgts], binning, legend_entries, normalise)
 
     yrange = [0.8*np.min((ys, yb)), 1.2*np.max((ys, yb))]
     if log_scale:
@@ -261,6 +271,88 @@ def plot_kinematics(df_sig, df_bkg, sig_label, bkg_label, var,
     save_fig(fig, save_path + var + setting_label)
     save_data([ys, yb], [xs, xb], legend_entries, [xlabel, ylabel],
               save_path + var + setting_label, plot_text)
+
+    return
+
+
+def plot_kinematics_nfolds(dfs_sig, dfs_bkg, sig_labels, bkg_labels, var,
+                         file_path, standardised=True, normalise=True,
+                         log_scale=True, sig_wgts=None, bkg_wgts=None, text="", ex=""):
+    """
+    Function to plot the histogram of a kinematic variable for signal and background on one figure.
+
+    Args:
+        df_sig (pandas.dataframe): dataframe of kinematics for set of signal events
+        df_bkg (pandas.dataframe): dataframe of kinematics for set of background events
+        var (str): name of kinematic variable to plot
+        file_path (str): where to save the plots to.
+        standardised (bool): whether the variable distributions were standardised
+            to have a mean of 0 and stdev of 1.
+        normalise (bool): whether to normalise the distributions to have unit area
+            (remember "density" normalises by binwidth as well as height).
+        log_scale (bool): whether to use a log scale on the y-axis.
+        sig_wgts (pandas.series): dataframe of event weights for set of signal events
+        bkg_wgts (pandas.series): dataframe of event weights for set of background events
+        text (str): text to add to plot e.g. describing cuts placed.
+
+    """
+    # plot
+    fig, ax = plt.subplots()
+    plot_text = []
+    if standardised:
+        plot_text.append("Standardised to (mean, std) = (0, 1)")
+    if text!="":
+        plot_text.append(text)
+    add_text(ax, plot_text)
+    nfolds = len(dfs_sig)
+
+    xmin = math.floor(min([min(df_sig.loc[:, var].min(), df_bkg.loc[:, var].min()) for df_sig, df_bkg in zip(dfs_sig, dfs_bkg)]))
+    xmax = math.ceil(max([max(df_sig.loc[:, var].max(), df_bkg.loc[:, var].max()) for df_sig, df_bkg in zip(dfs_sig, dfs_bkg)]))
+
+    # don't bother plotting the variables that are all 1 value and just for sanity checking,
+    #    e.g. btag should always be 1.
+    if xmin == xmax:
+        print("trying to plot "+var+" that just has the same value for everything, skipping")
+        return
+    binning = np.linspace(xmin, xmax, 21) #rounding to nearest integer, nicer in most cases
+    allys = []
+    allxs = []
+    for i, (df_sig, df_bkg) in enumerate(zip(dfs_sig, dfs_bkg)):
+        legend_entries = [bkg_labels[i], sig_labels[i]]
+        [yb, ys], [xb, xs] = draw_n_hists(ax, [df_bkg.loc[:, var], df_sig.loc[:, var]],
+                                      [bkg_wgts[i], sig_wgts[i]], binning, legend_entries, normalise)
+
+        yrange = [0.8*np.min((ys, yb)), 1.2*np.max((ys, yb))]
+        if log_scale:
+            if normalise:
+                yrange = [0.1*(np.min((ys, yb))+0.00001), 5*np.max((ys, yb))]
+            else:
+                yrange = [0.01, 5*np.max((ys, yb))]
+        allys.append([yb, ys])
+        allxs.append([xb, xs])
+
+
+    xlabel = r"{}".format(get_x_label(var))
+    ylabel = "Normalised Events" if normalise else "Events / Bin"
+    draw_labels_legends(ax, xlabel, ylabel, legendloc='upper right', yrange=yrange, log_y=log_scale)
+
+    # save
+    if ((len(ex) > 0) and (ex[0] != "_")):
+        ex = "_"+ex
+    save_path = file_path + "/kinematics/nfolds_" + str(nfolds) + "_eventnum_"
+    setting_label = ""
+    if standardised:
+        setting_label += "_standardised"
+    if normalise:
+        setting_label += "_normalised"
+    if ex != "":
+        setting_label += ex
+    misc.create_dirs(save_path)
+    fig.tight_layout()
+
+    save_fig(fig, save_path + var + setting_label)
+    #save_data(allys, allxs, legend_entries, [xlabel, ylabel],
+    #          save_path + var + setting_label, plot_text)
 
     return
 
