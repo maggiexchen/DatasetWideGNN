@@ -680,7 +680,7 @@ finally:
 
     fig_pred, ax_pred = plt.subplots()
     binning = np.linspace(0, 1, 41)
-    ax_pred.hist(train_sig_pred.detach().to(device).numpy(), bins=binning,
+    ax_pred.hist(train_sig_pred.detach().to(cpu).numpy(), bins=binning,
                  label="Signal (training)", histtype='step', linestyle='--', density=True,
                  color="darkorange", weights=train_sig_wgts.detach().to(cpu).numpy())
     ax_pred.hist(train_bkg_pred.detach().to(cpu).numpy(), bins=binning,
