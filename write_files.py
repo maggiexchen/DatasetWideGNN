@@ -46,7 +46,7 @@ lumi_Run3 = 370.
 logging.info('Importing and writing signal %s ...', str(user.signal))
 if user.signal_mass is not None:
     print("signal mass ", user.signal_mass)
-    signal_mass_str = "_*" + str(user.signal_mass) + "*"
+    signal_mass_str = "_mass" + str(user.signal_mass) + "*"
 else:
     signal_mass_str = "_*"
 signal_file_paths = glob(user.ntuple_path + "GNNTree_" + str(user.signal)
