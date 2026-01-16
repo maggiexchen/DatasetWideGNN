@@ -5,7 +5,6 @@ friend_graph: True
 edge_weights: True
 targettarget_eff: 
 edge_frac: 0.1
-targettarget_eff:
 linking_length:
 hidden_sizes_gcn: [32, 32, 32, 32]
 hidden_sizes_mlp: [16, 12]
