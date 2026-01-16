@@ -28,8 +28,12 @@ def get_cutstring(cuts):
         (str) cutstring
     """
     cutstring = ""
-    for var, cut in cuts.items():
-        cutstring = cutstring + "_" + var + str(cut["threshold"]).replace(".0","").replace(".","p")
+    var = []
+    threshold = []
+    for cut in cuts:
+        var.append(str(cut["name"]))
+        threshold.append(str(cut["threshold"]).replace(".0", "").replace(".", "p"))
+    cutstring = cutstring + "_".join(f"{v}{t}" for v, t in zip(var, threshold))
     return cutstring
 
 def print_mem_info():
@@ -399,7 +403,8 @@ def cut_operation(df, cuts):
         (pandas.df): output event dataframe after cuts
     """
     conditions = []
-    for variable, cut in cuts.items():
+    for cut in cuts:
+        variable = cut.name
         threshold = cut.threshold
         operation = cut.operation
         if operation == ">":

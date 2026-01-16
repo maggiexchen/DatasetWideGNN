@@ -8,7 +8,7 @@ signal_mass: 1000
 backgrounds: ["singletop", "ttbar"]
 cuts:
   met:
-    threshold: 2000
+    threshold: 200
     operation: ">"
 feature_dim:
 distance:

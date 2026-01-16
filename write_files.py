@@ -46,7 +46,7 @@ lumi_Run3 = 370.
 logging.info('Importing and writing signal %s ...', str(user.signal))
 if user.signal_mass is not None:
     print("signal mass ", user.signal_mass)
-    signal_mass_str = "_mass" + str(user.signal_mass) + "*"
+    signal_mass_str = "_*" + str(user.signal_mass) + "*"
 else:
     signal_mass_str = "_*"
 signal_file_paths = glob(user.ntuple_path + "GNNTree_" + str(user.signal)
@@ -73,11 +73,12 @@ print("Total ", user.signal, " events before cuts: ", len(df_sig[user.signal]), 
 df_sig[user.signal]["target"] = [1]*len(df_sig[user.signal])
 
 if user.cuts is not None:
+    print("CUTSTRING ", user.cutstring)
     df_sig[user.signal] = misc.cut_operation(df_sig[user.signal], user.cuts)
     print("Total ", user.signal, " events after cuts: ", len(df_sig[user.signal]), " weigthed after cuts: ", df_sig[user.signal]["eventWeight"].sum())
 
 df_sig[user.signal].to_hdf(user.kinematic_h5_path + str(user.signal) + "_" + user.signal_mass +\
-                           user.cutstring + ".h5", key=str(user.signal), mode="w")
+                           "_" + user.cutstring + ".h5", key=str(user.signal), mode="w")
 
 logging.info('Importing and writing background ')
 df_bkgs = {}
@@ -112,7 +113,7 @@ for background in user.backgrounds:
         df_bkgs[background] = misc.cut_operation(df_bkgs[background], user.cuts)
         print("Total ", background, " events after cuts: ", len(df_bkgs[background]), " weighted after cuts: ", df_bkgs[background]["eventWeight"].sum())
 
-    df_bkgs[background].to_hdf(user.kinematic_h5_path + str(background) + user.cutstring + ".h5",
+    df_bkgs[background].to_hdf(user.kinematic_h5_path + str(background) + "_" + user.cutstring + ".h5",
                                key=str(background), mode="w")
 
 if plot_event_weights:
