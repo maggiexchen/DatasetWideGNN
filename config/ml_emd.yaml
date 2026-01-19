@@ -1,7 +1,6 @@
 kinematic_variable: "LQ_LowLevel"
 embedding_variable:
 distance: "emd"
-flip: True
 friend_graph: True
 edge_weights: True
 targettarget_eff: 
@@ -17,6 +16,6 @@ batch_size: 256
 gnn_type: "Graph"
 epochs: 50
 patience_early_stopping: 10
-# num_folds: 3 # now defined in the user config
-single_fold:
+num_folds: 2
+single_fold: 1
 plot_conv_kinematics: False

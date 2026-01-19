@@ -7,7 +7,7 @@ signal: LQ
 signal_mass: 1000
 backgrounds: ["singletop", "ttbar"]
 cuts:
-  met:
+  - name: met
     threshold: 200
     operation: ">"
 feature_dim:

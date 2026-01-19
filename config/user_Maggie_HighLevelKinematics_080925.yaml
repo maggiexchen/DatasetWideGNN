@@ -1,0 +1,34 @@
+#######################
+# user config for Maggie
+#######################
+
+# signal model hhh, LQ, stau
+signal: LQ
+signal_mass: 1000
+backgrounds: ["singletop", "ttbar"]
+cuts:
+  - name: met
+    threshold: 200
+    operation: ">"
+feature_dim:
+distance:
+  euclidean:
+  cosine:
+  emd:
+    objects: ["bjet1", "bjet2", "lep1", "lep2"]
+
+run_with_cuda: False
+n_folds: 2
+
+# input paths
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_080925/
+feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/LQs_080925/
+kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/LQs_080925/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/linking_lengths/ 
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/output_scores/
+
+# output paths
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/plots/ 
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/models/

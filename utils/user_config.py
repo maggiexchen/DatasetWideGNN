@@ -2,7 +2,7 @@
 Class to encode the user configuration yaml
 """
 import logging
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 import utils.misc as misc
 
@@ -14,6 +14,7 @@ class CutConfig(BaseModel):
     """
     Class to define the cut dictionary structure
     """
+    name: str
     threshold: float
     operation: str
 
@@ -26,7 +27,7 @@ class UserConfig(BaseModel):
     signal: str
     signal_mass: Optional[str] = None
     backgrounds: list[str]
-    cuts: Dict[str, CutConfig]
+    cuts: List[CutConfig]
     cutstring: Optional[str] = None
     feature_dim: Optional[int] = None
 
