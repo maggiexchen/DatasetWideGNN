@@ -1,6 +1,8 @@
 #!/bin/bash
 
 BASE_DIR="/data/atlas/atlasdata3/maggiechen/gnn_project"
+SAVE_DIR="/data/atlas/atlasdata3/maggiechen/gnn_project/hyperparameter_optimisation"
+
 # Define the path to the user config & ml training file
 
 USER_CONFIG_FILE=$BASE_DIR"/hyperparameter_optimisation/config/user_Maggie_DNN_scan.yaml"
@@ -29,7 +31,6 @@ MLP_HIDDEN_NODES=(5 10 15 20)
 MLP_LAYERS=(2 3 4)
 
 # Define model dir and file name
-SAVE_DIR="/data/atlas/atlasdata3/maggiechen/gnn_project/hyperparameter_optimisation"
 model_save_path=$SAVE_DIR"/"$MODEL"_"$VAR_LEVEL"_EdgeFrac"$EDGE_FRAC"/models/"
 plot_save_path=$SAVE_DIR"/"$MODEL"_"$VAR_LEVEL"_EdgeFrac"$EDGE_FRAC"/plots/"
 sed -i "s|^model_path: .*|model_path: $model_save_path|" "$USER_CONFIG_FILE"
