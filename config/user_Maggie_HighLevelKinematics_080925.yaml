@@ -18,7 +18,7 @@ distance:
     objects: ["bjet1", "bjet2", "lep1", "lep2"]
 
 run_with_cuda: False
-n_folds: 2
+n_folds: 3
 
 # input paths
 ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_080925/
