@@ -1,7 +1,6 @@
 kinematic_variable: "LQ_LowLevel"
 embedding_variable:
 distance: "emd"
-flip: True
 friend_graph: True
 edge_weights: True
 targettarget_eff: 

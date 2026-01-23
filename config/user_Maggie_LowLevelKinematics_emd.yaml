@@ -7,7 +7,7 @@ signal: LQ
 signal_mass: 1000
 backgrounds: ["singletop", "ttbar"]
 cuts:
-  met:
+  - name: met
     threshold: 200
     operation: ">"
 feature_dim:
@@ -21,14 +21,14 @@ run_with_cuda: False
 n_folds: 2
 
 # input paths
-ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_191124/
+ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQ_191124_smallunsliced/
 feature_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
 kinematic_h5_path: /data/atlas/atlasdata3/maggiechen/gnn_project/data/LQ_split_files/large_MetCut200/
-ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd/linking_lengths/ 
-dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd/distances/
-score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd/output_scores/
+ll_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd_smallunsliced/linking_lengths/ 
+dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd_smallunsliced/distances/
+score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd_smallunsliced/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd/plots/ 
-adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd/models/
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd_smallunsliced/plots/ 
+adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd_smallunsliced/graph/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_MetCut200_LowLevelKinematics_emd_smallunsliced/models/
