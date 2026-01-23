@@ -1,0 +1,35 @@
+#######################
+# user config for Seb
+#######################
+
+# signal model hhh, LQ, stau
+signal: LQ
+signal_mass: 1000
+backgrounds: ["singletop", "ttbar"]
+cuts:
+  met:
+    threshold: 200
+    operation: ">"
+feature_dim:
+distance:
+  euclidean:
+  cosine:
+  emd:
+    objects: ["bjet1", "bjet2", "lep1", "lep2"]
+run_with_cuda: True
+n_folds: 3
+wandb_project: "Dataset-wide GNN"
+wandb_entity: "staus_ml"
+
+# input paths
+ntuple_path: /scratch/sr5986/GNN_project/LQ_slice_files/ntuples/
+feature_h5_path: /scratch/sr5986/GNN_project/LQ_slice_files/MetCut200/
+kinematic_h5_path: /scratch/sr5986/GNN_project/LQ_slice_files/MetCut200/
+ll_path: /scratch/sr5986/GNN_project/LQ_slice_files/MetCut200/linking_lengths/
+dist_path: /scratch/sr5986/GNN_project/LQ_slice_files/MetCut200/distances/
+score_path: /scratch/sr5986/GNN_project/LQ_slice_files/MetCut200/output_scores/
+
+# output paths
+plot_path: /scratch/sr5986/GNN_project/LQ_slice_files/MetCut200/plots/
+adj_path: /scratch/sr5986/GNN_project/LQ_slice_files/MetCut200/graph/
+model_path: /scratch/sr5986/GNN_project/LQ_slice_files/MetCut200/models/

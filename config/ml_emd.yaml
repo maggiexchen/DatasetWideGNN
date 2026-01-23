@@ -5,7 +5,7 @@ flip: True
 friend_graph: True
 edge_weights: True
 targettarget_eff: 
-edge_frac: 0.1
+edge_frac: 0.05
 linking_length:
 hidden_sizes_gcn: [32, 32, 32, 32]
 hidden_sizes_mlp: [16, 12]
@@ -18,5 +18,5 @@ gnn_type: "Graph"
 epochs: 50
 patience_early_stopping: 10
 # num_folds: 3 # now defined in the user config
-single_fold:
+single_fold: True
 plot_conv_kinematics: False
