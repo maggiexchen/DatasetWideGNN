@@ -1,7 +1,6 @@
 #!/bin/bash
 
 BASE_DIR="/data/atlas/atlasdata3/maggiechen/gnn_project"
-SAVE_DIR="/data/atlas/atlasdata3/maggiechen/gnn_project/hyperparameter_optimisation"
 
 # Define the path to the user config & ml training file
 
@@ -14,6 +13,8 @@ MODEL="DNN" # DNN, GCN or Graph
 EPOCH=5
 SINGLEFOLD=1
 VALFRAC=4
+
+SAVE_DIR=$BASE_DIR"/hyperparameter_optimisation/"$MODEL"_"$VAR_LEVEL"/"
 
 sed -i "s|^kinematic_variable: .*|kinematic_variable: $VAR_LEVEL|" "$ML_CONFIG_FILE"
 sed -i "s|^gnn_type: .*|gnn_type: $MODEL|" "$ML_CONFIG_FILE"
@@ -31,8 +32,8 @@ MLP_HIDDEN_NODES=(5 10 15 20)
 MLP_LAYERS=(2 3 4)
 
 # Define model dir and file name
-model_save_path=$SAVE_DIR"/"$MODEL"_"$VAR_LEVEL"_EdgeFrac"$EDGE_FRAC"/models/"
-plot_save_path=$SAVE_DIR"/"$MODEL"_"$VAR_LEVEL"_EdgeFrac"$EDGE_FRAC"/plots/"
+model_save_path=$SAVE_DIR"models/"
+plot_save_path=$SAVE_DIR"plots/"
 sed -i "s|^model_path: .*|model_path: $model_save_path|" "$USER_CONFIG_FILE"
 sed -i "s|^plot_path: .*|plot_path: $plot_save_path|" "$USER_CONFIG_FILE"
 
@@ -55,9 +56,9 @@ for lr_pat in "${LR_PATIENCE[@]}"; do
                                 mlp_hidden_layers+=", "
                             fi
                         done
-                        for ((i=1; i<=dnn_layers; i++)); do
+                        for ((j=1; j<=dnn_layers; i++)); do
                             dropout_rates+="$dropout"
-                            if [ $i -lt $dnn_layers ]; then
+                            if [ $j -lt $dnn_layers ]; then
                             dropout_rates+=", "
                             fi
                         done
