@@ -80,7 +80,7 @@ os.makedirs(user.ll_path, exist_ok=True)
 if ml.linking_length is not None:
     logging.info("linking length is given in config,\
                  IGNORING edge_frac/targettarget_eff if present!")
-    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + "linking_length_" + \
+    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + str(variable) + "_" + "linking_length_" + \
         str(ml.linking_length).replace(".","p") + "/"
 
 elif ml.edge_frac is not None and ml.targettarget_eff is not None:
@@ -92,7 +92,7 @@ elif ml.edge_frac is not None:
         raise ValueError("""not given a supported edge fraction,
                          (0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5)""")
     ll_path = user.ll_path + "edge_frac_"
-    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + "edge_frac_" + \
+    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + str(variable) + "_" + "edge_frac_" + \
         str(ml.edge_frac).replace(".","p") + "/"
 
 elif ml.targettarget_eff is not None:
@@ -102,7 +102,7 @@ elif ml.targettarget_eff is not None:
                          (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)""")
 
     ll_path = user.ll_path + "targettarget_eff_"
-    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + "targettarget_eff_" + \
+    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + str(variable)  + "_" + "targettarget_eff_" + \
         str(ml.targettarget_eff).replace(".","p") + "/"
 
 else:

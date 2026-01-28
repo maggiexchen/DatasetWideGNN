@@ -91,10 +91,10 @@ else:
 
 ### str for train/val split label. If single fold, then val_frac is 1/num_folds. Otherwise, nf is num_folds
 if ml.single_fold:
-    val_frac = 1/user.n_folds
+    val_frac = 1/ml.num_folds
     nf_str = f"_val_frac{val_frac:.2f}"
 else:
-    nf_str = "_nf" + str(user.n_folds)
+    nf_str = "_nf" + str(ml.num_folds)
 
 ### create model label and result plot path
 if len(ml.hidden_sizes_gcn) == 0:
@@ -151,7 +151,7 @@ elif ml.linking_length is not None:
 logging.info('Importing signal and background files...')
 
 # normal loading setup
-full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels, sig_fold, bkg_fold = adj.data_loader(user.kinematic_h5_path, kinematics, ex=user.cutstring, signal=user.signal, signal_mass=user.signal_mass, num_folds = user.n_folds)
+full_sig, full_bkg, full_x, full_sig_wgts, full_bkg_wgts, full_sig_labels, full_bkg_labels, sig_fold, bkg_fold = adj.data_loader(user.kinematic_h5_path, kinematics, ex=user.cutstring, signal=user.signal, signal_mass=user.signal_mass, num_folds = ml.num_folds)
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
 print("full sig size ", full_sig.size())
@@ -230,7 +230,7 @@ val_outputs = torch.tensor([]).to(cpu)
 val_truth_labels = torch.tensor([]).to(cpu)
 val_wgts = torch.tensor([]).to(cpu)
 
-for fold_no in range(user.n_folds):
+for fold_no in range(ml.num_folds):
 
     model_file_name = f"model_fold_{fold_no}.pth"
     #### finish loading model to use mean and std from model to standardise data

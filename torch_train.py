@@ -100,28 +100,28 @@ if do_gnn and (ml.linking_length is None):
         raise ValueError(f"not given a supported edge fraction, {edge_frac_list}")
     else:
         ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
-        adj_path = user.adj_path + "/" + ml.distance + "_edge_frac_" + \
+        adj_path = user.adj_path + "/" + ml.distance + "_" + str(variable) + "_edge_frac_" + \
             str(ml.edge_frac).replace(".", "p") + "/"
 elif do_gnn and (ml.linking_length is not None):
     if ml.edge_frac is not None:
         # when both linking length and edge fraction are specified,
         # use the linking length at specified edge fraction
         ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
-        adj_path = user.adj_path + "/" + ml.distance + "_edge_frac_" + \
+        adj_path = user.adj_path + "/" + ml.distance + "_" + str(variable)  + "_edge_frac_" + \
             str(ml.edge_frac).replace(".", "p") + "/"
     else:
         logging.info("linking length is given in config, IGNORING the edge fraction in the config")
         ll_str = "_LL" + str(ml.linking_length).replace(".", "p")
-        adj_path = user.adj_path + "/" + ml.distance + "_linking_length_" + \
+        adj_path = user.adj_path + "/" + ml.distance + "_" + str(variable)  + "_linking_length_" + \
             str(ml.linking_length).replace(".", "p") + "/"
         
 ### str for train/val split label. If single fold, then val_frac is 1/num_folds.
 # Otherwise, nf is num_folds
 if ml.single_fold is True:
-    val_frac = 1/user.n_folds
+    val_frac = 1/ml.num_folds
     nf_str = f"_val_frac{val_frac:.2f}"
 else:
-    nf_str = "_nf" + str(user.n_folds)
+    nf_str = "_nf" + str(ml.num_folds)
 
 ### create model label and result plot path
 if len(ml.hidden_sizes_gcn) == 0:
@@ -198,7 +198,7 @@ full_sig_wgts, full_bkg_wgts, \
 full_sig_labels, full_bkg_labels, \
 sig_fold, bkg_fold = adj.data_loader(user.kinematic_h5_path, kinematics, ex=user.cutstring,
                                      signal=user.signal, signal_mass=user.signal_mass,
-                                     num_folds=user.n_folds)
+                                     num_folds=ml.num_folds)
 
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
@@ -326,11 +326,11 @@ try:
     logging.info("Starting k-fold cross validation ...")
     logging.info("Time taken so far: %s", str(time.time()-st))
 
-    for fold_no in range(user.n_folds):
+    for fold_no in range(ml.num_folds):
         train_idx = np.where(fold_assignment != fold_no)[0]
         val_idx = np.where(fold_assignment == fold_no)[0]
 
-        logging.info("starting fold %s/%s", str(fold_no+1), str(user.n_folds))
+        logging.info("starting fold %s/%s", str(fold_no+1), str(ml.num_folds))
         logging.info("train idx %s", str(len(train_idx)))
         logging.info("val idx %s", str(len(val_idx)))
 
@@ -525,7 +525,7 @@ try:
         train_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = train_outputs_fold.flatten().numpy()
         val_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = val_outputs_fold.flatten().numpy()
 
-        logging.info("Finished fold %s/%s", str(fold_no), str(user.n_folds))
+        logging.info("Finished fold %s/%s", str(fold_no), str(ml.num_folds))
         logging.info("Number of epochs: %s/%s", str(epoch+1), str(ml.epochs))
         logging.info("Final train Loss: %s", str(avg_tr_loss))
         logging.info("Final validation Loss: %s", str(avg_vl_loss))
@@ -568,7 +568,7 @@ try:
     logging.info("plotting model outputs per fold")
     fig_fold, ax_fold = plt.subplots()
     fold_colours = ["steelblue", "darkorange", "forestgreen"]
-    for k in range(user.n_folds):
+    for k in range(ml.num_folds):
         logging.info("Training Fold %s %s", str(k+1), str(train_outputs_per_fold["fold_"+str(k+1)+"_outputs"]))
         logging.info("Validation Fold %s %s", str(k+1), str(val_outputs_per_fold["fold_"+str(k+1)+"_outputs"]))
         fig_fold, ax_fold = plt.subplots()
@@ -633,7 +633,7 @@ finally:
     # save performance to json
     perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc,
                           val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
-    perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), user.n_folds,
+    perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), ml.num_folds,
                              ml.hidden_sizes_gcn, ml.hidden_sizes_mlp, ml.LR, ml.dropout_rates,
                              ml.epochs, model_path)
 
