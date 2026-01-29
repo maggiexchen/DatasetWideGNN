@@ -30,7 +30,8 @@ parser.add_argument(
     "--variable",
     "-v",
     type=str,
-    required=True,
+    required=False,
+    default=None,
     help="Specify the type of kinematic variables to calculate distance for",
 )
 
@@ -38,7 +39,8 @@ parser.add_argument(
     "--distance",
     "-d",
     type=str,
-    required=True,
+    required=False,
+    default=None,
     help="Specify the type of distance to calculate",
 )
 
@@ -75,8 +77,26 @@ user = uconfig.UserConfig.from_yaml(user_config_path)
 ml_config_path = args.MLconfig
 ml = mlconfig.MLConfig.from_yaml(ml_config_path)
 
-variable = str(args.variable)
-distance = str(args.distance)
+# Use command line args if provided, otherwise fall back to ML config
+# Prefer embedding_variable over distance_variable from config (like in torch_adj_builder)
+if args.variable is not None:
+    variable = str(args.variable)
+    logging.info("Using variable from command line argument: %s", variable)
+else:
+    variable = str(ml.embedding_variable) if ml.embedding_variable is not None \
+        else str(ml.distance_variable)
+    if ml.embedding_variable is not None:
+        logging.info("Using embedding variable from ML config: %s", variable)
+    else:
+        logging.info("Using distance variable from ML config: %s", variable)
+
+if args.distance is not None:
+    distance = str(args.distance)
+    logging.info("Using distance from command line argument: %s", distance)
+else:
+    distance = str(ml.distance)
+    logging.info("Using distance from ML config: %s", distance)
+
 batch_size = args.batchsize
 
 signal_label, background_label = plotting.get_plot_labels(user.signal)
