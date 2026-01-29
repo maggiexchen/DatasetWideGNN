@@ -70,69 +70,90 @@ batch_size = args.batchsize
 
 os.makedirs(user.adj_path, exist_ok=True)
 
-variable = ml.kinematic_variable if ml.embedding_variable==ml.embedding_variable \
-    else ml.embedding_variable
+### will build graph with embedding variable if given, else distance variable
+variable = ml.embedding_variable if ml.embedding_variable is not None \
+    else ml.distance_variable
+if ml.embedding_variable is not None:
+    logging.info("Using embedding variable for graph construction: %s", variable)
+else:
+    logging.info("Using distance variable for graph construction: %s", variable)
+
 do_edge_wgt = ml.edge_weights
 
 os.makedirs(user.ll_path, exist_ok=True)
 
-# TODO support edge_frac or target_eff
+# Check that exactly one linking length method is specified
+num_methods = sum([
+    ml.linking_length is not None,
+    ml.edge_frac is not None,
+    ml.targettarget_eff is not None
+])
+
+if num_methods > 1:
+    raise ValueError("Only one of linking_length, edge_frac, or targettarget_eff can be set in ML config!")
+if num_methods == 0:
+    raise ValueError("Must specify one of linking_length, edge_frac, or targettarget_eff in ML config!")
+
+# Load or set linking length based on the specified method
 if ml.linking_length is not None:
-    logging.info("linking length is given in config,\
-                 IGNORING edge_frac/targettarget_eff if present!")
-    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + str(variable) + "_" + "linking_length_" + \
+    # Manual linking length provided
+    logging.info("Using manual linking length from config: %s", str(ml.linking_length))
+    linking_length = ml.linking_length
+    adj_path = user.adj_path + "/" + str(variable) + "_" + str(ml.distance) + "_" + "linking_length_" + \
         str(ml.linking_length).replace(".","p") + "/"
 
-elif ml.edge_frac is not None and ml.targettarget_eff is not None:
-    raise ValueError("edge_frac and targettarget_eff in ML config, pick just one!")
-
 elif ml.edge_frac is not None:
-    logging.info("Will try to use edge_frac to define linking length....")
+    # Load linking length from edge_frac dictionary
+    logging.info("Using edge_frac to define linking length: %s", str(ml.edge_frac))
     if ml.edge_frac not in [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]:
-        raise ValueError("""not given a supported edge fraction,
+        raise ValueError("""Not given a supported edge fraction, must be one of:
                          (0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5)""")
-    ll_path = user.ll_path + "edge_frac_"
-    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + str(variable) + "_" + "edge_frac_" + \
-        str(ml.edge_frac).replace(".","p") + "/"
-
-elif ml.targettarget_eff is not None:
-    logging.info("Will try to use targettarget_eff to define linking length....")
-    if ml.targettarget_eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
-        raise ValueError("""not given a supported sig-sig efficiency,
-                         (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)""")
-
-    ll_path = user.ll_path + "targettarget_eff_"
-    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + str(variable)  + "_" + "targettarget_eff_" + \
-        str(ml.targettarget_eff).replace(".","p") + "/"
-
-else:
-    raise ValueError("Neither manual LL, edge_frac or targettarget_eff in ML config, pick one!")
-
-ll_path = ll_path + variable + "_" + ml.distance + user.cutstring + "_linking_length.json"
-
-if ml.linking_length is None:
-    print("Saving linking length to ", ll_path)
+    
+    ll_path = user.ll_path + "edge_frac_" + str(variable) + "_" + str(ml.distance) + user.cutstring + "_linking_length.json"
+    logging.info("Loading linking length from: %s", ll_path)
     with open(ll_path, 'r', encoding="utf-8") as lfile:
         length_dict = json.load(lfile)
-        lengths = length_dict["length"]
-        if ml.edge_frac is not None:
-            linking_length = lengths[length_dict["edge_frac"].index(ml.edge_frac)]
+        linking_length = length_dict["length"][length_dict["edge_frac"].index(ml.edge_frac)]
+    logging.info("Linking length = %s", str(linking_length))
+    
+    adj_path = user.adj_path + "/" + str(variable) + "_" + str(ml.distance) + "_" + "edge_frac_" + \
+        str(ml.edge_frac).replace(".","p") + "/"
+
+else:  # ml.targettarget_eff is not None
+    # Load linking length from targettarget_eff dictionary
+    logging.info("Using targettarget_eff to define linking length: %s", str(ml.targettarget_eff))
+    if ml.targettarget_eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+        raise ValueError("""Not given a supported target efficiency, must be one of:
+                         (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)""")
+    
+    ll_path = user.ll_path + "targettarget_eff_" + str(variable) + "_" + str(ml.distance) + user.cutstring + "_linking_length.json"
+    logging.info("Loading linking length from: %s", ll_path)
+    with open(ll_path, 'r', encoding="utf-8") as lfile:
+        length_dict = json.load(lfile)
+        # Try both possible keys in the dictionary
+        if "targettarget_eff" in length_dict:
+            linking_length = length_dict["length"][length_dict["targettarget_eff"].index(ml.targettarget_eff)]
+        elif "bkgbkg_eff" in length_dict:
+            linking_length = length_dict["length"][length_dict["bkgbkg_eff"].index(ml.targettarget_eff)]
         else:
-            linking_length = lengths[length_dict["bkgbkg_eff"].index(ml.targettarget_eff)]
-        logging.info("linking length = %s", str(linking_length))
+            raise KeyError("Expected 'targettarget_eff' or 'bkgbkg_eff' key in linking length file")
+    logging.info("Linking length = %s", str(linking_length))
+    
+    adj_path = user.adj_path + "/" + str(variable) + "_" + str(ml.distance) + "_" + "targettarget_eff_" + \
+        str(ml.targettarget_eff).replace(".","p") + "/"
 
 misc.create_dirs(adj_path)
 
-kinematics = misc.get_kinematics(ml.kinematic_variable, user.feature_dim)
+kinematics = misc.get_kinematics(ml.distance_variable, user.feature_dim)
 input_size = len(kinematics)
 
-logging.info("kinematic variable set: %s", ml.kinematic_variable)
+logging.info("kinematic variable set: %s", ml.distance_variable)
 logging.info("embedding variable set: %s", ml.embedding_variable)
 logging.info("distance metric: %s", ml.distance)
 if ml.edge_frac is not None:
     logging.info("desired edge fraction: %s", str(ml.edge_frac))
 elif ml.targettarget_eff is not None:
-    logging.info("desired edge fraction: %s", str(ml.targettarget_eff))
+    logging.info("desired target efficiency: %s", str(ml.targettarget_eff))
 else:
     logging.info("linking length: %s", str(ml.linking_length))
 

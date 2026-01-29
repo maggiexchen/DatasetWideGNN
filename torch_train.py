@@ -91,29 +91,53 @@ assert ml.patience_LR < ml.patience_early_stopping, \
 if do_gnn and (ml.distance is None):
     raise ValueError("Need to specify a distance metric for the adjacency matrix in the ML config")
 
-# TODO resupport target_eff option
-edge_frac_list = [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
-if do_gnn and (ml.linking_length is None):
-    if ml.edge_frac is None:
-        raise ValueError("Need to specify an edge_frac for the adjacency matrix in the ML config")
-    elif ml.edge_frac not in edge_frac_list:
-        raise ValueError(f"not given a supported edge fraction, {edge_frac_list}")
+if do_gnn:
+
+    # Determine which variable is used for building the graph (embedding_variable or distance_variable)
+    # This matches the logic in torch_adj_builder
+    distance_variable = ml.embedding_variable if ml.embedding_variable is not None \
+        else ml.distance_variable
+    if ml.embedding_variable is not None:
+        logging.info("Loading graph constructed with embedding variables: %s", distance_variable)
     else:
-        ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
-        adj_path = user.adj_path + "/" + ml.distance + "_" + str(variable) + "_edge_frac_" + \
-            str(ml.edge_frac).replace(".", "p") + "/"
-elif do_gnn and (ml.linking_length is not None):
-    if ml.edge_frac is not None:
-        # when both linking length and edge fraction are specified,
-        # use the linking length at specified edge fraction
-        ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
-        adj_path = user.adj_path + "/" + ml.distance + "_" + str(variable)  + "_edge_frac_" + \
-            str(ml.edge_frac).replace(".", "p") + "/"
-    else:
-        logging.info("linking length is given in config, IGNORING the edge fraction in the config")
+        logging.info("Loading graph constructed with distance variables: %s", distance_variable)
+
+    # Check that exactly one linking length method is specified
+    num_methods = sum([
+        ml.linking_length is not None,
+        ml.edge_frac is not None,
+        ml.targettarget_eff is not None
+    ])
+    
+    if num_methods > 1:
+        raise ValueError("Only one of linking_length, edge_frac, or targettarget_eff can be set in ML config!")
+    if num_methods == 0:
+        raise ValueError("Must specify one of linking_length, edge_frac, or targettarget_eff in ML config!")
+    
+    # Set ll_str and adj_path based on which method is used
+    if ml.linking_length is not None:
+        logging.info("Using manual linking length from config: %s", str(ml.linking_length))
         ll_str = "_LL" + str(ml.linking_length).replace(".", "p")
-        adj_path = user.adj_path + "/" + ml.distance + "_" + str(variable)  + "_linking_length_" + \
+        adj_path = user.adj_path + "/" + str(distance_variable) + "_" + str(ml.distance) + "_linking_length_" + \
             str(ml.linking_length).replace(".", "p") + "/"
+    
+    elif ml.edge_frac is not None:
+        logging.info("Using edge_frac to define linking length: %s", str(ml.edge_frac))
+        if ml.edge_frac not in [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]:
+            raise ValueError("""Not given a supported edge fraction, must be one of:
+                             (0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5)""")
+        ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
+        adj_path = user.adj_path + "/" + str(distance_variable) + "_" + str(ml.distance) + "_edge_frac_" + \
+            str(ml.edge_frac).replace(".", "p") + "/"
+    
+    else:  # ml.targettarget_eff is not None
+        logging.info("Using targettarget_eff to define linking length: %s", str(ml.targettarget_eff))
+        if ml.targettarget_eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+            raise ValueError("""Not given a supported target efficiency, must be one of:
+                             (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)""")
+        ll_str = "_LLTargetEff" + str(ml.targettarget_eff).replace(".", "p")
+        adj_path = user.adj_path + "/" + str(distance_variable) + "_" + str(ml.distance) + "_targettarget_eff_" + \
+            str(ml.targettarget_eff).replace(".", "p") + "/"
         
 ### str for train/val split label. If single fold, then val_frac is 1/num_folds.
 # Otherwise, nf is num_folds
@@ -156,10 +180,14 @@ if user.wandb_project is not None and user.wandb_entity is not None:
 
 kinematic_plot_path = user.plot_path + "/training_kinematics/" 
 if do_gnn:
-    kinematic_plot_path += ml.distance + "_frac" + str(ml.edge_frac) + "/"
-
+    if ml.edge_frac is not None:
+        kinematic_plot_path += str(distance_variable) + "_" + str(ml.distance) + "_frac" + str(ml.edge_frac) + "/"
+    elif ml.targettarget_eff is not None:
+        kinematic_plot_path += str(distance_variable) + "_" + str(ml.distance) + "_targeteff" + str(ml.targettarget_eff) + "/"
+    else:
+        kinematic_plot_path += str(distance_variable) + "_" + str(ml.distance) + "_ll" + str(ml.linking_length) + "/"
 if do_gnn:
-    plot_path = user.plot_path + ml.distance + "_models/" + model_label + "/"
+    plot_path = user.plot_path + str(distance_variable) + "_" + str(ml.distance) + "_models/" + model_label + "/"
 else:
     plot_path = user.plot_path + "/MLP/" + model_label + "/"
 misc.create_dirs(plot_path)
@@ -171,14 +199,14 @@ else:
 input_size = len(kinematics)
 
 logging.info("chosen model: %s", model_label)
-logging.info("embedding variable set: %s", ml.embedding_variable)
+logging.info("graph built with variable set: %s", distance_variable)
 logging.info("input data path: %s", user.feature_h5_path)
 logging.info("input ll json path: %s", user.ll_path)
 logging.info("input distances path: %s", user.dist_path)
 logging.info("output plot path: %s", plot_path)
 if do_gnn:
     logging.info("adj matrix storage path: %s", adj_path)
-    model_path = user.model_path + ml.distance + "_models/" + model_label + "/" + ml.gnn_type + "/"
+    model_path = user.model_path + str(distance_variable) + "_" + str(ml.distance) + "_models/" + model_label + "/" + ml.gnn_type + "/"
 else:
     model_path = user.model_path + "dnn_models/" + model_label + "/"
 logging.info("model storage path: %s", model_path)
