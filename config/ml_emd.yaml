@@ -1,4 +1,5 @@
 kinematic_variable: "LQ_LowLevel"
+distance_variable: "LQ_LowLevel" ### must be LowLevel for emd
 embedding_variable:
 distance: "emd"
 friend_graph: True

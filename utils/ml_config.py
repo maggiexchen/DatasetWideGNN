@@ -13,6 +13,7 @@ class MLConfig(BaseModel):
     """
 
     kinematic_variable: str
+    distance_variable: str
     embedding_variable: Optional[str]
     distance: Optional[str]
     friend_graph: Optional[bool]
@@ -62,6 +63,8 @@ class MLConfig(BaseModel):
         if (do_gnn is None or do_gnn):
             if data.get("distance") is None:
                 raise ValueError("Need to specify a type of distance metric in the ML config")
+            if data.get("distance_variable") is None:
+                raise ValueError("Need to specify a distance variable set in the ML config")
             if data.get("friend_graph") is None:
                 raise ValueError("Need to specify whether to use a friend graph in the ML config")
             if data.get("edge_weights") is None:
