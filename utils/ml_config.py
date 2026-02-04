@@ -32,6 +32,7 @@ class MLConfig(BaseModel):
     epochs: int
     patience_early_stopping: int
     single_fold: Optional[bool]
+    num_folds: int
     plot_conv_kinematics: bool
 
     # Pydantic type settings
