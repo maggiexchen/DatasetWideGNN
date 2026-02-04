@@ -1,4 +1,5 @@
-kinematic_variable: LQ_HighLevel
+ml_variable: LQ_HighLevel
+distance_variable:
 embedding_variable:
 distance: euclidean
 friend_graph: True
@@ -16,5 +17,6 @@ batch_size: 1024
 gnn_type: DNN
 epochs: 5
 patience_early_stopping: 100
+num_folds: 4
 single_fold: 1
 plot_conv_kinematics: False

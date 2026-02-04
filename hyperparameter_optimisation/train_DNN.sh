@@ -8,19 +8,19 @@ USER_CONFIG_FILE=$BASE_DIR"/hyperparameter_optimisation/config/user_Maggie_DNN_s
 ML_CONFIG_FILE=$BASE_DIR"/hyperparameter_optimisation/config/ml_LQ_DNN_scan.yaml"
 
 # GNN parameters to fix
-VAR_LEVEL=$1 # LQ_LowLevel or LQ_HighLevel
+ML_VAR_LEVEL=$1 # LQ_LowLevel or LQ_HighLevel
 MODEL="DNN" # DNN, GCN or Graph
 EPOCH=5
 SINGLEFOLD=1
 VALFRAC=4
 
-SAVE_DIR=$BASE_DIR"/hyperparameter_optimisation/"$MODEL"_"$VAR_LEVEL"/"
+SAVE_DIR=$BASE_DIR"/hyperparameter_optimisation/"$MODEL"_Inputs"$ML_VAR_LEVEL"/"
 
-sed -i "s|^kinematic_variable: .*|kinematic_variable: $VAR_LEVEL|" "$ML_CONFIG_FILE"
+sed -i "s|^ml_variable: .*|ml_variable: $ML_VAR_LEVEL|" "$ML_CONFIG_FILE"
 sed -i "s|^gnn_type: .*|gnn_type: $MODEL|" "$ML_CONFIG_FILE"
 sed -i "s|^epochs: .*|epochs: $EPOCH|" "$ML_CONFIG_FILE"
 sed -i "s|^single_fold: .*|single_fold: $SINGLEFOLD|" "$ML_CONFIG_FILE"
-sed -i "s|^n_fold: .*|n_fold: $VALFRAC|" "$USER_CONFIG_FILE"
+sed -i "s|^num_folds: .*|num_folds: $VALFRAC|" "$ML_CONFIG_FILE"
 
 # Parameters to optimise
 BATCHSIZE=(1024 2048)

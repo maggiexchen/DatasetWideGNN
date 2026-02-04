@@ -8,23 +8,25 @@ USER_CONFIG_FILE=$BASE_DIR"/hyperparameter_optimisation/config/user_Maggie_GNN_s
 ML_CONFIG_FILE=$BASE_DIR"/hyperparameter_optimisation/config/ml_LQ_GNN_scan.yaml"
 
 # GNN parameters to fix
-VAR_LEVEL=$1 # LQ_LowLevel or LQ_HighLevel
-MODEL=$2 # GCN or Graph
-DISTANCE=$3 # euclidean, cosine, or emd
+ML_VAR_LEVEL=$1 # LQ_LowLevel or LQ_HighLevel
+DIST_VAR_LEVEL=$2 # variables used to calculate the graph
+MODEL=$3 # GCN or Graph
+DISTANCE=$4 # euclidean, cosine, or emd
 EDGE_FRAC=0.1
 EPOCH=5
 SINGLEFOLD=1
 VALFRAC=4
 
-SAVE_DIR=$BASE_DIR"/hyperparameter_optimisation/"$MODEL"_"$VAR_LEVEL"_"$DISTANCE"_EdgeFrac"$EDGE_FRAC"/"
+SAVE_DIR=$BASE_DIR"/hyperparameter_optimisation/"$MODEL"_"$DISTANCE""$DIST_VAR_LEVEL"_Inputs"$ML_VAR_LEVEL"_EdgeFrac"$EDGE_FRAC"/"
 
-sed -i "s|^kinematic_variable: .*|kinematic_variable: $VAR_LEVEL|" "$ML_CONFIG_FILE"
+sed -i "s|^ml_variable: .*|ml_variable: $ML_VAR_LEVEL|" "$ML_CONFIG_FILE"
+sed -i "s|^distance_variable: .*|distance_variable: $DIST_VAR_LEVEL|" "$DIST_CONFIG_FILE"
 sed -i "s|^gnn_type: .*|gnn_type: $MODEL|" "$ML_CONFIG_FILE"
 sed -i "s|^distance: .*|distance: $DISTANCE|" "$ML_CONFIG_FILE"
 sed -i "s|^edge_frac: .*|edge_frac: $EDGE_FRAC|" "$ML_CONFIG_FILE"
 sed -i "s|^epochs: .*|epochs: $EPOCH|" "$ML_CONFIG_FILE"
 sed -i "s|^single_fold: .*|single_fold: $SINGLEFOLD|" "$ML_CONFIG_FILE"
-sed -i "s|^n_fold: .*|n_fold: $VALFRAC|" "$USER_CONFIG_FILE"
+sed -i "s|^num_folds: .*|num_folds: $VALFRAC|" "$ML_CONFIG_FILE"
 
 BATCHSIZE=(1024)
 DROPOUT=(0)
