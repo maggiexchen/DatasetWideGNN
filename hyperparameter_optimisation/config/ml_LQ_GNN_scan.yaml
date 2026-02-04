@@ -1,5 +1,5 @@
 ml_variable: LQ_LowLevel
-distance_variable:
+distance_variable: LQ_LowLevel
 embedding_variable:
 distance: emd
 friend_graph: True

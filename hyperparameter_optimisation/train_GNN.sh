@@ -20,7 +20,7 @@ VALFRAC=4
 SAVE_DIR=$BASE_DIR"/hyperparameter_optimisation/"$MODEL"_"$DISTANCE""$DIST_VAR_LEVEL"_Inputs"$ML_VAR_LEVEL"_EdgeFrac"$EDGE_FRAC"/"
 
 sed -i "s|^ml_variable: .*|ml_variable: $ML_VAR_LEVEL|" "$ML_CONFIG_FILE"
-sed -i "s|^distance_variable: .*|distance_variable: $DIST_VAR_LEVEL|" "$DIST_CONFIG_FILE"
+sed -i "s|^distance_variable: .*|distance_variable: $DIST_VAR_LEVEL|" "$ML_CONFIG_FILE"
 sed -i "s|^gnn_type: .*|gnn_type: $MODEL|" "$ML_CONFIG_FILE"
 sed -i "s|^distance: .*|distance: $DISTANCE|" "$ML_CONFIG_FILE"
 sed -i "s|^edge_frac: .*|edge_frac: $EDGE_FRAC|" "$ML_CONFIG_FILE"
@@ -121,7 +121,7 @@ for lr_pat in "${LR_PATIENCE[@]}"; do
                                         sed -i "s|^dropout_rates: .*|dropout_rates: $dropout_rates|" "$ML_CONFIG_FILE"
                                         echo "Dropout rates: " $dropout_rates
                                         
-                                        python $BASE_DIR"/torch_train.py" -u"$USER_CONFIG_FILE" -c "$ML_CONFIG_FILE"
+                                        python $BASE_DIR"/torch_train.py" -u "$USER_CONFIG_FILE" -c "$ML_CONFIG_FILE"
                                     done
                                 done
                             done
