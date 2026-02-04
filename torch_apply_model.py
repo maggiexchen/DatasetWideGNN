@@ -161,14 +161,14 @@ else:
 misc.create_dirs(plot_path)
 
 if user.signal == "stau":
-    kinematics = misc.get_kinematics_staus(ml.kinematic_variable)
+    kinematics = misc.get_kinematics_staus(ml.ml_variable)
 else:
-    kinematics = misc.get_kinematics(ml.kinematic_variable)
+    kinematics = misc.get_kinematics(ml.ml_variable)
 input_size = len(kinematics)
 
 logging.info("signal: %s", user.signal)
 logging.info("chosen model: %s", model_label)
-logging.info("kinematic variable set: %s", ml.kinematic_variable)
+logging.info("kinematic variable set: %s", ml.ml_variable)
 logging.info("graph built with variable set: %s", distance_variable)
 logging.info("input data path: %s", user.kinematic_h5_path)
 logging.info("input ll json path: %s", user.ll_path)

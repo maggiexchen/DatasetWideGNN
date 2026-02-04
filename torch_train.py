@@ -193,9 +193,9 @@ else:
 misc.create_dirs(plot_path)
 
 if user.signal == "stau":
-    kinematics = misc.get_kinematics_staus(ml.kinematic_variable)
+    kinematics = misc.get_kinematics_staus(ml.ml_variable)
 else:
-    kinematics = misc.get_kinematics(ml.kinematic_variable)
+    kinematics = misc.get_kinematics(ml.ml_variable)
 input_size = len(kinematics)
 
 logging.info("chosen model: %s", model_label)
