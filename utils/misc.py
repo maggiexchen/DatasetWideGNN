@@ -161,7 +161,19 @@ def get_kinematics(variable, dim=None):
                       'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta',
                       'bjet1phi', 'bjet2phi', 'lep1phi', 'lep2phi',
                       'met', 'metphi']
-    elif variable == "LQ_All":
+    elif variable == "LQ_All": 
+        kinematics = ['njets', 'nbjets',
+                      'bjet1eta', 'bjet1phi', 'bjet1pt', 'bjet2eta', 'bjet2phi', 'bjet2pt',
+                      'lep1eta', 'lep1phi', 'lep1pt', 'lep2eta', 'lep2phi', 'lep2pt',
+                      'met', 'metphi', 'metsigHt', 'sumptllbb', 'sumptllbbMET',
+                      'mt2', 'mtl1', 'mtl2',  'mtlb1', 'mtlb2',
+                      'mtlmin', 'mtlbmin', 'summtlb', 'summtl',
+                      'mindPhiMETl', 'maxdPhiMETl', 'mindPhiMETb', 'maxdPhiMETb',
+                      'avedPhiMETl', 'avedPhiMETb',
+                      'dPhil1MET', 'dPhil2MET', 'dPhib1MET', 'dPhib2MET',
+                      'dRl1b1', 'dRl1b2', 'dRl2b1', 'dRl2b2',
+                      'sumdRlb', 'mindRlb', 'invsumdRlb', 'invmindRlb']
+    elif variable == "LQ_All_debug": ### for debugging/plotting purposes, NOT FOR TRAINING
         kinematics = ['xsec', 'genWeight', 'njets', 'nbjets',
                       'bjet1eta', 'bjet1phi', 'bjet1pt', 'bjet2eta', 'bjet2phi', 'bjet2pt',
                       'lep1eta', 'lep1phi', 'lep1pt', 'lep2eta', 'lep2phi', 'lep2pt',
