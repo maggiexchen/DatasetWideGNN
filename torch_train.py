@@ -91,37 +91,61 @@ assert ml.patience_LR < ml.patience_early_stopping, \
 if do_gnn and (ml.distance is None):
     raise ValueError("Need to specify a distance metric for the adjacency matrix in the ML config")
 
-# TODO resupport target_eff option
-edge_frac_list = [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
-if do_gnn and (ml.linking_length is None):
-    if ml.edge_frac is None:
-        raise ValueError("Need to specify an edge_frac for the adjacency matrix in the ML config")
-    elif ml.edge_frac not in edge_frac_list:
-        raise ValueError(f"not given a supported edge fraction, {edge_frac_list}")
+if do_gnn:
+
+    # Determine which variable is used for building the graph (embedding_variable or distance_variable)
+    # This matches the logic in torch_adj_builder
+    distance_variable = ml.embedding_variable if ml.embedding_variable is not None \
+        else ml.distance_variable
+    if ml.embedding_variable is not None:
+        logging.info("Loading graph constructed with embedding variables: %s", distance_variable)
     else:
-        ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
-        adj_path = user.adj_path + "/" + ml.distance + "_edge_frac_" + \
-            str(ml.edge_frac).replace(".", "p") + "/"
-elif do_gnn and (ml.linking_length is not None):
-    if ml.edge_frac is not None:
-        # when both linking length and edge fraction are specified,
-        # use the linking length at specified edge fraction
-        ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
-        adj_path = user.adj_path + "/" + ml.distance + "_edge_frac_" + \
-            str(ml.edge_frac).replace(".", "p") + "/"
-    else:
-        logging.info("linking length is given in config, IGNORING the edge fraction in the config")
+        logging.info("Loading graph constructed with distance variables: %s", distance_variable)
+
+    # Check that exactly one linking length method is specified
+    num_methods = sum([
+        ml.linking_length is not None,
+        ml.edge_frac is not None,
+        ml.targettarget_eff is not None
+    ])
+    
+    if num_methods > 1:
+        raise ValueError("Only one of linking_length, edge_frac, or targettarget_eff can be set in ML config!")
+    if num_methods == 0:
+        raise ValueError("Must specify one of linking_length, edge_frac, or targettarget_eff in ML config!")
+    
+    # Set ll_str and adj_path based on which method is used
+    if ml.linking_length is not None:
+        logging.info("Using manual linking length from config: %s", str(ml.linking_length))
         ll_str = "_LL" + str(ml.linking_length).replace(".", "p")
-        adj_path = user.adj_path + "/" + ml.distance + "_linking_length_" + \
+        adj_path = user.adj_path + "/" + str(distance_variable) + "_" + str(ml.distance) + "_linking_length_" + \
             str(ml.linking_length).replace(".", "p") + "/"
+    
+    elif ml.edge_frac is not None:
+        logging.info("Using edge_frac to define linking length: %s", str(ml.edge_frac))
+        if ml.edge_frac not in [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]:
+            raise ValueError("""Not given a supported edge fraction, must be one of:
+                             (0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5)""")
+        ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
+        adj_path = user.adj_path + "/" + str(distance_variable) + "_" + str(ml.distance) + "_edge_frac_" + \
+            str(ml.edge_frac).replace(".", "p") + "/"
+    
+    else:  # ml.targettarget_eff is not None
+        logging.info("Using targettarget_eff to define linking length: %s", str(ml.targettarget_eff))
+        if ml.targettarget_eff not in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+            raise ValueError("""Not given a supported target efficiency, must be one of:
+                             (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)""")
+        ll_str = "_LLTargetEff" + str(ml.targettarget_eff).replace(".", "p")
+        adj_path = user.adj_path + "/" + str(distance_variable) + "_" + str(ml.distance) + "_targettarget_eff_" + \
+            str(ml.targettarget_eff).replace(".", "p") + "/"
         
 ### str for train/val split label. If single fold, then val_frac is 1/num_folds.
 # Otherwise, nf is num_folds
 if ml.single_fold is True:
-    val_frac = 1/user.n_folds
+    val_frac = 1/ml.num_folds
     nf_str = f"_val_frac{val_frac:.2f}"
 else:
-    nf_str = "_nf" + str(user.n_folds)
+    nf_str = "_nf" + str(ml.num_folds)
 
 ### create model label and result plot path
 if len(ml.hidden_sizes_gcn) == 0:
@@ -156,29 +180,33 @@ if user.wandb_project is not None and user.wandb_entity is not None:
 
 kinematic_plot_path = user.plot_path + "/training_kinematics/" 
 if do_gnn:
-    kinematic_plot_path += ml.distance + "_frac" + str(ml.edge_frac) + "/"
-
+    if ml.edge_frac is not None:
+        kinematic_plot_path += str(distance_variable) + "_" + str(ml.distance) + "_frac" + str(ml.edge_frac) + "/"
+    elif ml.targettarget_eff is not None:
+        kinematic_plot_path += str(distance_variable) + "_" + str(ml.distance) + "_targeteff" + str(ml.targettarget_eff) + "/"
+    else:
+        kinematic_plot_path += str(distance_variable) + "_" + str(ml.distance) + "_ll" + str(ml.linking_length) + "/"
 if do_gnn:
-    plot_path = user.plot_path + ml.distance + "_models/" + model_label + "/"
+    plot_path = user.plot_path + str(distance_variable) + "_" + str(ml.distance) + "_models/" + model_label + "/"
 else:
     plot_path = user.plot_path + "/MLP/" + model_label + "/"
 misc.create_dirs(plot_path)
 
 if user.signal == "stau":
-    kinematics = misc.get_kinematics_staus(ml.kinematic_variable)
+    kinematics = misc.get_kinematics_staus(ml.ml_variable)
 else:
-    kinematics = misc.get_kinematics(ml.kinematic_variable)
+    kinematics = misc.get_kinematics(ml.ml_variable)
 input_size = len(kinematics)
 
 logging.info("chosen model: %s", model_label)
-logging.info("embedding variable set: %s", ml.embedding_variable)
+logging.info("graph built with variable set: %s", distance_variable)
 logging.info("input data path: %s", user.feature_h5_path)
 logging.info("input ll json path: %s", user.ll_path)
 logging.info("input distances path: %s", user.dist_path)
 logging.info("output plot path: %s", plot_path)
 if do_gnn:
     logging.info("adj matrix storage path: %s", adj_path)
-    model_path = user.model_path + ml.distance + "_models/" + model_label + "/" + ml.gnn_type + "/"
+    model_path = user.model_path + str(distance_variable) + "_" + str(ml.distance) + "_models/" + model_label + "/" + ml.gnn_type + "/"
 else:
     model_path = user.model_path + "dnn_models/" + model_label + "/"
 logging.info("model storage path: %s", model_path)
@@ -198,7 +226,7 @@ full_sig_wgts, full_bkg_wgts, \
 full_sig_labels, full_bkg_labels, \
 sig_fold, bkg_fold = adj.data_loader(user.kinematic_h5_path, kinematics, ex=user.cutstring,
                                      signal=user.signal, signal_mass=user.signal_mass,
-                                     num_folds=user.n_folds)
+                                     num_folds=ml.num_folds)
 
 len_sig = len(full_sig)
 len_bkg = len(full_bkg)
@@ -326,11 +354,11 @@ try:
     logging.info("Starting k-fold cross validation ...")
     logging.info("Time taken so far: %s", str(time.time()-st))
 
-    for fold_no in range(user.n_folds):
+    for fold_no in range(ml.num_folds):
         train_idx = np.where(fold_assignment != fold_no)[0]
         val_idx = np.where(fold_assignment == fold_no)[0]
 
-        logging.info("starting fold %s/%s", str(fold_no+1), str(user.n_folds))
+        logging.info("starting fold %s/%s", str(fold_no+1), str(ml.num_folds))
         logging.info("train idx %s", str(len(train_idx)))
         logging.info("val idx %s", str(len(val_idx)))
 
@@ -525,7 +553,7 @@ try:
         train_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = train_outputs_fold.flatten().numpy()
         val_outputs_per_fold["fold_"+str(fold_no+1)+"_outputs"] = val_outputs_fold.flatten().numpy()
 
-        logging.info("Finished fold %s/%s", str(fold_no), str(user.n_folds))
+        logging.info("Finished fold %s/%s", str(fold_no), str(ml.num_folds))
         logging.info("Number of epochs: %s/%s", str(epoch+1), str(ml.epochs))
         logging.info("Final train Loss: %s", str(avg_tr_loss))
         logging.info("Final validation Loss: %s", str(avg_vl_loss))
@@ -568,7 +596,7 @@ try:
     logging.info("plotting model outputs per fold")
     fig_fold, ax_fold = plt.subplots()
     fold_colours = ["steelblue", "darkorange", "forestgreen"]
-    for k in range(user.n_folds):
+    for k in range(ml.num_folds):
         logging.info("Training Fold %s %s", str(k+1), str(train_outputs_per_fold["fold_"+str(k+1)+"_outputs"]))
         logging.info("Validation Fold %s %s", str(k+1), str(val_outputs_per_fold["fold_"+str(k+1)+"_outputs"]))
         fig_fold, ax_fold = plt.subplots()
@@ -633,7 +661,7 @@ finally:
     # save performance to json
     perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc,
                           val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
-    perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), user.n_folds,
+    perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), ml.num_folds,
                              ml.hidden_sizes_gcn, ml.hidden_sizes_mlp, ml.LR, ml.dropout_rates,
                              ml.epochs, model_path)
 

@@ -1,10 +1,11 @@
-kinematic_variable: "LQ_HighLevel"
+ml_variable: "LQ_HighLevel"
+distance_variable:
 embedding_variable:
 distance: "euclidean"
 friend_graph: True
 edge_weights: True
-edge_frac: 0.05
 targettarget_eff: 
+edge_frac: 0.05
 linking_length:
 hidden_sizes_gcn: [10, 10, 10]
 hidden_sizes_mlp: [10]
@@ -16,6 +17,7 @@ batch_size: 2048
 gnn_type: "GCN"
 epochs: 100
 patience_early_stopping: 20
+num_folds: 3 # This is used in training
 single_fold:
 plot_conv_kinematics: False
 

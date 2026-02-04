@@ -12,7 +12,8 @@ class MLConfig(BaseModel):
     Class to define the user config structure
     """
 
-    kinematic_variable: str
+    ml_variable: str
+    distance_variable: str
     embedding_variable: Optional[str]
     distance: Optional[str]
     friend_graph: Optional[bool]
@@ -51,17 +52,19 @@ class MLConfig(BaseModel):
         with open(yaml_path, 'r', encoding='utf-8') as file:
             data = yaml.safe_load(file)
 
-        if data["kinematic_variable"] is None:
-            raise ValueError("Need to specify a type of kinematic variable in the ML config")
+        if data["ml_variable"] is None:
+            raise ValueError("Need to specify a type of ML variable as input features for the model in the ML config")
 
         if data["embedding_variable"] is None:
-            data["embedding_variable"] = data["kinematic_variable"]
+            data["embedding_variable"] = data["ml_variable"]
 
         do_gnn = len(data.get("hidden_sizes_gcn", [])) > 0
         # Require gnn config inputs unless explicitly told do_gnn is False
         if (do_gnn is None or do_gnn):
             if data.get("distance") is None:
                 raise ValueError("Need to specify a type of distance metric in the ML config")
+            if data.get("distance_variable") is None:
+                raise ValueError("Need to specify a distance variable set in the ML config")
             if data.get("friend_graph") is None:
                 raise ValueError("Need to specify whether to use a friend graph in the ML config")
             if data.get("edge_weights") is None:
