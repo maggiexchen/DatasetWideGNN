@@ -56,7 +56,7 @@ for lr_pat in "${LR_PATIENCE[@]}"; do
                                 mlp_hidden_layers+=", "
                             fi
                         done
-                        for ((j=1; j<=dnn_layers; i++)); do
+                        for ((j=1; j<=dnn_layers; j++)); do
                             dropout_rates+="$dropout"
                             if [ $j -lt $dnn_layers ]; then
                             dropout_rates+=", "
