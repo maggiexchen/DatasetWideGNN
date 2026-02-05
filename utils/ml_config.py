@@ -13,7 +13,7 @@ class MLConfig(BaseModel):
     """
 
     ml_variable: str
-    distance_variable: str
+    distance_variable: Optional[str]
     embedding_variable: Optional[str]
     distance: Optional[str]
     friend_graph: Optional[bool]
