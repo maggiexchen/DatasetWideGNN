@@ -19,5 +19,7 @@ It will create a directory within `hyperparameter_optimisation/` and save all th
 
 To get the set of parameters for the best model (highest validation auc) and plot the correlation between all the parameters and performance metrics, run
 `python plot_scans.py -m DNN -i <model input variables (LQ_LowLevel / LQ_HighLevel)>` for DNN, or 
+\\
+\\
 `python plot_scans.py -m DNN -i <model input variables (LQ_LowLevel / LQ_HighLevel)> -d <distance (euclidean, cosine, emd)> -dv <distance variables (LQ_LowLevel / LQ_HighLevel)> -e <edge fraction>` for GNN
 The corrlation plot will be saved in the `WhereYouSavedTheScans/plots/`
