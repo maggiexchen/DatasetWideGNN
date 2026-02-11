@@ -661,9 +661,9 @@ finally:
     # save performance to json
     perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc,
                           val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
-    perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), ml.num_folds,
-                             ml.hidden_sizes_gcn, ml.hidden_sizes_mlp, ml.LR, ml.dropout_rates,
-                             ml.epochs, model_path)
+    perf.save_metadata_kfold(len_sig, len_bkg, ml.num_folds,
+                             ml.hidden_sizes_gcn, ml.hidden_sizes_mlp, ml.num_nb_list,
+                             ml.LR, ml.patience_LR, ml.dropout_rates, ml.epochs, model_path)
 
     logging.info("Plotting training/validation losses ...")
     fig_loss, ax_loss = plt.subplots()
