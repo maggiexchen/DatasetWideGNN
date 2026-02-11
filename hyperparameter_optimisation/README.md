@@ -1,6 +1,6 @@
 ### Hyperparameter scan for DNN & GNN models
 
-## DNN model optimisation
+## Model optimisation
 For the very first time, run
 `chmod +x train_DNN.sh` and `chmod +x train_GNN.sh`
 
@@ -17,6 +17,7 @@ For GNN scan, run
 
 It will create a directory within `hyperparameter_optimisation/` and save all the models, metadata and performance json files and plots there.
 
+## Plotting
 To get the set of parameters for the best model (highest validation auc) and plot the correlation between all the parameters and performance metrics, run
 `python plot_scans.py -m DNN -i <model input variables (LQ_LowLevel / LQ_HighLevel)>` for DNN
 
