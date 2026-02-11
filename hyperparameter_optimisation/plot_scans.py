@@ -70,10 +70,8 @@ input_variable = args.input_variable
 
 if model_type == "DNN":
     opt_path = os.path.join(parent_dir, "hyperparameter_optimisation", model_type+"_Inputs_"+input_variable)
-    user_config_path = os.path.join(parent_dir, "hyperparameter_optimisation", "config/user_Maggie_DNN_scan.yaml")
-    # user_config_path = os.path.join(opt_path, "metadata", "user_Maggie_DNN_scan.yaml")
-    scan_script = "train_DNN.sh"
-    # scan_script = os.path.join(opt_path, "metadata", "train_DNN.sh")
+    user_config_path = os.path.join(opt_path, "metadata", "user_Maggie_DNN_scan.yaml")
+    scan_script = os.path.join(opt_path, "metadata", "train_DNN.sh")
     param_dict = {
         "BATCHSIZE": int,
         "DROPOUT": int,
@@ -82,15 +80,13 @@ if model_type == "DNN":
         "MLP_HIDDEN_NODES": int,
         "MLP_LAYERS": int,
     }
-elif model_type == "GCN" or "Graph":
+elif (model_type == "GCN") or (model_type == "Graph"):
     distance_var = args.distance_variable
     distance = args.distance
     edge_frac = args.edge_frac
     opt_path = os.path.join(parent_dir, "hyperparameter_optimisation", model_type+"_"+distance+"_"+distance_var+"_Inputs_"+input_variable+"_EdgeFrac_"+str(edge_frac))
-    user_config_path = os.path.join(parent_dir, "hyperparameter_optimisation", "config/user_Maggie_GNN_scan.yaml")
-    # user_config_path = os.path.join(opt_path, "metadata", "user_Maggie_GNN_scan.yaml")
-    scan_script = "train_GNN.sh"
-    # scan_script = os.path.join(opt_path, "metadata", "train_GNN.sh")
+    user_config_path = os.path.join(opt_path, "metadata", "user_Maggie_GNN_scan.yaml")
+    scan_script = os.path.join(opt_path, "metadata", "train_GNN.sh")
     param_dict = {
         "BATCHSIZE": int,
         "DROPOUT": int,
@@ -144,8 +140,10 @@ df_perf = pd.DataFrame(performance)
 df_metadata = pd.DataFrame(metadata)
 metrics = df_perf.columns
 parameters = df_metadata.columns
-print(metrics)
-print(parameters)
+
+df_perf["min train loss"] = df_perf["train_loss"].apply(min)
+df_perf["min val loss"] = df_perf["val_loss"].apply(min)
+
 max_val_auc_ind = numpy.argmax(df_perf["val_auc"])
 print("Maximum val AUC found: ", df_perf["val_auc"][max_val_auc_ind])
 print("Model parameters that yield the maximum val AUC: \n", df_metadata.iloc[max_val_auc_ind])
@@ -159,26 +157,23 @@ df_parameters = pd.DataFrame({
     "MLP hidden layers": df_metadata["hidden_sizes_mlp"].apply(len)
 })
 
-if model_type == "GCN" or "Graph":
+if (model_type == "GCN") or (model_type == "Graph"):
     df_parameters["GNN hidden nodes"] = df_metadata["hidden_sizes_gcn"].apply(lambda x: x[0])
     df_parameters["GNN hidden layers"] = df_metadata["hidden_sizes_gcn"].apply(len)
     df_parameters["neighbours sampled"] = df_metadata["neighbour_sampling"].apply(lambda x: x[0])
     df_parameters["neighbours layers"] = df_metadata["neighbours_sampling"].apply(len)
 
 print("Plotting correlation map")
-# tick_labels = ["Margin", "Penalty", "Dimension", 
-#                "Same-class efficiency", "Same-class purity", "Edge fraction"]
-df_corr = pd.concat([df_perf["train_auc"], df_perf["val_auc"], df_metadata])
-correlation_matrix = df_perf[["loss_margin", "loss_penalty", "embedding_dim", "same_class_eff", "same_class_purity", "edge_fraction"]].corr()
-col_names = correlation_matrix.columns
-corr_fig, corr_ax = plt.subplots(figsize=(11, 9), constrained_layout=True)
-sns.heatmap(correlation_matrix.loc[col_names[-3:], col_names[:3]], annot=True, cbar=True, xticklabels=tick_labels[-3:], yticklabels=tick_labels[:3], cmap="coolwarm", cbar_kws={'label': 'Correlation'})
+df_corr = pd.concat([df_parameters, df_perf["train_auc"], df_perf["val_auc"]], axis=1).corr()
+metric_cols = ["train_auc", "val_auc"]
+param_cols = df_parameters.columns
+corr_fig, corr_ax = plt.subplots(figsize=(16, 4), constrained_layout=True)
+sns.heatmap(df_corr.loc[metric_cols, param_cols], annot=True, cbar=True, cmap="coolwarm", cbar_kws={'label': 'Correlation'})
 cbar = corr_ax.collections[0].colorbar
 cbar.ax.yaxis.label.set_rotation(270)
 cbar.ax.yaxis.labelpad = 20
 cbar.ax.yaxis.label.set_fontsize(16)
 corr_ax.tick_params(axis='x', labelsize=16)  # Set font size for x-axis tick labels
 corr_ax.tick_params(axis='y', labelsize=16)
-os.makedirs(plot_path+"/corr/", exist_ok=True)
-corr_plot_name = plot_path+"/corr/corr.pdf"
+corr_plot_name = plot_path+"scan_correlation.pdf"
 corr_fig.savefig(corr_plot_name)
