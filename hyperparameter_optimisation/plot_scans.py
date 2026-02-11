@@ -54,13 +54,6 @@ def GetParser():
         help="In the case of a GNN model, specify the edge fraction of the graph"
     )
 
-    parser.add_argument(
-        "--corr",
-        "-c",
-        action="store_true",
-        help="Plot correlation between parameters and metrics"
-    )
-
     args = parser.parse_args()
     return args
 

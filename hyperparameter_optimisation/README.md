@@ -10,9 +10,14 @@ Note that for the GNN opitmisation, the distances, linking lengths, row/column i
 Modify the parameters in `train_DNN.sh` and `train_GNN.sh` such as the `BASE_DIR` and `SAVE_DIR` to match your own directories.
 
 For DNN scan, run
-`./train_DNN.sh <variables> DNN`
+`./train_DNN.sh <model input variables (LQ_LowLevel / LQ_HighLevel)>`
 
 For GNN scan, run
-`./train_GNN.sh <variables> <model (GCN/Graph)> <distance>`
+`./train_GNN.sh <model input variables (LQ_LowLevel / LQ_HighLevel)> <model (GCN/Graph)> <distance (euclidean, cosine, emd)>`
 
-It will create a directory within `hyperparameter_optimisation` and save all the models, jsons and plots there.
+It will create a directory within `hyperparameter_optimisation/` and save all the models, metadata and performance json files and plots there.
+
+To get the set of parameters for the best model (highest validation auc) and plot the correlation between all the parameters and performance metrics, run
+`python plot_scans.py -m DNN -i <model input variables (LQ_LowLevel / LQ_HighLevel)>` for DNN, or 
+`python plot_scans.py -m DNN -i <model input variables (LQ_LowLevel / LQ_HighLevel)> -d <distance (euclidean, cosine, emd)> -dv <distance variables (LQ_LowLevel / LQ_HighLevel)> -e <edge fraction>` for GNN
+The corrlation plot will be saved in the `WhereYouSavedTheScans/plots/`
