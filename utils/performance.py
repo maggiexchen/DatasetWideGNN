@@ -152,7 +152,7 @@ def save_metadata(train_sig_size, train_bkg_size, val_sig_size, val_bkg_size,
 
 def save_metadata_kfold(full_sig_size, full_bkg_size, num_folds, 
                         hidden_sizes_gcn, hidden_sizes_mlp, neighbour_sampling,
-                        learning_rate, learning_rate_patience, dropout_rates, epochs, path):
+                        batch_size, learning_rate, learning_rate_patience, dropout_rates, epochs, path):
     """
     Function to save architecture metadata as a json,
     k-folding used
@@ -177,6 +177,7 @@ def save_metadata_kfold(full_sig_size, full_bkg_size, num_folds,
         'hidden_sizes_gcn': hidden_sizes_gcn,
         'hidden_sizes_mlp': hidden_sizes_mlp,
         'neighbour_sampling': neighbour_sampling,
+        'batch_size': batch_size,
         'learning_rate': learning_rate,
         'learning_rate_patience': learning_rate_patience,
         'dropout_rates': dropout_rates,

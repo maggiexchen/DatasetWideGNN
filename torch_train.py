@@ -663,7 +663,7 @@ finally:
                           val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
     perf.save_metadata_kfold(len_sig, len_bkg, ml.num_folds,
                              ml.hidden_sizes_gcn, ml.hidden_sizes_mlp, ml.num_nb_list,
-                             ml.LR, ml.patience_LR, ml.dropout_rates, ml.epochs, model_path)
+                             ml.batch_size, ml.LR, ml.patience_LR, ml.dropout_rates, ml.epochs, model_path)
 
     logging.info("Plotting training/validation losses ...")
     fig_loss, ax_loss = plt.subplots()
