@@ -29,6 +29,6 @@ dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighK
 score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/hyperparameter_optimisation/
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/hyperparameter_optimisation/DNN_Inputs_LQ_HighLevel/plots/
 adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/hyperparameter_optimisation/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/hyperparameter_optimisation/DNN_Inputs_LQ_HighLevel/models/
