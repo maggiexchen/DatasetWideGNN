@@ -22,5 +22,6 @@ To get the set of parameters for the best model (highest validation auc) and plo
 
 or 
 
-`python plot_scans.py -m DNN -i <model input variables (LQ_LowLevel / LQ_HighLevel)> -d <distance (euclidean, cosine, emd)> -dv <distance variables (LQ_LowLevel / LQ_HighLevel)> -e <edge fraction>` for GNN
+`python plot_scans.py -m DNN -i <model input variables (LQ_LowLevel / LQ_HighLevel)> -d <distance (euclidean, cosine, emd)> -dv <distance variables (LQ_LowLevel / LQ_HighLevel)> -e <edge fraction>` for GNN.
+
 The corrlation plot will be saved in the `WhereYouSavedTheScans/plots/`
