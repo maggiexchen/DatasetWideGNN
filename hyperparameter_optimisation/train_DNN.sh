@@ -10,11 +10,11 @@ ML_CONFIG_FILE=$BASE_DIR"/hyperparameter_optimisation/config/ml_LQ_DNN_scan.yaml
 # GNN parameters to fix
 ML_VAR_LEVEL=$1 # LQ_LowLevel or LQ_HighLevel
 MODEL="DNN" # DNN, GCN or Graph
-EPOCH=5
+EPOCH=20
 SINGLEFOLD=1
 VALFRAC=4
 
-SAVE_DIR=$BASE_DIR"/hyperparameter_optimisation/"$MODEL"_Inputs"$ML_VAR_LEVEL"/"
+SAVE_DIR=$BASE_DIR"/hyperparameter_optimisation/"$MODEL"_Inputs_"$ML_VAR_LEVEL"/"
 
 sed -i "s|^ml_variable: .*|ml_variable: $ML_VAR_LEVEL|" "$ML_CONFIG_FILE"
 sed -i "s|^gnn_type: .*|gnn_type: $MODEL|" "$ML_CONFIG_FILE"
@@ -36,6 +36,12 @@ model_save_path=$SAVE_DIR"models/"
 plot_save_path=$SAVE_DIR"plots/"
 sed -i "s|^model_path: .*|model_path: $model_save_path|" "$USER_CONFIG_FILE"
 sed -i "s|^plot_path: .*|plot_path: $plot_save_path|" "$USER_CONFIG_FILE"
+
+metadata_save_path=$SAVE_DIR"metadata/"
+mkdir -p $metadata_save_path
+cp "$0" "$metadata_save_path/train_DNN.sh"
+cp "$USER_CONFIG_FILE" "$metadata_save_path/user_Maggie_DNN_scan.yaml"
+cp "$ML_CONFIG_FILE" "$metadata_save_path/ml_LQ_DNN_scan.yaml"
 
 # Loop through the parameter values
 # First loop through the LR, LR patience, dropout, batchsize
