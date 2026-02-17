@@ -60,8 +60,8 @@ class MLConfig(BaseModel):
             data["embedding_variable"] = data["ml_variable"]
 
         do_gnn = len(data.get("hidden_sizes_gcn", [])) > 0
-        # Require gnn config inputs unless explicitly told do_gnn is False
-        if (do_gnn is None or do_gnn):
+
+        if (do_gnn):
             if data.get("distance") is None:
                 raise ValueError("Need to specify a type of distance metric in the ML config")
             if data.get("distance_variable") is None:
