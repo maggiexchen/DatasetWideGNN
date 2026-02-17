@@ -106,6 +106,7 @@ def save_performance(train_loss, train_fpr, train_tpr, train_threshold, train_au
         'train_tpr': train_tpr.tolist(),
         'train_threshold': train_threshold.tolist(),
         'train_auc': train_auc,
+        'val_loss': val_loss,
         'val_fpr': val_fpr.tolist(),
         'val_tpr': val_tpr.tolist(),
         'val_threshold': val_threshold.tolist(),
@@ -149,8 +150,9 @@ def save_metadata(train_sig_size, train_bkg_size, val_sig_size, val_bkg_size,
         json.dump(meta_dict, outfile)
 
 
-def save_metadata_kfold(full_sig_size, full_bkg_size, num_folds, hidden_sizes_gcn,
-                        hidden_sizes_mlp, learning_rate, dropout_rates, epochs, path):
+def save_metadata_kfold(full_sig_size, full_bkg_size, num_folds, 
+                        hidden_sizes_gcn, hidden_sizes_mlp, neighbour_sampling,
+                        batch_size, learning_rate, learning_rate_patience, dropout_rates, epochs, path):
     """
     Function to save architecture metadata as a json,
     k-folding used
@@ -161,7 +163,9 @@ def save_metadata_kfold(full_sig_size, full_bkg_size, num_folds, hidden_sizes_gc
         num_folds (int): number of folds for k-folding
         hidden_sizes_gcn (list(float)): list of hidden nodes per GCN hidden layer
         hidden_sizes_mlp (list(float)): list of hidden nodes per MLP hidden layer
+        neighbour_sampling (list(float)): list of number of neighbours sampled in each depth
         learning_rate (float): initial learning rate
+        learning_rate (float): learning rate patience
         dropout_rates (list(float)): list of dropout rates per hidden layer
         epochs (int): number of epochs inc. early stopping
         path (str): directory to store metadata json
@@ -172,7 +176,10 @@ def save_metadata_kfold(full_sig_size, full_bkg_size, num_folds, hidden_sizes_gc
         'num_folds': num_folds,
         'hidden_sizes_gcn': hidden_sizes_gcn,
         'hidden_sizes_mlp': hidden_sizes_mlp,
+        'neighbour_sampling': neighbour_sampling,
+        'batch_size': batch_size,
         'learning_rate': learning_rate,
+        'learning_rate_patience': learning_rate_patience,
         'dropout_rates': dropout_rates,
         'epochs': epochs
     }

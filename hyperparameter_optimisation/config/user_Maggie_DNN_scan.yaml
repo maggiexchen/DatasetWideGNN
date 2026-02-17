@@ -18,7 +18,7 @@ distance:
     objects: ["bjet1", "bjet2", "lep1", "lep2"]
 
 run_with_cuda: False
-n_folds: 3
+n_folds: 4
 
 # input paths
 ntuple_path: /data/atlas/users/pacey/GNN/ntuples/LQs_080925/
@@ -29,6 +29,6 @@ dist_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighK
 score_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/output_scores/
 
 # output paths
-plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/plots/ 
+plot_path: /data/atlas/atlasdata3/maggiechen/gnn_project/hyperparameter_optimisation/DNN_Inputs_LQ_HighLevel/plots/
 adj_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/graph/
-model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/trained_models/LQ_HighKin_080925/models/
+model_path: /data/atlas/atlasdata3/maggiechen/gnn_project/hyperparameter_optimisation/DNN_Inputs_LQ_HighLevel/models/

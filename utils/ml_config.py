@@ -13,7 +13,7 @@ class MLConfig(BaseModel):
     """
 
     ml_variable: str
-    distance_variable: str
+    distance_variable: Optional[str]
     embedding_variable: Optional[str]
     distance: Optional[str]
     friend_graph: Optional[bool]
@@ -32,6 +32,7 @@ class MLConfig(BaseModel):
     epochs: int
     patience_early_stopping: int
     single_fold: Optional[bool]
+    num_folds: int
     plot_conv_kinematics: bool
 
     # Pydantic type settings
@@ -59,8 +60,8 @@ class MLConfig(BaseModel):
             data["embedding_variable"] = data["ml_variable"]
 
         do_gnn = len(data.get("hidden_sizes_gcn", [])) > 0
-        # Require gnn config inputs unless explicitly told do_gnn is False
-        if (do_gnn is None or do_gnn):
+
+        if (do_gnn):
             if data.get("distance") is None:
                 raise ValueError("Need to specify a type of distance metric in the ML config")
             if data.get("distance_variable") is None:

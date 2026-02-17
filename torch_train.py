@@ -199,12 +199,12 @@ else:
 input_size = len(kinematics)
 
 logging.info("chosen model: %s", model_label)
-logging.info("graph built with variable set: %s", distance_variable)
 logging.info("input data path: %s", user.feature_h5_path)
-logging.info("input ll json path: %s", user.ll_path)
-logging.info("input distances path: %s", user.dist_path)
 logging.info("output plot path: %s", plot_path)
 if do_gnn:
+    logging.info("graph built with variable set: %s", distance_variable)
+    logging.info("input distances path: %s", user.dist_path)
+    logging.info("input ll json path: %s", user.ll_path)
     logging.info("adj matrix storage path: %s", adj_path)
     model_path = user.model_path + str(distance_variable) + "_" + str(ml.distance) + "_models/" + model_label + "/" + ml.gnn_type + "/"
 else:
@@ -399,7 +399,7 @@ try:
             num_neighbors=ml.num_nb_list,
             shuffle=True,
             batch_size=ml.batch_size,
-            num_workers=4,
+            num_workers=4*int(user.run_with_cuda),
             pin_memory=torch.cuda.is_available(),
         )
         val_loader = NeighborLoader(
@@ -408,7 +408,7 @@ try:
             num_neighbors=ml.num_nb_list,
             shuffle=False,
             batch_size=ml.batch_size,
-            num_workers=4,
+            num_workers=4*int(user.run_with_cuda),
             pin_memory=torch.cuda.is_available(),
         )
 
@@ -661,9 +661,9 @@ finally:
     # save performance to json
     perf.save_performance(train_loss, train_fpr, train_tpr, train_cut, train_auc,
                           val_loss, val_fpr, val_tpr, val_cut, val_auc, model_path)
-    perf.save_metadata_kfold(len(val_sig_pred), len(val_bkg_pred), ml.num_folds,
-                             ml.hidden_sizes_gcn, ml.hidden_sizes_mlp, ml.LR, ml.dropout_rates,
-                             ml.epochs, model_path)
+    perf.save_metadata_kfold(len_sig, len_bkg, ml.num_folds,
+                             ml.hidden_sizes_gcn, ml.hidden_sizes_mlp, ml.num_nb_list,
+                             ml.batch_size, ml.LR, ml.patience_LR, ml.dropout_rates, ml.epochs, model_path)
 
     logging.info("Plotting training/validation losses ...")
     fig_loss, ax_loss = plt.subplots()
