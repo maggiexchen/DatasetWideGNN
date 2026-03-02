@@ -191,14 +191,11 @@ if sigsig_mean > bkgbkg_mean:
     friend_species = "background"
 if not do_same_class:
     logging.info("<sig-sig> = %s, <bkg-bkg> = %s",str(sigsig_mean), str(bkgbkg_mean))
-    if not do_edge_frac:
-        logging.info("The %s events are closest, measuring for their self-connection eff.",
-                     friend_species)
+    logging.info("The %s events are closest, measuring for their self-connection eff.",
+                  friend_species)
 else:
     if not do_edge_frac:
-        logging.info("Doing same-class optimisation, measuring for sig-sig self-connection eff.")
-if do_edge_frac:
-    logging.info("Doing edge_frac optimisation, don't really care about relative distance sizes.")
+        logging.info("Doing same-class optimisation.")
 
 
 # calculate ROC values for sigsig and bkgbkg Between sigsig (0) and bkgbkg (1)
@@ -217,19 +214,18 @@ if do_edge_frac:
 
 tpr_ss_sb, fpr_ss_sb, cut_ss_sb, roc_auc_ss_sb = \
     perf.calc_roc(norm_sigsig, norm_sigbkg, sigsig_wgt, sigbkg_wgt,
-                  is_target_closest=is_signal_closest)
+                  is_target_closest=(sigsig_mean <= sigbkg_mean))
 
 tpr_bb_sb, fpr_bb_sb, cut_bb_sb, roc_auc_bb_sb = \
     perf.calc_roc(norm_bkgbkg, norm_sigbkg, bkgbkg_wgt, sigbkg_wgt,
-                  is_target_closest=(not is_signal_closest))
+                  is_target_closest=(bkgbkg_mean <= sigbkg_mean))
 del sigbkg_wgt
-if not do_edge_frac:
-    tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = \
-        perf.calc_roc(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt,
-                      is_target_closest=is_signal_closest)
-    tpr_bb_ss, fpr_bb_ss, cut_bb_ss, roc_auc_bb_ss = \
-        perf.calc_roc(norm_bkgbkg, norm_sigsig, bkgbkg_wgt, sigsig_wgt,
-                      is_target_closest=(not is_signal_closest))
+tpr_ss_bb, fpr_ss_bb, cut_ss_bb, roc_auc_ss_bb = \
+    perf.calc_roc(norm_sigsig, norm_bkgbkg, sigsig_wgt, bkgbkg_wgt,
+                  is_target_closest=is_signal_closest)
+tpr_bb_ss, fpr_bb_ss, cut_bb_ss, roc_auc_bb_ss = \
+    perf.calc_roc(norm_bkgbkg, norm_sigsig, bkgbkg_wgt, sigsig_wgt,
+                  is_target_closest=(not is_signal_closest))
 
 del sigsig_wgt, bkgbkg_wgt
 # saving roc and auc to json file
@@ -239,15 +235,13 @@ roc_dict = {
             "fpr_ss_sb": fpr_ss_sb.tolist(),
             "bb_sb_bkg_cut": cut_bb_sb.tolist(),
             "tpr_bb_sb": tpr_bb_sb.tolist(),
-            "fpr_bb_sb": fpr_bb_sb.tolist()}
-
-if not do_edge_frac:
-    roc_dict["bb_ss_bkg_cut"] = cut_bb_ss.tolist()
-    roc_dict["tpr_bb_ss"] = tpr_bb_ss.tolist()
-    roc_dict["fpr_bb_ss"] = fpr_bb_ss.tolist()
-    roc_dict["ss_bb_bkg_cut"] = cut_ss_bb.tolist()
-    roc_dict["tpr_ss_bb"] = tpr_ss_bb.tolist()
-    roc_dict["fpr_ss_bb"] = fpr_ss_bb.tolist()
+            "fpr_bb_sb": fpr_bb_sb.tolist(),
+            "bb_ss_bkg_cut": cut_bb_ss.tolist(),
+            "tpr_bb_ss": tpr_bb_ss.tolist(),
+            "fpr_bb_ss": fpr_bb_ss.tolist(),
+            "ss_bb_bkg_cut": cut_ss_bb.tolist(),
+            "tpr_ss_bb": tpr_ss_bb.tolist(),
+            "fpr_ss_bb": fpr_ss_bb.tolist()}
 
 roc_path = plot_path + "/" + variable + "/ROC/"
 misc.create_dirs(roc_path)
@@ -265,7 +259,7 @@ if do_edge_frac:
 
     del norm_sigsig, norm_sigbkg, norm_bkgbkg
 
-    edge_frac = [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
+    edge_frac = [0.01, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.275, 0.3]
     linking_lengths = graph_def.find_threshold_edge_frac(sigsig_distance, sigbkg_distance,
                                                          bkgbkg_distance,
                                                          edge_frac, x_max,
@@ -286,10 +280,18 @@ if do_edge_frac:
 
     logging.info("Plotting ROC curves ...")
     minmax_ll = norm.minmax(torch.tensor(linking_lengths), 0, d_max)
-    plotting.plot_roc_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb,
-                                roc_auc_ss_sb, roc_auc_bb_sb, cut_ss_sb,
-                                cut_bb_sb, minmax_ll.numpy(), variable, distance, plot_path)
-
+    if is_signal_closest:
+        plotting.plot_roc_edge_frac(tpr_ss_bb, fpr_ss_bb, tpr_ss_sb, fpr_ss_sb,
+                            roc_auc_ss_bb, roc_auc_ss_sb, cut_ss_bb,
+                            cut_ss_sb, minmax_ll.numpy(), variable, distance, plot_path,
+                            xlab="sig-sig efficiency", ylab="other efficiency",
+                            )
+    else:
+        plotting.plot_roc_edge_frac(tpr_bb_ss, fpr_bb_ss, tpr_bb_sb, fpr_bb_sb,
+                            roc_auc_bb_ss, roc_auc_bb_sb, cut_bb_ss,
+                            cut_bb_sb, minmax_ll.numpy(), variable, distance, plot_path,
+                            xlab="bkg-bkg efficiency", ylab="other efficiency",
+                            leg1="bkg-bkg sig-sig", leg2="bkg-bkg sig-bkg")
 else:
 
     logging.info("doing targettarget_eff threshold calculations")
@@ -322,12 +324,12 @@ else:
         if do_same_class:
             ss_sb_roc_cut, ss_sb_threshold = \
                 graph_def.find_threshold(tpr_ss_sb, fpr_ss_sb, eff, cut_ss_sb,
-                                         is_target_closest=is_signal_closest)
+                                         is_target_closest=(sigsig_mean <= sigbkg_mean))
             ss_sb_roc_cuts.append(ss_sb_roc_cut)
             ss_sb_thresholds.append(norm.reverse_minmax(ss_sb_threshold, 0, d_max))
             bb_sb_roc_cut, bb_sb_threshold = \
                 graph_def.find_threshold(tpr_bb_sb, fpr_bb_sb, eff, cut_bb_sb,
-                                         is_target_closest=(not is_signal_closest))
+                                         is_target_closest=(bkgbkg_mean <= sigbkg_mean))
             bb_sb_roc_cuts.append(bb_sb_roc_cut)
             targettarget_thresholds.append(norm.reverse_minmax(bb_sb_threshold, 0, d_max).item())
         else:
@@ -373,24 +375,24 @@ else:
 
     logging.info("Plotting ROC curves ...")
     if do_same_class:
-        plotting.plot_roc(fpr_ss_sb, tpr_ss_sb,
-                          fpr_bb_sb, tpr_bb_sb,
+        plotting.plot_roc(fpr_ss_sb, tpr_ss_sb, "sig-sig sig-bkg",
+                          fpr_bb_sb, tpr_bb_sb, "bkg-bkg sig-bkg",
                           roc_auc_ss_sb, roc_auc_bb_sb,
                           ss_sb_roc_cuts, bb_sb_roc_cuts,
-                          variable, distance, plot_path)
+                          variable, distance, plot_path, "_sameclass", "same-class eff.", "sig-bkg eff.")
     else:
         if is_signal_closest:
-            plotting.plot_roc(fpr_ss_bb, tpr_ss_bb,
-                              fpr_ss_sb, tpr_ss_sb,
+            plotting.plot_roc(tpr_ss_bb, fpr_ss_bb, "sig-sig bkg-bkg",
+                              tpr_ss_sb, fpr_ss_sb, "sig-sig sig-bkg",
                               roc_auc_ss_bb, roc_auc_ss_sb,
                               ss_bb_roc_cuts, ss_sb_roc_cuts,
-                              variable, distance, plot_path)
+                              variable, distance, plot_path, "_signalfriends", "sig-sig eff.", "other eff.")
         else:
-            plotting.plot_roc(fpr_bb_ss, tpr_bb_ss,
-                              fpr_bb_sb, tpr_bb_sb,
-                              roc_auc_bb_sb, roc_auc_bb_sb,
+            plotting.plot_roc(tpr_bb_ss, fpr_bb_ss, "bkg-bkg sig-sig",
+                              tpr_bb_sb, fpr_bb_sb, "bkg-bkg sig-bkg",
+                              roc_auc_bb_ss, roc_auc_bb_sb,
                               bb_ss_roc_cuts, bb_sb_roc_cuts,
-                              variable, distance, plot_path)
+                              variable, distance, plot_path, "_bkgfriends", "bkg-bkg eff.", "other eff.")
 
 
 logging.info("saving ll json to: %s", ll_path)

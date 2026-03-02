@@ -1,5 +1,5 @@
-ml_variable: "LQ_HighLevel"
-distance_variable:
+distance_variable: ""
+ml_variable: "LQ_bestMLvars"
 embedding_variable:
 distance: 
 friend_graph: 
@@ -8,15 +8,15 @@ targettarget_eff:
 edge_frac:
 linking_length:
 hidden_sizes_gcn: []
-hidden_sizes_mlp: [12, 12]
-dropout_rates: [0, 0]
-LR: 0.01
-patience_LR: 3
+hidden_sizes_mlp: [10, 10, 10]
+dropout_rates: [0, 0, 0]
+LR: 0.001
+patience_LR: 2
 num_nb_list: []
-batch_size: 256
+batch_size: 2048
 gnn_type:
-epochs: 50
-patience_early_stopping: 20
+epochs: 100
+patience_early_stopping: 10
 num_folds: 3 # This is used in training
 single_fold:
 plot_conv_kinematics: False

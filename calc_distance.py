@@ -83,7 +83,6 @@ full_sig, full_bkg, full_x, sig_wgt, bkg_wgt, sig_labels, bkg_labels, _, _ = \
     adj.data_loader(user.feature_h5_path, kinematics, ex=user.cutstring, signal=user.signal,
                     signal_mass=user.signal_mass, standardisation=standardise)
 
-
 # option to weight events, atm only relevant for HHH.
 global_bkg_wgt = 1.0
 if user.signal == "hhh":

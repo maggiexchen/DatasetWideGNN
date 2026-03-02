@@ -1,19 +1,16 @@
 executable = batch_calc_distance.sh
 
 # adjust arguments as needed.... e.g. 
-#arguments = "10000 euclidean LQ_avedPhiMETl"
-#arguments = "10000 euclidean LQ_HighLevel3"
-#arguments = "10000 cityblock LQ_HighLevel3"
-#arguments = "10000 braycurtis LQ_HighLevel3"
-#arguments = "10000 cosine LQ_HighLevel3"
-arguments = "10000 chebyshev LQ_HighLevel3"
-#arguments = "10000 emd LQ_LowLevel"
+
+#arguments = "10000 euclidean LQ_HL_bestCos"
+#arguments = "10000 euclidean LQ_HL_bestEuc"
 
 getenv = true
 output = ../logs/batch_calc_distance_$(ClusterID).out
 error = ../logs/batch_calc_distance_$(ClusterID).err
 log = ../logs/batch_calc_distance_$(ClusterID).log
+batch_name = "calcdistance"
 
-request_memory = 100000
+request_memory = 10000
 queue 1
 

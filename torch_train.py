@@ -118,16 +118,17 @@ if do_gnn:
     if ml.linking_length is not None:
         logging.info("Using manual linking length from config: %s", str(ml.linking_length))
         ll_str = "_LL" + str(ml.linking_length).replace(".", "p")
-        adj_path = user.adj_path + "/" + str(distance_variable) + "_" + str(ml.distance) + "_linking_length_" + \
+        adj_path = user.adj_path + "/" + ml.distance + "_" + str(ml.distance_variable) + "_linking_length_" + \
             str(ml.linking_length).replace(".", "p") + "/"
     
     elif ml.edge_frac is not None:
         logging.info("Using edge_frac to define linking length: %s", str(ml.edge_frac))
-        if ml.edge_frac not in [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]:
+        edge_frac_list = [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3]
+        if ml.edge_frac not in edge_frac_list:
             raise ValueError("""Not given a supported edge fraction, must be one of:
                              (0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5)""")
         ll_str = "_LLFrac" + str(ml.edge_frac).replace(".", "p")
-        adj_path = user.adj_path + "/" + str(distance_variable) + "_" + str(ml.distance) + "_edge_frac_" + \
+        adj_path = user.adj_path + "/" + ml.distance + "_" + str(ml.distance_variable) + "_edge_frac_" + \
             str(ml.edge_frac).replace(".", "p") + "/"
     
     else:  # ml.targettarget_eff is not None
@@ -136,7 +137,7 @@ if do_gnn:
             raise ValueError("""Not given a supported target efficiency, must be one of:
                              (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)""")
         ll_str = "_LLTargetEff" + str(ml.targettarget_eff).replace(".", "p")
-        adj_path = user.adj_path + "/" + str(distance_variable) + "_" + str(ml.distance) + "_targettarget_eff_" + \
+        adj_path = user.adj_path + "/" + ml.distance + "_" + str(ml.distance_variable) + "_targettarget_eff_" + \
             str(ml.targettarget_eff).replace(".", "p") + "/"
         
 ### str for train/val split label. If single fold, then val_frac is 1/num_folds.
@@ -181,24 +182,28 @@ if user.wandb_project is not None and user.wandb_entity is not None:
 kinematic_plot_path = user.plot_path + "/training_kinematics/" 
 if do_gnn:
     if ml.edge_frac is not None:
-        kinematic_plot_path += str(distance_variable) + "_" + str(ml.distance) + "_frac" + str(ml.edge_frac) + "/"
+        kinematic_plot_path += ml.distance + "_" + ml.distance_variable + "_frac" + str(ml.edge_frac) + "/"
     elif ml.targettarget_eff is not None:
-        kinematic_plot_path += str(distance_variable) + "_" + str(ml.distance) + "_targeteff" + str(ml.targettarget_eff) + "/"
+        kinematic_plot_path += ml.distance + "_" + ml.distance_variable + "_targeteff" + str(ml.targettarget_eff) + "/"
     else:
-        kinematic_plot_path += str(distance_variable) + "_" + str(ml.distance) + "_ll" + str(ml.linking_length) + "/"
+        kinematic_plot_path += ml.distance + "_" + ml.distance_variable + "_ll" + str(ml.linking_length) + "/"
 if do_gnn:
-    plot_path = user.plot_path + str(distance_variable) + "_" + str(ml.distance) + "_models/" + model_label + "/"
+    plot_path = user.plot_path + ml.distance + "_" + ml.distance_variable + "_" + ml.ml_variable + "_models/" + model_label + "/"
 else:
-    plot_path = user.plot_path + "/MLP/" + model_label + "/"
+    plot_path = user.plot_path + "/" + ml.ml_variable + "_MLP/" + model_label + "/"
 misc.create_dirs(plot_path)
 
 if user.signal == "stau":
-    kinematics = misc.get_kinematics_staus(ml.ml_variable)
+    distance_kinematics = misc.get_kinematics_staus(ml.distance_variable)
+    input_features = misc.get_kinematics_staus(ml.ml_variable)
 else:
-    kinematics = misc.get_kinematics(ml.ml_variable)
-input_size = len(kinematics)
+    distance_kinematics = misc.get_kinematics(ml.distance_variable)
+    input_features = misc.get_kinematics(ml.ml_variable)
+input_size = len(input_features)
 
 logging.info("chosen model: %s", model_label)
+logging.info("graph build with variable set: %s", ml.distance_variable)
+logging.info("ML input features set: %s", ml.ml_variable)
 logging.info("input data path: %s", user.feature_h5_path)
 logging.info("output plot path: %s", plot_path)
 if do_gnn:
@@ -206,9 +211,9 @@ if do_gnn:
     logging.info("input distances path: %s", user.dist_path)
     logging.info("input ll json path: %s", user.ll_path)
     logging.info("adj matrix storage path: %s", adj_path)
-    model_path = user.model_path + str(distance_variable) + "_" + str(ml.distance) + "_models/" + model_label + "/" + ml.gnn_type + "/"
+    model_path = user.model_path + ml.distance + "_" + ml.distance_variable + "_" + ml.ml_variable + "_models/" + model_label + "/" + ml.gnn_type + "/"
 else:
-    model_path = user.model_path + "dnn_models/" + model_label + "/"
+    model_path = user.model_path + ml.ml_variable + "_dnn_models/" + model_label + "/"
 logging.info("model storage path: %s", model_path)
 
 logging.info("distance metric: %s", ml.distance)
@@ -224,7 +229,7 @@ logging.info('Importing signal and background files...')
 full_sig, full_bkg, full_x, \
 full_sig_wgts, full_bkg_wgts, \
 full_sig_labels, full_bkg_labels, \
-sig_fold, bkg_fold = adj.data_loader(user.kinematic_h5_path, kinematics, ex=user.cutstring,
+sig_fold, bkg_fold = adj.data_loader(user.kinematic_h5_path, input_features, ex=user.cutstring,
                                      signal=user.signal, signal_mass=user.signal_mass,
                                      num_folds=ml.num_folds)
 
@@ -306,7 +311,7 @@ if ml.plot_conv_kinematics:
 #    logging.info("Adjacency Matrix: ", adj_mat)
     del sparse_adj_matrix
 #    for nconv in range(3):
-#        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, kinematics,
+#        plotting.plot_conv_kinematics(adj_mat, full_x, len_sig, input_features,
 #                                      signal, ml.edge_frac, kinematic_plot_path,
 #                                      normalisation="D_half_inv", standardise=False,
 #                                      nconv=nconv, edge_wgts=do_edge_wgt)
@@ -707,7 +712,7 @@ finally:
             signal_label, background_label, linking_length_label]
 
     fig_pred, ax_pred = plt.subplots()
-    binning = np.linspace(0, 1, 41)
+    binning = np.linspace(0, 1, 21)
     ax_pred.hist(train_sig_pred.detach().to(cpu).numpy(), bins=binning,
                  label="Signal (training)", histtype='step', linestyle='--', density=True,
                  color="darkorange", weights=train_sig_wgts.detach().to(cpu).numpy())

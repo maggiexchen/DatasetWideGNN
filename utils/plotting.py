@@ -257,7 +257,7 @@ def plot_kinematics(df_sig, df_bkg, sig_label, bkg_label, var,
     # save
     if ((len(ex) > 0) and (ex[0] != "_")):
         ex = "_"+ex
-    save_path = file_path+"/kinematics/"
+    save_path = file_path+"/kinematics_181225/"
     setting_label = ""
     if standardised:
         setting_label += "_standardised"
@@ -507,8 +507,8 @@ def plot_centrality(centrality, sig, bkg, file_path, eff):
     return
 
 
-def plot_roc(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_bb_sb,
-             ss_sb_roc_cuts, bb_sb_roc_cuts, variable, distance, plot_path):
+def plot_roc(fpr_ss_sb, tpr_ss_sb, leg1, fpr_bb_sb, tpr_bb_sb, leg2,  roc_auc_ss_sb, roc_auc_bb_sb,
+             ss_sb_roc_cuts, bb_sb_roc_cuts, variable, distance, plot_path, roctype="", xlab="", ylab=""):
     """
     Function to plot ROC curve of distance cut efficiencies.
 
@@ -527,8 +527,8 @@ def plot_roc(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_
     """
     fig, _ = plt.subplots()
     plt.style.use(hep.style.ROOT)
-    plt.plot(fpr_ss_sb, tpr_ss_sb, label=f'sig-sig sig-bkg (AUC = {roc_auc_ss_sb:.3f})')
-    plt.plot(fpr_bb_sb, tpr_bb_sb, label=f'bkg-bkg sig-bkg (AUC = {roc_auc_bb_sb:.3f})')
+    plt.plot(fpr_ss_sb, tpr_ss_sb, label=f'{leg1} (AUC = {roc_auc_ss_sb:.3f})')
+    plt.plot(fpr_bb_sb, tpr_bb_sb, label=f'{leg2} (AUC = {roc_auc_bb_sb:.3f})')
     plt.scatter(np.array(ss_sb_roc_cuts)[:,1], np.array(ss_sb_roc_cuts)[:,0], marker='x',
                 s=50, label="linking lengths",color="red")
     plt.scatter(np.array(bb_sb_roc_cuts)[:,1], np.array(bb_sb_roc_cuts)[:,0], marker='x',
@@ -536,17 +536,18 @@ def plot_roc(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_
     plt.legend(loc="lower right", fontsize="11")
     plt.ylim(0.,1.)
     plt.xlim(0.,1.)
-    plt.xlabel("sig-bkg (efficiency")
-    plt.ylabel("sig-sig (bkg-bkg) efficiency")
+    plt.xlabel(f"{xlab}")
+    plt.ylabel(f"{ylab}")
     plot_dir = plot_path+"ROC/"
     misc.create_dirs(plot_dir)
-    save_fig(fig, plot_dir + "/" + variable + "_" + distance + "_ROC")
+    save_fig(fig, plot_dir + "/" + variable + "_" + distance + "_ROC" + roctype)
 
     return
 
 def plot_roc_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb, roc_auc_bb_sb,
                        ss_sb_roc_cuts, bb_sb_roc_cuts, linking_lengths,
-                       variable, distance, plot_path):
+                       variable, distance, plot_path, xlab="sig-bkg efficiency", ylab="Same class efficiency",
+                       leg1="sig-sig sig-bkg", leg2="bkg-bkg sig-bkg"):
     """
     Function to plot ROC curve of distance cut edge fractions.
 
@@ -564,10 +565,10 @@ def plot_roc_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb
         distance (str): distance metric choice
         plot_path (str): directory of where to save plot
     """
-    fig, _ = plt.subplots()
+    fig, ax = plt.subplots()
     plt.style.use(hep.style.ROOT)
-    plt.plot(fpr_ss_sb, tpr_ss_sb, label=f'sig-sig sig-bkg (AUC = {roc_auc_ss_sb:.3f})')
-    plt.plot(fpr_bb_sb, tpr_bb_sb, label=f'bkg-bkg sig-bkg (AUC = {roc_auc_bb_sb:.3f})')
+    plt.plot(fpr_ss_sb, tpr_ss_sb, label=f'{leg1} (AUC = {roc_auc_ss_sb:.3f})')
+    plt.plot(fpr_bb_sb, tpr_bb_sb, label=f'{leg2} (AUC = {roc_auc_bb_sb:.3f})')
     ss_sb_ind = []
     bb_sb_ind = []
     for l in linking_lengths:
@@ -577,14 +578,24 @@ def plot_roc_edge_frac(fpr_ss_sb, tpr_ss_sb, fpr_bb_sb, tpr_bb_sb, roc_auc_ss_sb
                 marker='x', s=50, label="linking lengths",color="red")
     plt.scatter(np.array(fpr_bb_sb)[bb_sb_ind], np.array(tpr_bb_sb)[bb_sb_ind],
                 marker='x', s=50, color="red")
-    plt.legend(loc="lower right", fontsize="11")
+    print(leg1, " markers at:", np.array(fpr_ss_sb)[ss_sb_ind], np.array(tpr_ss_sb)[ss_sb_ind])
+    print(leg2, " markers at:", np.array(fpr_bb_sb)[bb_sb_ind], np.array(tpr_bb_sb)[bb_sb_ind])
+    print(type(np.array(fpr_ss_sb)[ss_sb_ind]))
+    for (x,y) in zip(np.array(fpr_ss_sb)[ss_sb_ind].tolist(), np.array(tpr_ss_sb)[ss_sb_ind].tolist()):
+        print(x,y)
+        ax.annotate(f'({x:.2f}, {y:.2f})', (x+0.01, y+0.01), fontsize="12")
+    for (x,y) in zip(np.array(fpr_bb_sb)[bb_sb_ind].tolist(), np.array(tpr_bb_sb)[bb_sb_ind].tolist()):
+        ax.annotate(f'({x:.2f}, {y:.2f})', (x+0.01, y+0.01), fontsize="12")
+    legpos = "lower right"
+    if 'bkg-bkg' in xlab: legpos = "upper left"
+    plt.legend(loc=legpos, fontsize="12")
     plt.ylim(0.,1.)
     plt.xlim(0.,1.)
-    plt.xlabel("sig-bkg efficiency")
-    plt.ylabel("Same class efficiency")
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
     plot_dir = plot_path+"ROC/"
     misc.create_dirs(plot_dir)
-    save_fig(fig, plot_dir + "/" + variable + "_" + distance + "_ROC")
+    save_fig(fig, plot_dir + "/" + variable + "_" + distance + "_ROC_sameclass")
 
     return
 

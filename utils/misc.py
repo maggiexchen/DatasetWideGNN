@@ -132,8 +132,16 @@ def get_kinematics(variable, dim=None):
         kinematics = ["mH1","mH2","mH3","mHHH",
                       "sphere3dv2b","sphere3dv2btrans",
                       "aplan3dv2b","theta3dv2b"]
-    elif variable == "LQ_HighLevel":
-        kinematics = ['met', 'sumptllbb', 'mindPhiMETl', 'mtl1', 'mtl2']
+
+    elif variable == "LQ_bestMLvars":
+        kinematics = ['met', 'metsigHt', 'sumptllbb', 'mt2', 'mtl1', 'mindPhiMETl']
+    # feel like 2 vars is too few but this seems to perform the best so far...
+    elif variable == "LQ_HL_bestEuc":
+        kinematics = ['mindPhiMETl', 'met']
+    # best cosine set so far
+    elif variable == "LQ_HL_bestCos":
+        kinematics = ['met', 'metsigHt', 'sumptllbb', 'mt2', 'mtl1', 'mtl2', 'mindPhiMETl']
+
     elif variable == "LQ_LowLevel":
         kinematics = ['bjet1pt', 'bjet2pt', 'lep1pt', 'lep2pt',
                       'bjet1eta', 'bjet2eta', 'lep1eta', 'lep2eta',
@@ -163,15 +171,13 @@ def get_kinematics(variable, dim=None):
                       'dPhil1MET', 'dPhil2MET', 'dPhib1MET', 'dPhib2MET',
                       'dRl1b1', 'dRl1b2', 'dRl2b1', 'dRl2b2',
                       'sumdRlb', 'mindRlb', 'invsumdRlb', 'invmindRlb']
-    # best euc input features apparently:
-    elif variable == "LQ_bestMLvars":
-        kinematics = ['met', 'metsigHt', 'sumptllbb', 'mt2', 'mtl1', 'mindPhiMETl']
-    # feel like 2 vars is too few but this seems to perform the best so far...
-    elif variable == "LQ_HL_bestEuc":
-        kinematics = ['mindPhiMETl', 'met']
-    # best cosine set so far
-    elif variable == "LQ_HL_bestCos":
-        kinematics = ['met', 'metsigHt', 'sumptllbb', 'mt2', 'mtl1', 'mtl2', 'mindPhiMETl']
+
+    # Original, less optimised
+    elif variable == "LQ_HighLevel":
+        kinematics = ['met', 'sumptllbb', 'mindPhiMETl', 'mtl1', 'mtl2']
+    # 'All' High level vars where for super correlated pairs of variables one is removed (e.g. don't need mindPhiMETl and avedPhiMETl)
+    elif variable == "LQ_AllH":
+        kinematics = ['met', 'metsigHt', 'sumptllbb', 'mt2', 'mtl1', 'mtl2', 'mindPhiMETl', 'invsumdRlb', 'mindPhiMETb']
 
     elif variable == "embedding":
         if dim is None:
