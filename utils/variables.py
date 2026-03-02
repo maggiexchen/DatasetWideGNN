@@ -78,7 +78,7 @@ var_dict = {
         "dtype": "float32",
      },
     'metsigHt': {
-        "label": r"$p_{T}^{miss}/H_{T}~[\sqrt{GeV}]$",
+        "label": r"$p_{T}^{miss}/\sqrt{H_{T}}~[\sqrt{GeV}]$",
         "dtype": "float32",
      },
     'sumptllbb': {

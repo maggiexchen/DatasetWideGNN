@@ -1,4 +1,4 @@
-kinematic_variable: "LQ_LowLevel"
+distance_variable: "LQ_LowLevel"
 embedding_variable: "embedding"
 distance: "euclidean"
 flip: True

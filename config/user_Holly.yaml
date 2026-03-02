@@ -11,7 +11,7 @@ cuts:
     threshold: 200
     operation: ">"
 feature_dim:
-run_with_cuda: False
+run_with_cuda: True
 n_folds: 3
 
 # input paths

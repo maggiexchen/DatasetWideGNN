@@ -99,24 +99,24 @@ if ml.linking_length is not None:
     # Manual linking length provided
     logging.info("Using manual linking length from config: %s", str(ml.linking_length))
     linking_length = ml.linking_length
-    adj_path = user.adj_path + "/" + str(variable) + "_" + str(ml.distance) + "_" + "linking_length_" + \
+    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + variable + "_" + "linking_length_" + \
         str(ml.linking_length).replace(".","p") + "/"
 
 elif ml.edge_frac is not None:
     # Load linking length from edge_frac dictionary
     logging.info("Using edge_frac to define linking length: %s", str(ml.edge_frac))
-    if ml.edge_frac not in [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]:
+    if ml.edge_frac not in [0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3]:
         raise ValueError("""Not given a supported edge fraction, must be one of:
-                         (0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5)""")
+                         (0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3)""")
     
-    ll_path = user.ll_path + "edge_frac_" + str(variable) + "_" + str(ml.distance) + user.cutstring + "_linking_length.json"
+    ll_path = user.ll_path + "edge_frac_"
     logging.info("Loading linking length from: %s", ll_path)
     with open(ll_path, 'r', encoding="utf-8") as lfile:
         length_dict = json.load(lfile)
         linking_length = length_dict["length"][length_dict["edge_frac"].index(ml.edge_frac)]
     logging.info("Linking length = %s", str(linking_length))
     
-    adj_path = user.adj_path + "/" + str(variable) + "_" + str(ml.distance) + "_" + "edge_frac_" + \
+    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + variable + "_" + "edge_frac_" + \
         str(ml.edge_frac).replace(".","p") + "/"
 
 else:  # ml.targettarget_eff is not None
@@ -126,7 +126,7 @@ else:  # ml.targettarget_eff is not None
         raise ValueError("""Not given a supported target efficiency, must be one of:
                          (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)""")
     
-    ll_path = user.ll_path + "targettarget_eff_" + str(variable) + "_" + str(ml.distance) + user.cutstring + "_linking_length.json"
+    ll_path = user.ll_path + "targettarget_eff_"
     logging.info("Loading linking length from: %s", ll_path)
     with open(ll_path, 'r', encoding="utf-8") as lfile:
         length_dict = json.load(lfile)
@@ -139,8 +139,10 @@ else:  # ml.targettarget_eff is not None
             raise KeyError("Expected 'targettarget_eff' or 'bkgbkg_eff' key in linking length file")
     logging.info("Linking length = %s", str(linking_length))
     
-    adj_path = user.adj_path + "/" + str(variable) + "_" + str(ml.distance) + "_" + "targettarget_eff_" + \
+    adj_path = user.adj_path + "/" + str(ml.distance) + "_" + variable + "_" + "targettarget_eff_" + \
         str(ml.targettarget_eff).replace(".","p") + "/"
+
+ll_path = ll_path + variable + "_" + ml.distance + user.cutstring + "_linking_length.json"
 
 misc.create_dirs(adj_path)
 

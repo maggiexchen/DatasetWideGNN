@@ -3,7 +3,7 @@ echo "ml config " $1
 echo "userconfig " $2
 
 # change to your own area to run from:
-cd /home/pacey/GNN/new_merge/hhhgraph/
+cd /home/pacey/GNN/master/hhhgraph/
 
 source setup/setup_conda_env_Holly.sh
 
