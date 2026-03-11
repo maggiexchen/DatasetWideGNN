@@ -57,7 +57,7 @@ class MLConfig(BaseModel):
             raise ValueError("Need to specify a type of ML variable as input features for the model in the ML config")
 
         if data["embedding_variable"] is None:
-            data["embedding_variable"] = data["ml_variable"]
+            data["embedding_variable"] = data["distance_variable"]
 
         do_gnn = len(data.get("hidden_sizes_gcn", [])) > 0
 
