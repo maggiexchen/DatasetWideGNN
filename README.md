@@ -1,4 +1,4 @@
-# HHHGraph Land
+# Dataset-wide Graph Neural Network
 This repo generates the files, distances and adjacency needed for GNN training for HHH signal vs. background discrimination.
 
 TODO: info about checking out wiht submodule for the bespoke pyg version.
